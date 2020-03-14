@@ -719,7 +719,7 @@ namespace WalletWasabi.Services
 				},
 				allowedInputs,
 				SelectLockTimeForTransaction,
-				Synchronizer.WasabiClient.TorClient, 
+				Synchronizer.WasabiClient.TorClient,
 				bip79);
 		}
 
