@@ -72,6 +72,7 @@ namespace WalletWasabi.Gui.Controls.WalletExplorer
 		private bool _isCustomFee;
 		private bool _isCustomChangeAddress;
 		private string _bip79;
+		private ObservableAsPropertyHelper<bool> _bip79UrlIsVisible;
 
 		private const string WaitingForHardwareWalletButtonTextString = "Waiting for Hardware Wallet...";
 
@@ -221,6 +222,10 @@ namespace WalletWasabi.Gui.Controls.WalletExplorer
 						LabelToolTip = "Who can link this transaction to you? E.g.: \"Max, BitPay\"";
 					}
 				});
+
+			_bip79UrlIsVisible = this.WhenAnyValue(x => x.Bip79Url)
+				.Select(x => !string.IsNullOrWhiteSpace(x))
+				.ToProperty(this, x => x.Bip79UrlIsVisible, scheduler: RxApp.MainThreadScheduler);
 
 			FeeRateCommand = ReactiveCommand.Create(ChangeFeeRateDisplay, outputScheduler: RxApp.MainThreadScheduler);
 
@@ -788,6 +793,7 @@ namespace WalletWasabi.Gui.Controls.WalletExplorer
 		}
 
 		public decimal UsdExchangeRate => _usdExchangeRate?.Value ?? 0m;
+		public bool Bip79UrlIsVisible => _bip79UrlIsVisible?.Value ?? false;
 
 		public Money AllSelectedAmount
 		{
