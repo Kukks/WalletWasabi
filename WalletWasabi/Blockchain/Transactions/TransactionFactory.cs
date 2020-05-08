@@ -40,7 +40,7 @@ namespace WalletWasabi.Blockchain.Transactions
 		/// <exception cref="ArgumentException"></exception>
 		/// <exception cref="ArgumentNullException"></exception>
 		/// <exception cref="ArgumentOutOfRangeException"></exception>
-		public BuildTransactionResult BuildTransaction(
+		public Task<BuildTransactionResult> BuildTransaction(
 			PaymentIntent payments,
 			FeeRate feeRate,
 			IEnumerable<OutPoint> allowedInputs = null,
@@ -51,7 +51,7 @@ namespace WalletWasabi.Blockchain.Transactions
 		/// <exception cref="ArgumentException"></exception>
 		/// <exception cref="ArgumentNullException"></exception>
 		/// <exception cref="ArgumentOutOfRangeException"></exception>
-		public BuildTransactionResult BuildTransaction(PaymentIntent payments,
+		public async Task<BuildTransactionResult> BuildTransaction(PaymentIntent payments,
 			Func<FeeRate> feeRateFetcher,
 			IEnumerable<OutPoint> allowedInputs = null,
 			Func<LockTime> lockTimeSelector = null,
@@ -220,7 +220,7 @@ namespace WalletWasabi.Blockchain.Transactions
 			Transaction tx = null;
 			psbtSigner ??= new DefaultPSBTSigner(Password, spentCoins, builder, lockTimeSelector);
 			UpdatePSBTInfo(psbt, spentCoins, changeHdPubKey);
-			var signedPSBT = psbtSigner.TrySign(psbt, KeyManager, CancellationToken.None).GetAwaiter().GetResult();
+			var signedPSBT = await psbtSigner.TrySign(psbt, KeyManager, CancellationToken.None);
 			if (signedPSBT is null)
 			{
 				tx = psbt.GetGlobalTransaction();
@@ -232,8 +232,8 @@ namespace WalletWasabi.Blockchain.Transactions
 				// Try to pay using payjoin if available
 				if (payjoinClient is {})
 				{
-					var signedPayjoinPsbt = TryNegotiatePayjoin(payjoinClient, psbt, psbtSigner, CancellationToken.None)
-						.GetAwaiter().GetResult();
+					var signedPayjoinPsbt =
+						await TryNegotiatePayjoin(payjoinClient, psbt, psbtSigner, CancellationToken.None);
 					if (signedPayjoinPsbt != null)
 					{
 						//TODO: Schedule signedPsbt to be broadcast in 2 mins

@@ -2,6 +2,7 @@ using NBitcoin;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using WalletWasabi.Blockchain.Analysis.Clustering;
 using WalletWasabi.Blockchain.Keys;
 using WalletWasabi.Blockchain.TransactionBuilding;
@@ -17,7 +18,7 @@ namespace WalletWasabi.Tests.UnitTests.Transactions
 	public class TransactionFactoryTests
 	{
 		[Fact]
-		public void InsufficientBalance()
+		public async Task InsufficientBalance()
 		{
 			var transactionFactory = CreateTransactionFactory(new[]
 			{
@@ -29,14 +30,14 @@ namespace WalletWasabi.Tests.UnitTests.Transactions
 			var amount = Money.Coins(100m);
 			var payment = new PaymentIntent(new Key().ScriptPubKey, amount);
 
-			var ex = Assert.Throws<InsufficientBalanceException>(() => transactionFactory.BuildTransaction(payment, new FeeRate(2m)));
+			var ex = await Assert.ThrowsAsync<InsufficientBalanceException>(async () => await transactionFactory.BuildTransaction(payment, new FeeRate(2m)));
 
 			Assert.Equal(ex.Minimum, amount);
 			Assert.Equal(ex.Actual, transactionFactory.Coins.Select(x => x.Amount).Sum());
 		}
 
 		[Fact]
-		public void TooMuchFeePaid()
+		public async Task TooMuchFeePaid()
 		{
 			var transactionFactory = CreateTransactionFactory(new[]
 			{
@@ -45,17 +46,17 @@ namespace WalletWasabi.Tests.UnitTests.Transactions
 
 			var payment = new PaymentIntent(new Key().ScriptPubKey, MoneyRequest.CreateAllRemaining(subtractFee: true));
 
-			var result = transactionFactory.BuildTransaction(payment, new FeeRate(44.25m));
+			var result = await transactionFactory.BuildTransaction(payment, new FeeRate(44.25m));
 			var output = Assert.Single(result.OuterWalletOutputs);
 			Assert.Equal(result.Fee, output.Amount); // edge case! paid amount equal to paid fee
 
 			// The transaction cost is higher than the intended payment.
-			var ex = Assert.Throws<InvalidOperationException>(() => transactionFactory.BuildTransaction(payment, new FeeRate(50m)));
+			var ex = await Assert.ThrowsAsync<InvalidOperationException>(async () => await transactionFactory.BuildTransaction(payment, new FeeRate(50m)));
 			Assert.StartsWith("The transaction fee is more than twice the sent amount", ex.Message);
 		}
 
 		[Fact]
-		public void SelectMostPrivateIndependentlyOfCluster()
+		public async Task SelectMostPrivateIndependentlyOfCluster()
 		{
 			var transactionFactory = CreateTransactionFactory(new[]
 			{
@@ -67,7 +68,7 @@ namespace WalletWasabi.Tests.UnitTests.Transactions
 			var destination = new Key().ScriptPubKey;
 			var payment = new PaymentIntent(destination, Money.Coins(0.07m), label: "Sophie");
 			var feeRate = new FeeRate(2m);
-			var result = transactionFactory.BuildTransaction(payment, feeRate);
+			var result = await transactionFactory.BuildTransaction(payment, feeRate);
 
 			Assert.True(result.Signed);
 			var spentCoin = Assert.Single(result.SpentCoins);
@@ -83,7 +84,7 @@ namespace WalletWasabi.Tests.UnitTests.Transactions
 		}
 
 		[Fact]
-		public void SelectMostPrivateCoin()
+		public async Task SelectMostPrivateCoin()
 		{
 			var transactionFactory = CreateTransactionFactory(new[]
 			{
@@ -95,7 +96,7 @@ namespace WalletWasabi.Tests.UnitTests.Transactions
 			var destination = new Key().ScriptPubKey;
 			var payment = new PaymentIntent(destination, Money.Coins(0.07m), label: "Sophie");
 			var feeRate = new FeeRate(2m);
-			var result = transactionFactory.BuildTransaction(payment, feeRate);
+			var result = await transactionFactory.BuildTransaction(payment, feeRate);
 
 			Assert.True(result.Signed);
 			var spentCoin = Assert.Single(result.SpentCoins);
@@ -111,7 +112,7 @@ namespace WalletWasabi.Tests.UnitTests.Transactions
 		}
 
 		[Fact]
-		public void SelectMostPrivateCoins()
+		public async Task SelectMostPrivateCoins()
 		{
 			var transactionFactory = CreateTransactionFactory(new[]
 			{
@@ -125,7 +126,7 @@ namespace WalletWasabi.Tests.UnitTests.Transactions
 			// It has to select the most private coins regardless of the amounts
 			var payment = new PaymentIntent(new Key().ScriptPubKey, Money.Coins(0.17m));
 			var feeRate = new FeeRate(2m);
-			var result = transactionFactory.BuildTransaction(payment, feeRate);
+			var result = await transactionFactory.BuildTransaction(payment, feeRate);
 
 			Assert.True(result.Signed);
 			Assert.Equal(2, result.SpentCoins.Count());
@@ -142,7 +143,7 @@ namespace WalletWasabi.Tests.UnitTests.Transactions
 		}
 
 		[Fact]
-		public void SelectSameScriptPubKeyCoins()
+		public async Task SelectSameScriptPubKeyCoins()
 		{
 			var transactionFactory = CreateTransactionFactory(new[]
 			{
@@ -155,7 +156,7 @@ namespace WalletWasabi.Tests.UnitTests.Transactions
 			// Selecting 0.08 + 0.04 should be enough but it has to select 0.02 too because it is the same address
 			var payment = new PaymentIntent(new Key().ScriptPubKey, Money.Coins(0.1m), label: "Sophie");
 			var feeRate = new FeeRate(2m);
-			var result = transactionFactory.BuildTransaction(payment, feeRate);
+			var result = await transactionFactory.BuildTransaction(payment, feeRate);
 
 			Assert.True(result.Signed);
 			Assert.True(result.SpendsUnconfirmed);
@@ -172,7 +173,7 @@ namespace WalletWasabi.Tests.UnitTests.Transactions
 		}
 
 		[Fact]
-		public void SelectSameClusterCoins()
+		public async Task SelectSameClusterCoins()
 		{
 			var (password, keyManager) = DefaultKeyManager();
 
@@ -216,7 +217,7 @@ namespace WalletWasabi.Tests.UnitTests.Transactions
 			// Two 0.9btc coins are enough
 			var payment = new PaymentIntent(new Key().ScriptPubKey, Money.Coins(1.75m), label: "Sophie");
 			var feeRate = new FeeRate(2m);
-			var result = transactionFactory.BuildTransaction(payment, feeRate);
+			var result = await transactionFactory.BuildTransaction(payment, feeRate);
 
 			Assert.Equal(2, result.SpentCoins.Count());
 			Assert.All(result.SpentCoins, c => Assert.Equal(c.Clusters, cluster2));
@@ -226,7 +227,7 @@ namespace WalletWasabi.Tests.UnitTests.Transactions
 			// Three 0.9btc coins are enough
 			payment = new PaymentIntent(new Key().ScriptPubKey, Money.Coins(1.85m), label: "Sophie");
 			feeRate = new FeeRate(2m);
-			result = transactionFactory.BuildTransaction(payment, feeRate);
+			result = await transactionFactory.BuildTransaction(payment, feeRate);
 
 			Assert.Equal(3, result.SpentCoins.Count());
 			Assert.All(result.SpentCoins, c => Assert.Equal(c.Clusters, cluster2));
@@ -238,7 +239,7 @@ namespace WalletWasabi.Tests.UnitTests.Transactions
 			// That's why it has to use the coins in the cluster number 1
 			payment = new PaymentIntent(new Key().ScriptPubKey, Money.Coins(3.5m), label: "Sophie");
 			feeRate = new FeeRate(2m);
-			result = transactionFactory.BuildTransaction(payment, feeRate);
+			result = await transactionFactory.BuildTransaction(payment, feeRate);
 
 			Assert.Equal(4, result.SpentCoins.Count());
 			Assert.All(result.SpentCoins, c => Assert.Equal(c.Clusters, cluster1));
@@ -251,13 +252,13 @@ namespace WalletWasabi.Tests.UnitTests.Transactions
 			// That's why it has to use the coins from both the clusters
 			payment = new PaymentIntent(new Key().ScriptPubKey, Money.Coins(7.4m), label: "Sophie");
 			feeRate = new FeeRate(2m);
-			result = transactionFactory.BuildTransaction(payment, feeRate);
+			result = await transactionFactory.BuildTransaction(payment, feeRate);
 
 			Assert.Equal(9, result.SpentCoins.Count());
 		}
 
 		[Fact]
-		public void CustomChangeScript()
+		public async Task CustomChangeScript()
 		{
 			var transactionFactory = CreateTransactionFactory(new[]
 			{
@@ -272,7 +273,7 @@ namespace WalletWasabi.Tests.UnitTests.Transactions
 				new DestinationRequest(changeDestination, MoneyRequest.CreateChange(subtractFee: true))
 			});
 			var feeRate = new FeeRate(2m);
-			var result = transactionFactory.BuildTransaction(payment, feeRate);
+			var result = await transactionFactory.BuildTransaction(payment, feeRate);
 
 			Assert.True(result.Signed);
 			Assert.Single(result.SpentCoins);
@@ -287,7 +288,7 @@ namespace WalletWasabi.Tests.UnitTests.Transactions
 		}
 
 		[Fact]
-		public void SubtractFeeFromSpecificOutput()
+		public async Task SubtractFeeFromSpecificOutput()
 		{
 			var transactionFactory = CreateTransactionFactory(new[]
 			{
@@ -304,7 +305,7 @@ namespace WalletWasabi.Tests.UnitTests.Transactions
 				new DestinationRequest(destination3, Money.Coins(0.3m))
 			});
 			var feeRate = new FeeRate(2m);
-			var result = transactionFactory.BuildTransaction(payment, feeRate);
+			var result = await transactionFactory.BuildTransaction(payment, feeRate);
 
 			Assert.True(result.Signed);
 			var spentCoin = Assert.Single(result.SpentCoins);
@@ -321,7 +322,7 @@ namespace WalletWasabi.Tests.UnitTests.Transactions
 		}
 
 		[Fact]
-		public void SubtractFeeFromTooSmallOutput()
+		public async Task SubtractFeeFromTooSmallOutput()
 		{
 			var transactionFactory = CreateTransactionFactory(new[]
 			{
@@ -338,13 +339,13 @@ namespace WalletWasabi.Tests.UnitTests.Transactions
 				new DestinationRequest(destination3, Money.Coins(0.3m))
 			});
 			var feeRate = new FeeRate(20m);
-			var ex = Assert.Throws<NotEnoughFundsException>(() => transactionFactory.BuildTransaction(payment, feeRate));
+			var ex = await Assert.ThrowsAsync<NotEnoughFundsException>(async () => await transactionFactory.BuildTransaction(payment, feeRate));
 
 			Assert.Equal(Money.Satoshis(3240), ex.Missing);
 		}
 
 		[Fact]
-		public void MultiplePaymentsToSameAddress()
+		public async Task MultiplePaymentsToSameAddress()
 		{
 			var transactionFactory = CreateTransactionFactory(new[]
 			{
@@ -359,7 +360,7 @@ namespace WalletWasabi.Tests.UnitTests.Transactions
 				new DestinationRequest(destination, Money.Coins(0.3m))
 			});
 			var feeRate = new FeeRate(2m);
-			var result = transactionFactory.BuildTransaction(payment, feeRate);
+			var result = await transactionFactory.BuildTransaction(payment, feeRate);
 
 			Assert.True(result.Signed);
 			var spentCoin = Assert.Single(result.SpentCoins);
@@ -377,7 +378,7 @@ namespace WalletWasabi.Tests.UnitTests.Transactions
 		}
 
 		[Fact]
-		public void SendAbsolutelyAllCoins()
+		public async Task SendAbsolutelyAllCoins()
 		{
 			var transactionFactory = CreateTransactionFactory(new[]
 			{
@@ -393,7 +394,7 @@ namespace WalletWasabi.Tests.UnitTests.Transactions
 				new DestinationRequest(destination, MoneyRequest.CreateAllRemaining(subtractFee: true))
 			});
 			var feeRate = new FeeRate(2m);
-			var result = transactionFactory.BuildTransaction(payment, feeRate);
+			var result = await transactionFactory.BuildTransaction(payment, feeRate);
 
 			Assert.True(result.Signed);
 			Assert.Equal(Money.Coins(1.4m), result.SpentCoins.Select(x => x.Amount).Sum());
@@ -403,7 +404,7 @@ namespace WalletWasabi.Tests.UnitTests.Transactions
 		}
 
 		[Fact]
-		public void SpendOnlyAllowedCoins()
+		public async Task SpendOnlyAllowedCoins()
 		{
 			var transactionFactory = CreateTransactionFactory(new[]
 			{
@@ -422,7 +423,7 @@ namespace WalletWasabi.Tests.UnitTests.Transactions
 				coins.Single(x => x.Label == "Maria"),
 				coins.Single(x => x.Label == "Suyin")
 			}.ToArray();
-			var result = transactionFactory.BuildTransaction(payment, feeRate, allowedCoins.Select(x => x.OutPoint));
+			var result = await transactionFactory.BuildTransaction(payment, feeRate, allowedCoins.Select(x => x.OutPoint));
 
 			Assert.True(result.Signed);
 			Assert.Equal(Money.Coins(0.12m), result.SpentCoins.Select(x => x.Amount).Sum());
@@ -432,7 +433,7 @@ namespace WalletWasabi.Tests.UnitTests.Transactions
 		}
 
 		[Fact]
-		public void SpendWholeAllowedCoins()
+		public async Task SpendWholeAllowedCoins()
 		{
 			var transactionFactory = CreateTransactionFactory(new[]
 			{
@@ -452,7 +453,7 @@ namespace WalletWasabi.Tests.UnitTests.Transactions
 				coins.Single(x => x.Label == "Maria"),
 				coins.Single(x => x.Label == "Suyin")
 			}.ToArray();
-			var result = transactionFactory.BuildTransaction(payment, feeRate, allowedCoins.Select(x => x.OutPoint));
+			var result = await transactionFactory.BuildTransaction(payment, feeRate, allowedCoins.Select(x => x.OutPoint));
 
 			Assert.True(result.Signed);
 			Assert.Equal(Money.Coins(0.13m), result.SpentCoins.Select(x => x.Amount).Sum());
@@ -468,7 +469,7 @@ namespace WalletWasabi.Tests.UnitTests.Transactions
 		}
 
 		[Fact]
-		public void InsufficientAllowedCoins()
+		public async Task InsufficientAllowedCoins()
 		{
 			var transactionFactory = CreateTransactionFactory(new[]
 			{
@@ -484,15 +485,15 @@ namespace WalletWasabi.Tests.UnitTests.Transactions
 			var amount = Money.Coins(0.5m); // it is not enough
 			var payment = new PaymentIntent(new Key().ScriptPubKey, amount);
 
-			var ex = Assert.Throws<InsufficientBalanceException>(() =>
-				transactionFactory.BuildTransaction(payment, new FeeRate(2m), allowedCoins.Select(x => x.OutPoint)));
+			var ex = await Assert.ThrowsAsync<InsufficientBalanceException>(async () =>
+				await transactionFactory.BuildTransaction(payment, new FeeRate(2m), allowedCoins.Select(x => x.OutPoint)));
 
 			Assert.Equal(ex.Minimum, amount);
 			Assert.Equal(ex.Actual, allowedCoins[0].Amount);
 		}
 
 		[Fact]
-		public void SpendWholeCoinsEvenWhenNotAllowed()
+		public async Task SpendWholeCoinsEvenWhenNotAllowed()
 		{
 			var transactionFactory = CreateTransactionFactory(new[]
 			{
@@ -514,7 +515,7 @@ namespace WalletWasabi.Tests.UnitTests.Transactions
 				coins.Single(x => x.Amount == Money.Coins(0.08m)).OutPoint,
 				coins.Single(x => x.Amount == Money.Coins(0.02m)).OutPoint
 			}.ToArray();
-			var result = transactionFactory.BuildTransaction(payment, feeRate, allowedInputs);
+			var result = await transactionFactory.BuildTransaction(payment, feeRate, allowedInputs);
 
 			Assert.True(result.Signed);
 			Assert.Equal(Money.Coins(0.14m), result.SpentCoins.Select(x => x.Amount).Sum());
@@ -525,7 +526,7 @@ namespace WalletWasabi.Tests.UnitTests.Transactions
 		}
 
 		[Fact]
-		public void DoNotSignWatchOnly()
+		public async Task DoNotSignWatchOnly()
 		{
 			var transactionFactory = CreateTransactionFactory(new[]
 			{
@@ -534,7 +535,7 @@ namespace WalletWasabi.Tests.UnitTests.Transactions
 
 			var payment = new PaymentIntent(new Key().ScriptPubKey, MoneyRequest.CreateAllRemaining(subtractFee: true));
 
-			var result = transactionFactory.BuildTransaction(payment, new FeeRate(44.25m));
+			var result = await transactionFactory.BuildTransaction(payment, new FeeRate(44.25m));
 			Assert.Single(result.OuterWalletOutputs);
 			Assert.False(result.Signed);
 		}

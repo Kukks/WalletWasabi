@@ -214,7 +214,7 @@ namespace WalletWasabi.Wallets
 		/// <exception cref="ArgumentException"></exception>
 		/// <exception cref="ArgumentNullException"></exception>
 		/// <exception cref="ArgumentOutOfRangeException"></exception>
-		public BuildTransactionResult BuildTransaction(
+		public async Task<BuildTransactionResult> BuildTransaction(
 			string password,
 			PaymentIntent payments,
 			FeeStrategy feeStrategy,
@@ -224,7 +224,7 @@ namespace WalletWasabi.Wallets
 			IPsbtSigner psbtSigner = null)
 		{
 			var builder = new TransactionFactory(Network, KeyManager, Coins, password, allowUnconfirmed);
-			return builder.BuildTransaction(
+			return await builder.BuildTransaction(
 				payments,
 				() =>
 				{

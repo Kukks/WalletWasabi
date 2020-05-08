@@ -106,7 +106,7 @@ namespace WalletWasabi.Tests.RegressionTests
 				}
 
 				var scp = new Key().ScriptPubKey;
-				var res2 = wallet.BuildTransaction(password, new PaymentIntent(scp, Money.Coins(0.05m), label: "foo"), FeeStrategy.CreateFromConfirmationTarget(5), allowUnconfirmed: false);
+				var res2 = await wallet.BuildTransaction(password, new PaymentIntent(scp, Money.Coins(0.05m), label: "foo"), FeeStrategy.CreateFromConfirmationTarget(5), allowUnconfirmed: false);
 
 				Assert.NotNull(res2.Transaction);
 				Assert.Single(res2.OuterWalletOutputs);
@@ -128,7 +128,7 @@ namespace WalletWasabi.Tests.RegressionTests
 
 				Script receive = keyManager.GetNextReceiveKey("Basic", out _).P2wpkhScript;
 				Money amountToSend = wallet.Coins.Where(x => !x.Unavailable).Sum(x => x.Amount) / 2;
-				var res = wallet.BuildTransaction(password, new PaymentIntent(receive, amountToSend, label: "foo"), FeeStrategy.SevenDaysConfirmationTargetStrategy, allowUnconfirmed: true);
+				var res = await wallet.BuildTransaction(password, new PaymentIntent(receive, amountToSend, label: "foo"), FeeStrategy.SevenDaysConfirmationTargetStrategy, allowUnconfirmed: true);
 
 				foreach (SmartCoin coin in res.SpentCoins)
 				{
@@ -176,7 +176,7 @@ namespace WalletWasabi.Tests.RegressionTests
 
 				receive = keyManager.GetNextReceiveKey("SubtractFeeFromAmount", out _).P2wpkhScript;
 				amountToSend = wallet.Coins.Where(x => !x.Unavailable).Sum(x => x.Amount) / 3;
-				res = wallet.BuildTransaction(password, new PaymentIntent(receive, amountToSend, subtractFee: true, label: "foo"), FeeStrategy.SevenDaysConfirmationTargetStrategy, allowUnconfirmed: true);
+				res = await wallet.BuildTransaction(password, new PaymentIntent(receive, amountToSend, subtractFee: true, label: "foo"), FeeStrategy.SevenDaysConfirmationTargetStrategy, allowUnconfirmed: true);
 
 				Assert.Equal(2, res.InnerWalletOutputs.Count());
 				Assert.Empty(res.OuterWalletOutputs);
@@ -209,7 +209,7 @@ namespace WalletWasabi.Tests.RegressionTests
 
 				#region LowFee
 
-				res = wallet.BuildTransaction(password, new PaymentIntent(receive, amountToSend, label: "foo"), FeeStrategy.SevenDaysConfirmationTargetStrategy, allowUnconfirmed: true);
+				res = await wallet.BuildTransaction(password, new PaymentIntent(receive, amountToSend, label: "foo"), FeeStrategy.SevenDaysConfirmationTargetStrategy, allowUnconfirmed: true);
 
 				Assert.Equal(2, res.InnerWalletOutputs.Count());
 				Assert.Empty(res.OuterWalletOutputs);
@@ -242,7 +242,7 @@ namespace WalletWasabi.Tests.RegressionTests
 
 				#region MediumFee
 
-				res = wallet.BuildTransaction(password, new PaymentIntent(receive, amountToSend, label: "foo"), FeeStrategy.OneDayConfirmationTargetStrategy, allowUnconfirmed: true);
+				res = await wallet.BuildTransaction(password, new PaymentIntent(receive, amountToSend, label: "foo"), FeeStrategy.OneDayConfirmationTargetStrategy, allowUnconfirmed: true);
 
 				Assert.Equal(2, res.InnerWalletOutputs.Count());
 				Assert.Empty(res.OuterWalletOutputs);
@@ -275,7 +275,7 @@ namespace WalletWasabi.Tests.RegressionTests
 
 				#region HighFee
 
-				res = wallet.BuildTransaction(password, new PaymentIntent(receive, amountToSend, label: "foo"), FeeStrategy.TwentyMinutesConfirmationTargetStrategy, allowUnconfirmed: true);
+				res = await wallet.BuildTransaction(password, new PaymentIntent(receive, amountToSend, label: "foo"), FeeStrategy.TwentyMinutesConfirmationTargetStrategy, allowUnconfirmed: true);
 
 				Assert.Equal(2, res.InnerWalletOutputs.Count());
 				Assert.Empty(res.OuterWalletOutputs);
@@ -315,7 +315,7 @@ namespace WalletWasabi.Tests.RegressionTests
 
 				receive = keyManager.GetNextReceiveKey("MaxAmount", out _).P2wpkhScript;
 
-				res = wallet.BuildTransaction(password, new PaymentIntent(receive, MoneyRequest.CreateAllRemaining(), "foo"), FeeStrategy.SevenDaysConfirmationTargetStrategy, allowUnconfirmed: true);
+				res = await wallet.BuildTransaction(password, new PaymentIntent(receive, MoneyRequest.CreateAllRemaining(), "foo"), FeeStrategy.SevenDaysConfirmationTargetStrategy, allowUnconfirmed: true);
 
 				Assert.Single(res.InnerWalletOutputs);
 				Assert.Empty(res.OuterWalletOutputs);
@@ -338,7 +338,7 @@ namespace WalletWasabi.Tests.RegressionTests
 
 				var inputCountBefore = res.SpentCoins.Count();
 
-				res = wallet.BuildTransaction(password, new PaymentIntent(receive, MoneyRequest.CreateAllRemaining(), "foo"), FeeStrategy.SevenDaysConfirmationTargetStrategy,
+				res = await wallet.BuildTransaction(password, new PaymentIntent(receive, MoneyRequest.CreateAllRemaining(), "foo"), FeeStrategy.SevenDaysConfirmationTargetStrategy,
 					allowUnconfirmed: true,
 					allowedInputs: wallet.Coins.Where(x => !x.Unavailable).Select(x => x.OutPoint).Take(1));
 
@@ -358,7 +358,7 @@ namespace WalletWasabi.Tests.RegressionTests
 
 				Assert.Single(res.Transaction.Transaction.Outputs);
 
-				res = wallet.BuildTransaction(password, new PaymentIntent(receive, MoneyRequest.CreateAllRemaining(), "foo"), FeeStrategy.SevenDaysConfirmationTargetStrategy,
+				res = await wallet.BuildTransaction(password, new PaymentIntent(receive, MoneyRequest.CreateAllRemaining(), "foo"), FeeStrategy.SevenDaysConfirmationTargetStrategy,
 					allowUnconfirmed: true,
 					allowedInputs: new[] { res.SpentCoins.Select(x => x.OutPoint).First() });
 
@@ -375,13 +375,13 @@ namespace WalletWasabi.Tests.RegressionTests
 				#region Labeling
 
 				Script receive2 = keyManager.GetNextReceiveKey("foo", out _).P2wpkhScript;
-				res = wallet.BuildTransaction(password, new PaymentIntent(receive2, MoneyRequest.CreateAllRemaining(), "my label"), FeeStrategy.SevenDaysConfirmationTargetStrategy, allowUnconfirmed: true);
+				res = await wallet.BuildTransaction(password, new PaymentIntent(receive2, MoneyRequest.CreateAllRemaining(), "my label"), FeeStrategy.SevenDaysConfirmationTargetStrategy, allowUnconfirmed: true);
 
 				Assert.Single(res.InnerWalletOutputs);
 				Assert.Equal("foo, my label", res.InnerWalletOutputs.Single().Label);
 
 				amountToSend = wallet.Coins.Where(x => !x.Unavailable).Sum(x => x.Amount) / 3;
-				res = wallet.BuildTransaction(
+				res = await wallet.BuildTransaction(
 					password,
 					new PaymentIntent(
 						new DestinationRequest(new Key(), amountToSend, label: "outgoing"),
@@ -430,7 +430,7 @@ namespace WalletWasabi.Tests.RegressionTests
 
 				// covers:
 				// disallow unconfirmed with allowed inputs
-				res = wallet.BuildTransaction(password, toSend, FeeStrategy.TwentyMinutesConfirmationTargetStrategy, false, allowedInputs: allowedInputs);
+				res = await wallet.BuildTransaction(password, toSend, FeeStrategy.TwentyMinutesConfirmationTargetStrategy, false, allowedInputs: allowedInputs);
 
 				activeOutput = res.InnerWalletOutputs.Single(x => x.ScriptPubKey == receive);
 				Assert.Single(res.InnerWalletOutputs);
@@ -462,7 +462,7 @@ namespace WalletWasabi.Tests.RegressionTests
 				// feePc > 1
 				var k1 = new Key();
 				var k2 = new Key();
-				res = wallet.BuildTransaction(
+				res = await wallet.BuildTransaction(
 					password,
 					new PaymentIntent(
 						new DestinationRequest(k1, MoneyRequest.CreateChange()),
@@ -476,7 +476,7 @@ namespace WalletWasabi.Tests.RegressionTests
 
 				#region FeePcHigh
 
-				res = wallet.BuildTransaction(
+				res = await wallet.BuildTransaction(
 					password,
 					new PaymentIntent(new Key(), Money.Coins(0.0003m), label: "outgoing"),
 					FeeStrategy.TwentyMinutesConfirmationTargetStrategy);
@@ -484,7 +484,7 @@ namespace WalletWasabi.Tests.RegressionTests
 				Assert.True(res.FeePercentOfSent > 1);
 
 				var newChangeK = keyManager.GenerateNewKey("foo", KeyState.Clean, isInternal: true);
-				res = wallet.BuildTransaction(
+				res = await wallet.BuildTransaction(
 					password,
 					new PaymentIntent(
 						new DestinationRequest(newChangeK.P2wpkhScript, MoneyRequest.CreateChange(), "boo"),
@@ -584,13 +584,13 @@ namespace WalletWasabi.Tests.RegressionTests
 					new DestinationRequest(key.P2wpkhScript, Money.Coins(0.01m)),
 					new DestinationRequest(new Key().ScriptPubKey, Money.Coins(0.01m)),
 					new DestinationRequest(new Key().ScriptPubKey, Money.Coins(0.01m)));
-				var tx1Res = wallet.BuildTransaction(password, operations, FeeStrategy.TwentyMinutesConfirmationTargetStrategy, allowUnconfirmed: true);
+				var tx1Res = await wallet.BuildTransaction(password, operations, FeeStrategy.TwentyMinutesConfirmationTargetStrategy, allowUnconfirmed: true);
 				Assert.Equal(2, tx1Res.InnerWalletOutputs.Count());
 				Assert.Equal(2, tx1Res.OuterWalletOutputs.Count());
 
 				// Spend the unconfirmed coin (send it to ourself)
 				operations = new PaymentIntent(key.PubKey.WitHash.ScriptPubKey, Money.Coins(0.5m));
-				tx1Res = wallet.BuildTransaction(password, operations, FeeStrategy.TwentyMinutesConfirmationTargetStrategy, allowUnconfirmed: true);
+				tx1Res = await wallet.BuildTransaction(password, operations, FeeStrategy.TwentyMinutesConfirmationTargetStrategy, allowUnconfirmed: true);
 				eventAwaiter = new EventAwaiter<ProcessedResult>(
 					h => wallet.TransactionProcessor.WalletRelevantTransactionProcessed += h,
 					h => wallet.TransactionProcessor.WalletRelevantTransactionProcessed -= h);
@@ -614,7 +614,7 @@ namespace WalletWasabi.Tests.RegressionTests
 
 				// Spend the unconfirmed and unspent coin (send it to ourself)
 				operations = new PaymentIntent(key.PubKey.WitHash.ScriptPubKey, Money.Coins(0.6m), subtractFee: true);
-				var tx2Res = wallet.BuildTransaction(password, operations, FeeStrategy.TwentyMinutesConfirmationTargetStrategy, allowUnconfirmed: true);
+				var tx2Res = await wallet.BuildTransaction(password, operations, FeeStrategy.TwentyMinutesConfirmationTargetStrategy, allowUnconfirmed: true);
 
 				eventAwaiter = new EventAwaiter<ProcessedResult>(
 								h => wallet.TransactionProcessor.WalletRelevantTransactionProcessed += h,
@@ -665,7 +665,7 @@ namespace WalletWasabi.Tests.RegressionTests
 				ICoinsView GetAllCoins() => wallet.TransactionProcessor.Coins.AsAllCoinsView();
 				var coinCount = GetAllCoins().Count();
 				var to = keyManager.GetNextReceiveKey("foo", out _);
-				var res = wallet.BuildTransaction(password, new PaymentIntent(to.P2wpkhScript, Money.Coins(0.2345m), label: "bar"), FeeStrategy.TwentyMinutesConfirmationTargetStrategy, allowUnconfirmed: true);
+				var res = await wallet.BuildTransaction(password, new PaymentIntent(to.P2wpkhScript, Money.Coins(0.2345m), label: "bar"), FeeStrategy.TwentyMinutesConfirmationTargetStrategy, allowUnconfirmed: true);
 				await broadcaster.SendTransactionAsync(res.Transaction);
 				Assert.Equal(coinCount + 2, GetAllCoins().Count());
 				Assert.Equal(2, GetAllCoins().Count(x => !x.Confirmed));
