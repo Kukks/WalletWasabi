@@ -79,7 +79,7 @@ namespace WalletWasabi.Backend.Controllers
 					InputRegistrationTimesout = round.InputRegistrationTimesout,
 					RegisteredPeerCount = round.CountAlices(syncLock: false),
 					RequiredPeerCount = round.AnonymitySet,
-					QueuedPeers = round.CountQueuedAlices(syncLock: false),
+					QueuedPeersCount = round.CountQueuedAlices(syncLock: false),
 					MaximumInputCountPerPeer = 7, // Constant for now. If we want to do something with it later, we'll put it to the config file.
 					RegistrationTimeout = (int)round.AliceRegistrationTimeout.TotalSeconds,
 					FeePerInputs = round.FeePerInputs,
