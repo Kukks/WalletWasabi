@@ -1356,11 +1356,8 @@ namespace WalletWasabi.CoinJoin.Coordinator.Rounds
 				}
 				foreach (var id in ids)
 				{
-					var alices = Alices.Where(x => x.UniqueId == id);
-					foreach (var alice in alices)
-					{
-						QueuedAlices.Add(alice);
-					}
+					var alice = Alices.Where(x => x.UniqueId == id).FirstOrDefault<Alice>();
+					QueuedAlices.Add(alice);
 				}
 			}
 		}
