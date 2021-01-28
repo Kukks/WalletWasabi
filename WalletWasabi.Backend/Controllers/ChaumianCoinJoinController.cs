@@ -308,8 +308,6 @@ namespace WalletWasabi.Backend.Controllers
 					foreach (Guid aliceToRemove in alicesToRemove)
 					{
 						round.RemoveAlicesBy(aliceToRemove);
-						// Remove any refrences of Alice if they are in queued list
-						round.DequeueAlices(aliceToRemove);
 					}
 
 					round.AddAlice(alice);
@@ -478,7 +476,6 @@ namespace WalletWasabi.Backend.Controllers
 				case RoundPhase.InputRegistration:
 					{
 						round.RemoveAlicesBy(uniqueIdGuid);
-						round.QueueAlices(uniqueIdGuid);
 						return NoContent();
 					}
 				default:
