@@ -1202,6 +1202,7 @@ namespace WalletWasabi.CoinJoin.Coordinator.Rounds
 					throw new InvalidOperationException("Adding Alice is only allowed in InputRegistration phase.");
 				}
 				Alices.Add(alice);
+				QueueAlices(alice.UniqueId);
 			}
 
 			StartAliceTimeout(alice.UniqueId);
@@ -1388,6 +1389,7 @@ namespace WalletWasabi.CoinJoin.Coordinator.Rounds
 				}
 				foreach (var id in ids)
 				{
+					QueuedAlices.RemoveAll(x => x.UniqueId == id);
 					numberOfRemovedAlices = Alices.RemoveAll(x => x.UniqueId == id);
 				}
 			}
