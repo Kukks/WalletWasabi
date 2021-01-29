@@ -64,6 +64,7 @@ namespace WalletWasabi.CoinJoin.Coordinator.Rounds
 				CoinJoin = null;
 
 				Alices = new List<Alice>();
+				QueuedAlices = new List<Alice>();
 				Bobs = new List<Bob>();
 
 				Logger.LogInfo($"New round ({RoundId}) is created.\n\t" +
@@ -119,8 +120,8 @@ namespace WalletWasabi.CoinJoin.Coordinator.Rounds
 		public Transaction CoinJoin { get; private set; }
 
 		private List<Alice> Alices { get; }
-		private List<Bob> Bobs { get; } // Do not make it a hashset or do not make Bob IEquitable!!!
 		private List<Alice> QueuedAlices { get; }
+		private List<Bob> Bobs { get; } // Do not make it a hashset or do not make Bob IEquitable!!!
 
 		private List<UnblindedSignature> RegisteredUnblindedSignatures { get; }
 		private object RegisteredUnblindedSignaturesLock { get; }
