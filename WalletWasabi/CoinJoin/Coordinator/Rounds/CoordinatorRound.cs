@@ -121,7 +121,6 @@ namespace WalletWasabi.CoinJoin.Coordinator.Rounds
 		private List<Alice> Alices { get; }
 		private List<Bob> Bobs { get; } // Do not make it a hashset or do not make Bob IEquitable!!!
 		private List<Alice> QueuedAlices { get; }
-		private int UnconfirmedPeersAmount { get; set; }
 
 		private List<UnblindedSignature> RegisteredUnblindedSignatures { get; }
 		private object RegisteredUnblindedSignaturesLock { get; }
@@ -951,7 +950,7 @@ namespace WalletWasabi.CoinJoin.Coordinator.Rounds
 					return QueuedAlices.Count;
 				}
 			}
-			return UnconfirmedPeersAmount;
+			return QueuedAlices.Count;
 		}
 
 		public bool AllAlices(AliceState state)
