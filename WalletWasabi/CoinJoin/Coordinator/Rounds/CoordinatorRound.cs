@@ -1202,7 +1202,7 @@ namespace WalletWasabi.CoinJoin.Coordinator.Rounds
 					throw new InvalidOperationException("Adding Alice is only allowed in InputRegistration phase.");
 				}
 				Alices.Add(alice);
-				QueueAlices(alice.UniqueId);
+				QueuedAlices.Add(alice);
 			}
 
 			StartAliceTimeout(alice.UniqueId);
@@ -1345,37 +1345,6 @@ namespace WalletWasabi.CoinJoin.Coordinator.Rounds
 			outputCount += Alices.Count;
 
 			return await RpcClient.TestMempoolAcceptAsync(coinsToTest, fakeOutputCount: outputCount, FeePerInputs, FeePerOutputs).ConfigureAwait(false);
-		}
-
-		public void QueueAlices(params Guid[] ids)
-		{
-			using (RoundSynchronizerLock.Lock())
-			{
-				if ((Phase != RoundPhase.InputRegistration && Phase != RoundPhase.ConnectionConfirmation) || Status != CoordinatorRoundStatus.Running)
-				{
-					throw new InvalidOperationException("Queuing Alice is only allowed in InputRegistration and ConnectionConfirmation phases.");
-				}
-				foreach (var id in ids)
-				{
-					var alice = Alices.Where(x => x.UniqueId == id).FirstOrDefault<Alice>();
-					QueuedAlices.Add(alice);
-				}
-			}
-		}
-
-		public void DequeueAlices(params Guid[] ids)
-		{
-			using (RoundSynchronizerLock.Lock())
-			{
-				if ((Phase != RoundPhase.InputRegistration && Phase != RoundPhase.ConnectionConfirmation) || Status != CoordinatorRoundStatus.Running)
-				{
-					throw new InvalidOperationException("Dequeuing Alice is only allowed in InputRegistration and ConnectionConfirmation phases.");
-				}
-				foreach (var id in ids)
-				{
-					QueuedAlices.RemoveAll(x => x.UniqueId == id);
-				}
-			}
 		}
 
 		public int RemoveAlicesBy(params Guid[] ids)
