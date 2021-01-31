@@ -22,7 +22,7 @@ namespace WalletWasabi.CoinJoin.Common.Models
 
 		public int RegisteredPeerCount { get; set; }
 
-		public int QueuedPeersCount { get; set; }
+		public int QueuedPeerCount { get; set; }
 
 		public int RequiredPeerCount { get; set; }
 
