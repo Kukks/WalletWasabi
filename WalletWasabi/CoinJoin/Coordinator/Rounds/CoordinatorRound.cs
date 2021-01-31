@@ -631,6 +631,7 @@ namespace WalletWasabi.CoinJoin.Coordinator.Rounds
 
 			// It is ok to remove these Alices, because these did not get blind signatures.
 			RemoveAlicesBy(alicesNotConfirmConnectionIds.Distinct().ToArray());
+			DequeueAlicesBy(alicesNotConfirmConnectionIds.Distinct().ToArray());
 
 			int aliceCountAfterConnectionConfirmationTimeout = CountAlices();
 			int didNotConfirmCount = AnonymitySet - aliceCountAfterConnectionConfirmationTimeout;
@@ -1358,7 +1359,6 @@ namespace WalletWasabi.CoinJoin.Coordinator.Rounds
 				}
 				foreach (var id in ids)
 				{
-					QueuedAlices.RemoveAll(x => x.UniqueId == id);
 					numberOfRemovedAlices = Alices.RemoveAll(x => x.UniqueId == id);
 				}
 			}
@@ -1369,6 +1369,29 @@ namespace WalletWasabi.CoinJoin.Coordinator.Rounds
 			}
 
 			return numberOfRemovedAlices;
+		}
+
+		public int DequeueAlicesBy(params Guid[] ids)
+		{
+			var numberOfDequeuedAlices = 0;
+			using (RoundSynchronizerLock.Lock())
+			{
+				if ((Phase != RoundPhase.InputRegistration && Phase != RoundPhase.ConnectionConfirmation) || Status != CoordinatorRoundStatus.Running)
+				{
+					throw new InvalidOperationException("Dequeue Alice is only allowed in InputRegistration and ConnectionConfirmation phases.");
+				}
+				foreach (var id in ids)
+				{
+					numberOfDequeuedAlices = QueuedAlices.RemoveAll(x => x.UniqueId == id);
+				}
+			}
+
+			if (numberOfDequeuedAlices > 0)
+			{
+				Logger.LogInfo($"Round ({RoundId}): {numberOfDequeuedAlices} alices are removed.");
+			}
+
+			return numberOfDequeuedAlices;
 		}
 
 		#endregion Modifiers

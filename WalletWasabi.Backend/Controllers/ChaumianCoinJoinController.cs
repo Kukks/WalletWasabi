@@ -308,6 +308,8 @@ namespace WalletWasabi.Backend.Controllers
 					foreach (Guid aliceToRemove in alicesToRemove)
 					{
 						round.RemoveAlicesBy(aliceToRemove);
+						round.DequeueAlicesBy(aliceToRemove);
+						// todo I think this is just for dupes, if true rm from queue so it gets added back 
 					}
 
 					round.AddAlice(alice);
