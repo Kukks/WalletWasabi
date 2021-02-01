@@ -1202,6 +1202,21 @@ namespace WalletWasabi.CoinJoin.Coordinator.Rounds
 			Logger.LogInfo($"Round ({RoundId}): {nameof(AnonymitySet)} updated: {AnonymitySet}.");
 		}
 
+		public void DequeueAnyFamiliarAlice(IEnumerable<InputProofModel> inputProofs)
+		{
+			foreach (var inputProof in inputProofs)
+			{
+				var outpoint = inputProof.Input;
+				foreach (var alice in QueuedAlices)
+				{
+					if (alice.Inputs.Any(x => x.Outpoint == outpoint))
+					{
+						QueuedAlices.Remove(alice);
+					}
+				}
+			}
+		}
+
 		public void AddAlice(Alice alice)
 		{
 			using (RoundSynchronizerLock.Lock())
@@ -1367,7 +1382,8 @@ namespace WalletWasabi.CoinJoin.Coordinator.Rounds
 				}
 				foreach (var id in ids)
 				{
-					numberOfRemovedAlices = Alices.RemoveAll(x => x.UniqueId == id);
+					QueuedAlices.RemoveAll(x => x.UniqueId == id);
+					numberOfRemovedAlices = Alices.RemoveAll(x => x.UniqueId == id && x.State < AliceState.ConnectionConfirmed);
 				}
 			}
 

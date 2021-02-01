@@ -305,7 +305,7 @@ namespace WalletWasabi.Tests.RegressionTests
 
 				roundState = await satoshiClient.GetRoundStateAsync(aliceClient.RoundId);
 				Assert.Equal(0, roundState.RegisteredPeerCount);
-				Assert.Equal(1, roundState.QueuedPeerCount);
+				Assert.Equal(0, roundState.QueuedPeerCount); // unconfirm => Queued--
 			}
 
 			round = coordinator.GetCurrentInputRegisterableRoundOrDefault();
@@ -384,6 +384,7 @@ namespace WalletWasabi.Tests.RegressionTests
 				var roundState = await satoshiClient.GetRoundStateAsync(aliceClient.RoundId);
 				Assert.Equal(RoundPhase.ConnectionConfirmation, roundState.Phase);
 				Assert.Equal(2, roundState.RegisteredPeerCount);
+				Assert.Equal(2, roundState.QueuedPeerCount);
 				var inputRegistrableRoundState = await satoshiClient.GetRegistrableRoundStateAsync();
 				Assert.Equal(0, inputRegistrableRoundState.RegisteredPeerCount);
 
