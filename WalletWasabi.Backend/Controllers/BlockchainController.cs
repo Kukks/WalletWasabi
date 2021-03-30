@@ -57,7 +57,9 @@ namespace WalletWasabi.Backend.Controllers
 		public async Task<IActionResult> GetBlockInfoAsync()
 		{
 			var blockInfo = await RpcClient.GetBlockchainInfoAsync();
-			string output = JsonConvert.SerializeObject(blockInfo);
+			string output = JsonConvert.SerializeObject(blockInfo, new JsonSerializerSettings() {
+				ReferenceLoopHandling = ReferenceLoopHandling.Ignore
+			});
 			return Ok(output);
 		}
 
