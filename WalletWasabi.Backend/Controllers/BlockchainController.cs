@@ -42,6 +42,24 @@ namespace WalletWasabi.Backend.Controllers
 		public Global Global { get; }
 
 		/// <summary>
+		/// Get blockchain info
+		/// </summary>
+		/// <remarks>
+		/// Sample request:
+		///     GET /blockchainInfo
+		/// </remarks>
+		/// <returns></returns>
+		/// <response code="200">Returns array of fee estimations for the requested confirmation targets.</response>
+		[HttpGet("blockchainInfo")]
+		[ProducesResponseType(200)]
+		[ResponseCache(Duration = 300, Location = ResponseCacheLocation.Client)]
+		public async Task<IActionResult> GetBlockInfoAsync()
+		{
+			var blockInfo = await Global.RpcClient.GetBlockchainInfoAsync();
+			return Ok(blockInfo);
+		}
+
+		/// <summary>
 		/// Get fees for the requested confirmation targets based on Bitcoin Core's estimatesmartfee output.
 		/// </summary>
 		/// <remarks>
