@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
 using NBitcoin;
 using NBitcoin.RPC;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -55,8 +56,9 @@ namespace WalletWasabi.Backend.Controllers
 		[ResponseCache(Duration = 300, Location = ResponseCacheLocation.Client)]
 		public async Task<IActionResult> GetBlockInfoAsync()
 		{
-			var blockInfo = await Global.RpcClient.GetBlockchainInfoAsync();
-			return Ok(blockInfo);
+			var blockInfo = await RpcClient.GetBlockchainInfoAsync();
+			string output = JsonConvert.SerializeObject(blockInfo);
+			return Ok(output);
 		}
 
 		/// <summary>
