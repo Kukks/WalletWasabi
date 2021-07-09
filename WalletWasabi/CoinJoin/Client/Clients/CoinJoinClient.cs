@@ -157,7 +157,7 @@ namespace WalletWasabi.CoinJoin.Client.Clients
 								{
 									//TODO Instead of 2, 7 use fraction of round time. this is where 7 would kill us.
 									//double delaySeconds = new Random().Next(2, 7) * (1.0 / 6.0);
-									Synchronizer.MaxRequestIntervalForMixing = TimeSpan.FromSeconds(2);
+									Synchronizer.MaxRequestIntervalForMixing = TimeSpan.FromSeconds(1);
 								}
 								// if we're Queued
 								else if (Interlocked.Read(ref _frequentStatusProcessingIfNotMixing) == 1 || State.GetPassivelyMixingRounds().Any() || State.GetWaitingListCount() > 0)
@@ -186,7 +186,7 @@ namespace WalletWasabi.CoinJoin.Client.Clients
 								// this is the interval at which the CoinJoinClient
 								// observes its state in relation to
 								// synchronization and the round
-								await Task.Delay(1000, Cancel.Token).ConfigureAwait(false);
+								await Task.Delay(500, Cancel.Token).ConfigureAwait(false);
 							}
 							catch (TaskCanceledException ex)
 							{
