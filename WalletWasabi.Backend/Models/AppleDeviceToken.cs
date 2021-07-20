@@ -3,9 +3,8 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 
-namespace WalletWasabi.Standard.Backend.Models
+namespace WalletWasabi.Backend.Models
 {
-	[Index(nameof(Token), IsUnique = true)]
 	public class AppleDeviceToken
 	{
 		[Key]
