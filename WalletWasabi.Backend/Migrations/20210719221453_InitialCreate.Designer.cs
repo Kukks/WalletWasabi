@@ -8,7 +8,7 @@ using WalletWasabi.Backend.Data;
 
 namespace WalletWasabi.Backend.Migrations
 {
-    [DbContext(typeof(APNTokensContext))]
+    [DbContext(typeof(WasabiBackendContext))]
     [Migration("20210719221453_InitialCreate")]
     partial class InitialCreate
     {
