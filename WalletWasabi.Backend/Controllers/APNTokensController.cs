@@ -40,12 +40,12 @@ namespace WalletWasabi.Backend.Controllers
 		/// </summary>
 		/// <param name="tokenString">An Apple device token</param>
 		/// <response code="200">Always return Ok, we should not confirm whether a token is in the db or not here</response>
-		[HttpDelete]
+		[HttpDelete("{tokenString}")]
 		[ProducesResponseType(200)]
 		public async Task<IActionResult> DeleteTokenAsync([FromRoute] string tokenString)
 		{
 			await using var context = ContextFactory.CreateDbContext();
-			var token = await context.Tokens.FindAsync(tokenString);
+			var token = await context.Tokens.FirstOrDefaultAsync(token => token.Token == tokenString);
 			if (token != null)
 			{
 				context.Tokens.Remove(token);
