@@ -7,7 +7,7 @@ using WalletWasabi.Backend.Data;
 
 namespace WalletWasabi.Backend.Migrations
 {
-    [DbContext(typeof(APNTokensContext))]
+    [DbContext(typeof(WasabiBackendContext))]
     partial class APNTokensContextModelSnapshot : ModelSnapshot
     {
         protected override void BuildModel(ModelBuilder modelBuilder)
