@@ -13,6 +13,7 @@ using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore.Internal;
 using WalletWasabi.Backend.Middlewares;
 using WalletWasabi.Backend.Data;
 using WalletWasabi.Helpers;
@@ -64,11 +65,21 @@ namespace WalletWasabi.Backend
 
 			services.AddLogging(logging => logging.AddFilter((s, level) => level >= Microsoft.Extensions.Logging.LogLevel.Warning));
 
-			services.AddDbContext<APNTokensContext>();
+
+			services.AddDbContextFactory<WasabiBackendContext>((provider, builder) =>
+			{
+				var connString = provider.GetRequiredService<Global>().Config.DatabaseConnectionStringName;
+				if (string.IsNullOrEmpty(connString))
+				{
+					throw new ArgumentNullException("Database", "Connection string not set");
+				}
+				builder.UseNpgsql(connString, optionsBuilder => { optionsBuilder.EnableRetryOnFailure(10); });
+			});
 
 			services.AddSingleton<IExchangeRateProvider>(new ExchangeRateProvider());
 			services.AddSingleton(new Global(Configuration["datadir"]));
 			services.AddStartupTask<InitConfigStartupTask>();
+			services.AddStartupTask<MigrationStartupTask>();
 			services.AddResponseCompression();
 		}
 
