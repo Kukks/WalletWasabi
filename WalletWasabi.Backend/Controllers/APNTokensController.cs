@@ -1,6 +1,6 @@
-using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using WalletWasabi.Backend.Data;
 using WalletWasabi.Backend.Models;
 using WalletWasabi.Helpers;
@@ -12,11 +12,11 @@ namespace WalletWasabi.Backend.Controllers
 	[Produces("application/json")]
 	public class APNTokensController : ControllerBase
 	{
-		private readonly APNTokensContext Db;
+		private readonly IDbContextFactory<WasabiBackendContext> ContextFactory;
 
-		public APNTokensController(APNTokensContext db)
+		public APNTokensController(IDbContextFactory<WasabiBackendContext> contextFactory)
 		{
-			Db = db;
+			ContextFactory = contextFactory;
 		}
 
 		[HttpPost]
@@ -28,8 +28,10 @@ namespace WalletWasabi.Backend.Controllers
 			{
 				return BadRequest("Invalid Apple device token.");
 			}
-			Db.Tokens.Add(token);
-			await Db.SaveChangesAsync();
+
+			await using var context = ContextFactory.CreateDbContext();
+			await context.Tokens.AddAsync(token);
+			await context.SaveChangesAsync();
 			return Ok("Device token stored.");
 		}
 
@@ -42,11 +44,12 @@ namespace WalletWasabi.Backend.Controllers
 		[ProducesResponseType(200)]
 		public async Task<IActionResult> DeleteTokenAsync([FromRoute] string tokenString)
 		{
-			var token = await Db.Tokens.FindAsync(tokenString);
+			await using var context = ContextFactory.CreateDbContext();
+			var token = await context.Tokens.FindAsync(tokenString);
 			if (token != null)
 			{
-				Db.Tokens.Remove(token);
-				await Db.SaveChangesAsync();
+				context.Tokens.Remove(token);
+				await context.SaveChangesAsync();
 			}
 			return Ok();
 		}

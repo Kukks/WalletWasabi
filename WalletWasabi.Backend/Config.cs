@@ -82,6 +82,9 @@ namespace WalletWasabi.Backend
 		[JsonProperty(PropertyName = "RegTestBitcoinCoreRpcEndPoint")]
 		[JsonConverter(typeof(EndPointJsonConverter), Constants.DefaultRegTestBitcoinCoreRpcPort)]
 		public EndPoint RegTestBitcoinCoreRpcEndPoint { get; internal set; } = new IPEndPoint(IPAddress.Loopback, Constants.DefaultRegTestBitcoinCoreRpcPort);
+		[DefaultValue("User ID=postgres;Host=127.0.0.1;Port=65466;Database=wasabibackend;")]
+		[JsonProperty(PropertyName = "DatabaseConnectionStringName", DefaultValueHandling = DefaultValueHandling.Populate)]
+		public string DatabaseConnectionStringName { get; internal set; }
 
 		public EndPoint GetBitcoinP2pEndPoint()
 		{
