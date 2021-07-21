@@ -230,12 +230,14 @@ namespace WalletWasabi.CoinJoin.Coordinator
 					round.CoinJoinBroadcasted += Round_CoinJoinBroadcasted;
 					round.StatusChanged += Round_StatusChangedAsync;
 					await round.ExecuteNextPhaseAsync(RoundPhase.InputRegistration, feePerInputs, feePerOutputs).ConfigureAwait(false);
+					SchedulePushAsync(round.InputRegistrationTimeout); // Do not await this long delay
 					Rounds.Add(round);
 
 					var round2 = new CoordinatorRound(RpcClient, UtxoReferee, RoundConfig, confirmationTarget, RoundConfig.ConfirmationTarget, RoundConfig.ConfirmationTargetReductionRate);
 					round2.StatusChanged += Round_StatusChangedAsync;
 					round2.CoinJoinBroadcasted += Round_CoinJoinBroadcasted;
 					await round2.ExecuteNextPhaseAsync(RoundPhase.InputRegistration, feePerInputs, feePerOutputs).ConfigureAwait(false);
+					SchedulePushAsync(round2.InputRegistrationTimeout); // Do not await this long delay
 					Rounds.Add(round2);
 				}
 				else if (runningRoundCount == 1)
@@ -244,8 +246,25 @@ namespace WalletWasabi.CoinJoin.Coordinator
 					round.StatusChanged += Round_StatusChangedAsync;
 					round.CoinJoinBroadcasted += Round_CoinJoinBroadcasted;
 					await round.ExecuteNextPhaseAsync(RoundPhase.InputRegistration, feePerInputs, feePerOutputs).ConfigureAwait(false);
+					SchedulePushAsync(round.InputRegistrationTimeout); // Do not await this long delay
 					Rounds.Add(round);
 				}
+			}
+		}
+
+		public async Task SchedulePushAsync(TimeSpan inputRegistrationTimeout)
+		{
+			var pushDelay = inputRegistrationTimeout - TimeSpan.FromSeconds(15);
+			if (pushDelay.TotalMilliseconds < 0)
+			{
+				return;
+			}
+
+			await Task.Delay(pushDelay);
+			if (inputRegistrationTimeout == GetCurrentInputRegisterableRoundOrDefault().InputRegistrationTimeout)
+			{
+				// this sends 2 notifications for two rounds, so make sure the notifications are rate limited
+				Logger.LogInfo("PUSH NOTIFICATIONS! INPUT DONE IN 15.");
 			}
 		}
 
