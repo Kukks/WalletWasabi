@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -13,6 +14,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using WalletWasabi.Backend.Middlewares;
+using WalletWasabi.Backend.Data;
 using WalletWasabi.Helpers;
 using WalletWasabi.Interfaces;
 using WalletWasabi.Logging;
@@ -61,6 +63,8 @@ namespace WalletWasabi.Backend
 			});
 
 			services.AddLogging(logging => logging.AddFilter((s, level) => level >= Microsoft.Extensions.Logging.LogLevel.Warning));
+
+			services.AddDbContext<APNTokensContext>();
 
 			services.AddSingleton<IExchangeRateProvider>(new ExchangeRateProvider());
 			services.AddSingleton(new Global(Configuration["datadir"]));
