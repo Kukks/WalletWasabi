@@ -39,6 +39,8 @@ namespace WalletWasabi.Backend
 
 		public HostedServices HostedServices { get; set; }
 
+		public SendPushService SendPushService { get; set; }
+
 		public IndexBuilderService IndexBuilderService { get; private set; }
 
 		public Coordinator Coordinator { get; private set; }
@@ -47,7 +49,7 @@ namespace WalletWasabi.Backend
 
 		public CoordinatorRoundConfig RoundConfig { get; private set; }
 
-		public async Task InitializeAsync(Config config, CoordinatorRoundConfig roundConfig, IRPCClient rpc, CancellationToken cancel)
+		public async Task InitializeAsync(Config config, CoordinatorRoundConfig roundConfig, IRPCClient rpc, SendPushService pushService, CancellationToken cancel)
 		{
 			Config = Guard.NotNull(nameof(config), config);
 			RoundConfig = Guard.NotNull(nameof(roundConfig), roundConfig);
@@ -88,7 +90,6 @@ namespace WalletWasabi.Backend
 			var indexFilePath = Path.Combine(indexBuilderServiceDir, $"Index{RpcClient.Network}.dat");
 			var blockNotifier = HostedServices.FirstOrDefault<BlockNotifier>();
 			IndexBuilderService = new IndexBuilderService(RpcClient, blockNotifier, indexFilePath);
-			var pushService = new SendPushService();
 			Coordinator = new Coordinator(RpcClient.Network, blockNotifier, Path.Combine(DataDir, "CcjCoordinator"), RpcClient, roundConfig, () =>  pushService.SendNotificationsAsync(false));
 			IndexBuilderService.Synchronize();
 			Logger.LogInfo($"{nameof(IndexBuilderService)} is successfully initialized and started synchronization.");
