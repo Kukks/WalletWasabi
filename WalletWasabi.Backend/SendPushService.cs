@@ -68,6 +68,7 @@ namespace WalletWasabi.Backend
 
 		public async Task SendNotificationsAsync(bool isDebug)
 		{
+			await using var context = _dbContextFactory.CreateDbContext();
 			var client = new HttpClient();
 			client.DefaultRequestVersion = HttpVersion.Version20;
 			var content = new StringContent(_payload, Encoding.UTF8, "application/json");
@@ -80,7 +81,7 @@ namespace WalletWasabi.Backend
 			var tokens = context.Tokens
 				.Where(t => t.IsDebug == isDebug)
 				.Distinct();
-			foreach (var token in tokens)
+			await Task.WhenAll(tokens.Select(async token =>
 			{
 				var url = $"https://{server}.push.apple.com/3/device/{token}";
 				var res = await client.PostAsync(url, content);
@@ -90,15 +91,15 @@ namespace WalletWasabi.Backend
 					Logger.LogError($"HttpPost to APNs failed: {res.Content}");
 				}
 
-				if (res.StatusCode == HttpStatusCode.BadRequest ||
-					res.StatusCode == HttpStatusCode.Gone)
+				if (res.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.Gone)
 				{
-					if(res.ReasonPhrase == "BadDeviceToken")
+					if (res.ReasonPhrase == "BadDeviceToken")
 					{
 						context.Tokens.Remove(token);
 					}
 				}
-			} // TODO parallelize
+			}));
+			await context.SaveChangesAsync();
 		}
 
 	}
