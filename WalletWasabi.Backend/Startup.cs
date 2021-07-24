@@ -78,6 +78,8 @@ namespace WalletWasabi.Backend
 
 			services.AddSingleton<IExchangeRateProvider>(new ExchangeRateProvider());
 			services.AddSingleton(new Global(Configuration["datadir"]));
+			services.AddSingleton<SendPushService>();
+			services.AddSingleton(provider => new WebsiteTorifier(provider.GetRequiredService<IWebHostEnvironment>().WebRootPath));
 			services.AddStartupTask<InitConfigStartupTask>();
 			services.AddStartupTask<MigrationStartupTask>();
 			services.AddResponseCompression();
