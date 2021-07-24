@@ -19,9 +19,8 @@ namespace WalletWasabi.Backend
 	public class SendPushService
 	{
 		private readonly IDbContextFactory<WasabiBackendContext> ContextFactory;
-		private readonly Config Config;
 
-		private string KeyPath => Config.APNsAuthKeyFile;
+		private string _keyPath = "/home/Dan/Downloads/AuthKey_4L3728R8LJ.p8";
 		private string _auth_key_id = "4L3728R8LJ";
 		private string _teamId = "9Z72DXKVXK"; // Chaincase LLC
 		private string _bundleId = "cash.chaincase.testnet"; // APNs Development iOS
@@ -34,10 +33,9 @@ namespace WalletWasabi.Backend
 				}
 			}";
 
-		public SendPushService(IDbContextFactory<WasabiBackendContext> contextFactory, Config config)
+		public SendPushService(IDbContextFactory<WasabiBackendContext> contextFactory)
 		{
 			ContextFactory = contextFactory;
-			Config = config;
 		}
 
 		private string GenerateAuthenticationHeader()
@@ -55,7 +53,7 @@ namespace WalletWasabi.Backend
 			});
 			var claims = Convert.ToBase64String(claimsBytes);
 
-			var p8KeySpan = File.ReadAllBytes(KeyPath).AsSpan();
+			var p8KeySpan = File.ReadAllBytes(_keyPath).AsSpan();
 			var signer = ECDsa.Create();
 			signer.ImportPkcs8PrivateKey(p8KeySpan, out int _);
 			var dataToSign = Encoding.UTF8.GetBytes($"{header}.{claims}");
@@ -80,26 +78,28 @@ namespace WalletWasabi.Backend
 			var tokens = context.Tokens
 				.Where(t => t.IsDebug == isDebug)
 				.Distinct();
-			await Task.WhenAll(tokens.Select(async token =>
-			{
-				var url = $"https://{server}.push.apple.com/3/device/{token}";
-				var res = await client.PostAsync(url, content);
 
-				if (!res.IsSuccessStatusCode)
-				{
-					Logger.LogError($"HttpPost to APNs failed: {res.Content}");
-				}
-
-				if (res.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.Gone)
-				{
-					if (res.ReasonPhrase == "BadDeviceToken")
-					{
-						context.Tokens.Remove(token);
-					}
-				}
-			}));
+			await Task.WhenAll(tokens.Select(token => SendNotificationAsync(token, server, context, content, client)));
 			await context.SaveChangesAsync();
 		}
 
+		public async Task SendNotificationAsync(AppleDeviceToken token, string server, WasabiBackendContext context, StringContent content, HttpClient client)
+		{
+			var url = $"https://{server}.push.apple.com/3/device/{token}";
+			var res = await client.PostAsync(url, content);
+
+			if (!res.IsSuccessStatusCode)
+			{
+				Logger.LogError($"HttpPost to APNs failed: {res.Content}");
+			}
+
+			if (res.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.Gone)
+			{
+				if (res.ReasonPhrase == "BadDeviceToken")
+				{
+					context.Tokens.Remove(token);
+				}
+			}
+		}
 	}
 }
