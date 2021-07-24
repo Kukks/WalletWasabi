@@ -20,15 +20,16 @@ namespace WalletWasabi.Backend
 {
 	public class InitConfigStartupTask : IStartupTask
 	{
-		public InitConfigStartupTask(Global global, IMemoryCache cache, IWebHostEnvironment hostingEnvironment, IDbContextFactory<WasabiBackendContext> contextFactory)
+		private readonly WebsiteTorifier _websiteTorifier;
+		private readonly IServiceProvider _serviceProvider;
+
+		public InitConfigStartupTask(Global global, IMemoryCache cache, WebsiteTorifier websiteTorifier, IServiceProvider serviceProvider )
 		{
+			_websiteTorifier = websiteTorifier;
+			_serviceProvider = serviceProvider;
 			Global = global;
 			Cache = cache;
-			WebsiteTorifier = new WebsiteTorifier(hostingEnvironment.WebRootPath);
-			ContextFactory = contextFactory;
 		}
-
-		public WebsiteTorifier WebsiteTorifier { get; }
 		public Global Global { get; }
 		public IMemoryCache Cache { get; }
 		public IDbContextFactory<WasabiBackendContext> ContextFactory { get; }
@@ -57,13 +58,11 @@ namespace WalletWasabi.Backend
 					network: config.Network);
 
 			var cachedRpc = new CachedRpcClient(rpc, Cache);
-
-			var pushService = new SendPushService(ContextFactory, config);
-			await Global.InitializeAsync(config, roundConfig, cachedRpc, pushService, cancellationToken);
+			await Global.InitializeAsync(config, roundConfig, cachedRpc, _serviceProvider, cancellationToken);
 
 			try
 			{
-				await WebsiteTorifier.CloneAndUpdateOnionIndexHtmlAsync();
+				await _websiteTorifier.CloneAndUpdateOnionIndexHtmlAsync();
 			}
 			catch (Exception ex)
 			{

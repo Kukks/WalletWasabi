@@ -1,8 +1,6 @@
 ﻿using System;
-using System.IO;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
-using Microsoft.Extensions.Configuration;
 
 namespace WalletWasabi.Backend.Data
 {
@@ -12,9 +10,7 @@ namespace WalletWasabi.Backend.Data
 
 		public TContext CreateDbContext(string[] args)
 		{
-			return Create(
-				Directory.GetCurrentDirectory(),
-				Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"));
+			return Create();
 		}
 
 		protected abstract TContext CreateNewInstance(
@@ -22,27 +18,8 @@ namespace WalletWasabi.Backend.Data
 
 		public TContext Create()
 		{
-			var environmentName =
-				Environment.GetEnvironmentVariable(
-					"ASPNETCORE_ENVIRONMENT");
-
-			var basePath = AppContext.BaseDirectory;
-
-			return Create(basePath, environmentName);
-		}
-
-		private TContext Create(string basePath, string environmentName)
-		{
-			var builder = new ConfigurationBuilder()
-				.SetBasePath(basePath)
-				.AddJsonFile("appsettings.json")
-				.AddJsonFile($"appsettings.{environmentName}.json", true)
-				.AddEnvironmentVariables();
-
-			var config = builder.Build();
-
-			var connstr = config.GetConnectionString("User ID=postgres;Host=127.0.0.1;Port=65466;Database=doesntmatterbecauseitisnotactuallyused;");
-			return Create(connstr);
+			return Create(
+				"User ID=postgres;Host=127.0.0.1;Port=65466;Database=doesntmatterbecauseitisnotactuallyused;");
 		}
 
 		private TContext Create(string connectionString)
@@ -63,7 +40,7 @@ namespace WalletWasabi.Backend.Data
 
 			optionsBuilder.UseNpgsql(connectionString);
 
-			DbContextOptions<TContext> options = optionsBuilder.Options;
+			var options = optionsBuilder.Options;
 
 			return CreateNewInstance(options);
 		}
