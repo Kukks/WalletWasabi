@@ -68,7 +68,7 @@ namespace WalletWasabi.Backend
 
 		public async Task SendNotificationsAsync(bool isDebug)
 		{
-			await using var context = _dbContextFactory.CreateDbContext();
+			await using var context = ContextFactory.CreateDbContext();
 			var client = new HttpClient();
 			client.DefaultRequestVersion = HttpVersion.Version20;
 			var content = new StringContent(_payload, Encoding.UTF8, "application/json");
@@ -77,7 +77,6 @@ namespace WalletWasabi.Backend
 
 			//removeToken prepared statement
 			var server = isDebug ? "api.development" : "api";
-			await using var context = ContextFactory.CreateDbContext();
 			var tokens = context.Tokens
 				.Where(t => t.IsDebug == isDebug)
 				.Distinct();
