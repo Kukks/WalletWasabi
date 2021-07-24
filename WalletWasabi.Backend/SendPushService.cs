@@ -9,6 +9,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
 using WalletWasabi.Backend.Data;
 using WalletWasabi.Backend.Models;
 using WalletWasabi.Logging;
@@ -17,8 +18,10 @@ namespace WalletWasabi.Backend
 {
 	public class SendPushService
 	{
-		private readonly string KeyPath = "/home/Dan/Downloads/AuthKey_4L3728R8LJ.p8";
-		private WasabiBackendContext Context { get; set; }
+		private readonly IDbContextFactory<WasabiBackendContext> ContextFactory;
+		private readonly Config Config;
+
+		private string KeyPath => Config.APNsAuthKeyFile;
 		private string _auth_key_id = "4L3728R8LJ";
 		private string _teamId = "9Z72DXKVXK"; // Chaincase LLC
 		private string _bundleId = "cash.chaincase.testnet"; // APNs Development iOS
@@ -31,8 +34,10 @@ namespace WalletWasabi.Backend
 				}
 			}";
 
-		public SendPushService()
+		public SendPushService(IDbContextFactory<WasabiBackendContext> contextFactory, Config config)
 		{
+			ContextFactory = contextFactory;
+			Config = config;
 		}
 
 		private string GenerateAuthenticationHeader()
@@ -71,9 +76,8 @@ namespace WalletWasabi.Backend
 
 			//removeToken prepared statement
 			var server = isDebug ? "api.development" : "api";
-			// get options from config? or context from factory?
-			using var context = new WasabiBackendContext(null);
-			var tokens = Context.Tokens
+			await using var context = ContextFactory.CreateDbContext();
+			var tokens = context.Tokens
 				.Where(t => t.IsDebug == isDebug)
 				.Distinct();
 			foreach (var token in tokens)
@@ -91,7 +95,7 @@ namespace WalletWasabi.Backend
 				{
 					if(res.ReasonPhrase == "BadDeviceToken")
 					{
-						Context.Tokens.Remove(token);
+						context.Tokens.Remove(token);
 					}
 				}
 			} // TODO parallelize

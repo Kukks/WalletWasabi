@@ -68,7 +68,7 @@ namespace WalletWasabi.Backend
 
 			services.AddDbContextFactory<WasabiBackendContext>((provider, builder) =>
 			{
-				var connString = provider.GetRequiredService<Global>().Config.DatabaseConnectionStringName;
+				var connString = "User ID=postgres;Host=127.0.0.1;Port=65466;Database=wasabibackend;";
 				if (string.IsNullOrEmpty(connString))
 				{
 					throw new ArgumentNullException("Database", "Connection string not set");

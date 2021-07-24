@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Hosting;
 using NBitcoin;
@@ -10,6 +11,7 @@ using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
+using WalletWasabi.Backend.Data;
 using WalletWasabi.BitcoinCore;
 using WalletWasabi.CoinJoin.Coordinator.Rounds;
 using WalletWasabi.Logging;
@@ -18,16 +20,18 @@ namespace WalletWasabi.Backend
 {
 	public class InitConfigStartupTask : IStartupTask
 	{
-		public InitConfigStartupTask(Global global, IMemoryCache cache, IWebHostEnvironment hostingEnvironment)
+		public InitConfigStartupTask(Global global, IMemoryCache cache, IWebHostEnvironment hostingEnvironment, IDbContextFactory<WasabiBackendContext> contextFactory)
 		{
 			Global = global;
 			Cache = cache;
 			WebsiteTorifier = new WebsiteTorifier(hostingEnvironment.WebRootPath);
+			ContextFactory = contextFactory;
 		}
 
 		public WebsiteTorifier WebsiteTorifier { get; }
 		public Global Global { get; }
 		public IMemoryCache Cache { get; }
+		public IDbContextFactory<WasabiBackendContext> ContextFactory { get; }
 
 		public async Task ExecuteAsync(CancellationToken cancellationToken)
 		{
@@ -53,7 +57,9 @@ namespace WalletWasabi.Backend
 					network: config.Network);
 
 			var cachedRpc = new CachedRpcClient(rpc, Cache);
-			await Global.InitializeAsync(config, roundConfig, cachedRpc, cancellationToken);
+
+			var pushService = new SendPushService(ContextFactory, config);
+			await Global.InitializeAsync(config, roundConfig, cachedRpc, pushService, cancellationToken);
 
 			try
 			{
