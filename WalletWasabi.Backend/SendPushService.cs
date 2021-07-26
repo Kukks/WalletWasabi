@@ -49,13 +49,13 @@ namespace WalletWasabi.Backend
 			var claimsBytes = JsonSerializer.SerializeToUtf8Bytes(new
 			{
 				iss = _teamId,
-				iat = DateTime.Now
+				iat = DateTimeOffset.Now.ToUnixTimeSeconds()
 			});
 			var claims = Convert.ToBase64String(claimsBytes);
 
-			var apnsKey = GetBytesFromPem(_keyPath);
+			var p8KeySpan = GetBytesFromPem(_keyPath);
 			var signer = ECDsa.Create();
-			signer.ImportPkcs8PrivateKey(apnsKey, out _);
+			signer.ImportPkcs8PrivateKey(p8KeySpan, out _);
 			var dataToSign = Encoding.UTF8.GetBytes($"{header}.{claims}");
 			var signatureBytes = signer.SignData(dataToSign, HashAlgorithmName.SHA256);
 
@@ -91,13 +91,18 @@ namespace WalletWasabi.Backend
 				.Where(t => t.IsDebug == isDebug)
 				.Distinct();
 
-			await Task.WhenAll(tokens.Select(token => SendNotificationAsync(token, server, context, content, client)));
+			Console.WriteLine(tokens.Count());
+			foreach(var token in tokens)
+			{
+				await SendNotificationAsync(token, server, context, content, client);
+			}
+			//await Task.WhenAll(tokens.Select(token => SendNotificationAsync(token, server, context, content, client)));
 			await context.SaveChangesAsync();
 		}
 
 		public async Task SendNotificationAsync(AppleDeviceToken token, string server, WasabiBackendContext context, StringContent content, HttpClient client)
 		{
-			var url = $"https://{server}.push.apple.com/3/device/{token}";
+			var url = $"https://{server}.push.apple.com/3/device/{token.Token}";
 			var res = await client.PostAsync(url, content);
 
 			if (!res.IsSuccessStatusCode)
@@ -115,3 +120,5 @@ namespace WalletWasabi.Backend
 		}
 	}
 }
+
+//{ StatusCode: 403, ReasonPhrase: 'Forbidden', Version: 2.0, Content: System.Net.Http.HttpConnectionResponseContent, Headers: { apns - id: 79FFDC32 - BAA9 - 17E3 - B5A7 - F67C24157B52 } }
