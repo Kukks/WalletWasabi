@@ -93,7 +93,7 @@ namespace WalletWasabi.Backend
 			var indexFilePath = Path.Combine(indexBuilderServiceDir, $"Index{RpcClient.Network}.dat");
 			var blockNotifier = HostedServices.FirstOrDefault<BlockNotifier>();
 			IndexBuilderService = new IndexBuilderService(RpcClient, blockNotifier, indexFilePath);
-			Coordinator = new Coordinator(RpcClient.Network, blockNotifier, Path.Combine(DataDir, "CcjCoordinator"), RpcClient, roundConfig, () => _ = serviceProvider.GetRequiredService<SendPushService>().SendNotificationsAsync(false));
+			Coordinator = new Coordinator(RpcClient.Network, blockNotifier, Path.Combine(DataDir, "CcjCoordinator"), RpcClient, roundConfig, () => _ = serviceProvider.GetRequiredService<SendPushService>().SendNotificationsAsync(true));
 			IndexBuilderService.Synchronize();
 			Logger.LogInfo($"{nameof(IndexBuilderService)} is successfully initialized and started synchronization.");
 
