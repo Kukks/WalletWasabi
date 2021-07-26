@@ -20,7 +20,7 @@ namespace WalletWasabi.Backend
 	{
 		private readonly IDbContextFactory<WasabiBackendContext> ContextFactory;
 
-		private string _keyPath = "/home/Dan/Downloads/AuthKey_4L3728R8LJ.p8";
+		private string _keyPath = "/Users/Dan/Downloads/AuthKey_4L3728R8LJ.p8";
 		private string _auth_key_id = "4L3728R8LJ";
 		private string _teamId = "9Z72DXKVXK"; // Chaincase LLC
 		private string _bundleId = "cash.chaincase.testnet"; // APNs Development iOS
@@ -53,15 +53,27 @@ namespace WalletWasabi.Backend
 			});
 			var claims = Convert.ToBase64String(claimsBytes);
 
-			var p8KeySpan = File.ReadAllBytes(_keyPath).AsSpan();
+			var apnsKey = GetBytesFromPem(_keyPath);
 			var signer = ECDsa.Create();
-			signer.ImportPkcs8PrivateKey(p8KeySpan, out int _);
+			signer.ImportPkcs8PrivateKey(apnsKey, out _);
 			var dataToSign = Encoding.UTF8.GetBytes($"{header}.{claims}");
 			var signatureBytes = signer.SignData(dataToSign, HashAlgorithmName.SHA256);
 
 			var signature = Convert.ToBase64String(signatureBytes);
 
 			return $"{header}.{claims}.{signature}";
+		}
+
+		/// <summary>
+		/// Apple gives us a APNs Auth Key to sign jwts with in a p8 pem file.
+		/// This method reads that
+		/// </summary>
+		public static byte[] GetBytesFromPem(string pemFile)
+		{
+			var p8File = File.ReadAllLines(pemFile);
+			var p8Key = p8File.Skip(1).SkipLast(1); // Remove PEM bookends
+			var base64Key = string.Join("", p8Key);
+			return Convert.FromBase64String(base64Key);
 		}
 
 		public async Task SendNotificationsAsync(bool isDebug)
