@@ -25,13 +25,13 @@ namespace WalletWasabi.Backend
 		private string _teamId = "9Z72DXKVXK"; // Chaincase LLC
 		private string _bundleId = "cash.chaincase.testnet"; // APNs Development iOS
 		private string _payload = @"{
-				'aps': {
-					'content-available': 1,
-					'alert': 'Finalising CoinJoin',
-					'sound': 'default'
-					}
+				""aps"": {
+					""content-available"": 1,
+					""alert"": ""Doing CoinJoin Crypto..."",
+					""sound"": ""default"",
 				}
 			}";
+		private int _spam = 0;
 
 		public SendPushService(IDbContextFactory<WasabiBackendContext> contextFactory)
 		{
@@ -83,10 +83,11 @@ namespace WalletWasabi.Backend
 			client.DefaultRequestVersion = HttpVersion.Version20;
 			var content = new StringContent(_payload, Encoding.UTF8, "application/json");
 			client.DefaultRequestHeaders.Add("apns-topic", _bundleId);
+			client.DefaultRequestHeaders.Add("apns-push-type", "alert");
 			client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", GenerateAuthenticationHeader());
 
 			//removeToken prepared statement
-			var server = isDebug ? "api.development" : "api";
+			var server = isDebug ? "api.sandbox" : "api";
 			var tokens = context.Tokens
 				.Where(t => t.IsDebug == isDebug)
 				.Distinct();
@@ -102,7 +103,14 @@ namespace WalletWasabi.Backend
 
 		public async Task SendNotificationAsync(AppleDeviceToken token, string server, WasabiBackendContext context, StringContent content, HttpClient client)
 		{
+			if (_spam++ % 2 == 1)
+			{
+				return;
+			}
+
 			var url = $"https://{server}.push.apple.com/3/device/{token.Token}";
+			var guid = Guid.NewGuid().ToString();
+			content.Headers.Add("apns-id", guid);
 			var res = await client.PostAsync(url, content);
 
 			if (!res.IsSuccessStatusCode)
