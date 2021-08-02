@@ -12,6 +12,7 @@ using WalletWasabi.Backend.Models;
 using WalletWasabi.Backend.Models.Responses;
 using WalletWasabi.BitcoinCore;
 using WalletWasabi.Blockchain.Analysis.FeesEstimation;
+using WalletWasabi.Blockchain.Blocks;
 using WalletWasabi.Helpers;
 using WalletWasabi.Logging;
 using WalletWasabi.Models;
@@ -26,6 +27,9 @@ namespace WalletWasabi.Backend.Controllers
 	public class BlockchainController : Controller
 	{
 		public static readonly TimeSpan FilterTimeout = TimeSpan.FromMinutes(20);
+
+		// The longest ever reorgs on bitcoin were 53 blocks and 24 blocks, in 2010 & 2013
+		private static readonly int ImmatureBlockCount = 100;
 
 		public BlockchainController(IMemoryCache memoryCache, Global global)
 		{
@@ -43,24 +47,32 @@ namespace WalletWasabi.Backend.Controllers
 		public Global Global { get; }
 
 		/// <summary>
-		/// Get blockchain info
+		/// Get most recent mature block header
 		/// </summary>
 		/// <remarks>
 		/// Sample request:
-		///     GET /blockchainInfo
+		///     GET /latest-mature-header
 		/// </remarks>
 		/// <returns></returns>
-		/// <response code="200">Returns array of fee estimations for the requested confirmation targets.</response>
-		[HttpGet("blockchainInfo")]
+		/// <response code="200">Returns the latest mature block header.</response>
+		[HttpGet("latest-mature-header")]
 		[ProducesResponseType(200)]
 		[ResponseCache(Duration = 300, Location = ResponseCacheLocation.Client)]
-		public async Task<IActionResult> GetBlockInfoAsync()
+		public async Task<IActionResult> GetLatestMatureHeaderAsync()
 		{
-			var blockInfo = await RpcClient.GetBlockchainInfoAsync();
-			string output = JsonConvert.SerializeObject(blockInfo, new JsonSerializerSettings() {
-				ReferenceLoopHandling = ReferenceLoopHandling.Ignore
-			});
-			return Ok(output);
+			var blockCount = await RpcClient.GetBlockCountAsync();
+			var matureBlockCount = blockCount - ImmatureBlockCount;
+			var matureHash = await RpcClient.GetBlockHashAsync(matureBlockCount);
+			var header = await RpcClient.GetBlockHeaderAsync(matureHash);
+			// var latestMatureHeader = new SmartHeader(header.GetHash(), header.HashPrevBlock, Convert.ToUInt32(matureBlockCount), header.BlockTime);
+			var ret = new
+			{
+				BlockHash = header.GetHash().ToString(),
+				PrevHash = header.HashPrevBlock.ToString(),
+				Height = Convert.ToUInt32(matureBlockCount),
+				Time = header.BlockTime
+			};
+			return Ok(ret);
 		}
 
 		/// <summary>
