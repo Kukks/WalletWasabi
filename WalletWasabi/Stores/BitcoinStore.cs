@@ -1,5 +1,6 @@
 using NBitcoin;
 using System.Threading.Tasks;
+using WalletWasabi.Backend.Models;
 using WalletWasabi.Blockchain.Blocks;
 using WalletWasabi.Blockchain.Mempool;
 using WalletWasabi.Blockchain.P2p;
@@ -41,14 +42,14 @@ namespace WalletWasabi.Stores
 		/// </summary>
 		public UntrustedP2pBehavior CreateUntrustedP2pBehavior() => new UntrustedP2pBehavior(MempoolService);
 
-		public async Task InitializeAsync()
+		public async Task InitializeAsync(SmartHeader startingHeader = null)
 		{
 			using (BenchmarkLogger.Measure())
 			{
 				var initTasks = new[]
 				{
-					IndexStore.InitializeAsync(),
-					TransactionStore.InitializeAsync()
+					IndexStore.InitializeAsync(indexStoreFolderPath, startingHeader),
+					TransactionStore.InitializeAsync(networkWorkFolderPath, Network)
 				};
 
 				await Task.WhenAll(initTasks).ConfigureAwait(false);
