@@ -118,7 +118,7 @@ namespace WalletWasabi.Backend
 				Logger.LogError($"HttpPost to APNs failed: {res.Content}");
 			}
 
-			if (res.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.Gone)
+			if (res.StatusCode is HttpStatusCode.BadRequest || res.StatusCode is HttpStatusCode.Gone)
 			{
 				if (res.ReasonPhrase == "BadDeviceToken")
 				{
