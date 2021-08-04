@@ -46,7 +46,7 @@ namespace WalletWasabi.Stores
 		private List<FilterModel> ImmatureFilters { get; set; }
 		private AsyncLock IndexLock { get; set; }
 
-		public async Task InitializeAsync(string workFolderPath)
+		public async Task InitializeAsync(string workFolderPath, SmartHeader startingHeader = null)
 		{
 			using (BenchmarkLogger.Measure())
 			{
@@ -56,7 +56,9 @@ namespace WalletWasabi.Stores
 				var immatureIndexFilePath = Path.Combine(WorkFolderPath, "ImmatureIndex.dat");
 				ImmatureIndexFileManager = new DigestableSafeMutexIoManager(immatureIndexFilePath, digestRandomIndex: -1);
 
-				StartingFilter = StartingFilters.GetStartingFilter(Network);
+				StartingFilter = startingHeader != null ?
+					StartingFilters.GetStartingFilter(startingHeader) :
+					StartingFilters.GetStartingFilter(Network);
 				StartingHeight = StartingFilter.Header.Height;
 
 				ImmatureFilters = new List<FilterModel>(150);
@@ -71,13 +73,13 @@ namespace WalletWasabi.Stores
 
 					await EnsureBackwardsCompatibilityAsync().ConfigureAwait(false);
 
-					if (Network == Network.RegTest)
+					if (Network == Network.RegTest || startingHeader != null)
 					{
 						MatureIndexFileManager.DeleteMe(); // RegTest is not a global ledger, better to delete it.
-						ImmatureIndexFileManager.DeleteMe();
+						ImmatureIndexFileManager.DeleteMe(); // If sync from particular header, delete it
 					}
 
-					if (!MatureIndexFileManager.Exists())
+					if (!MatureIndexFileManager.Exists() )
 					{
 						await MatureIndexFileManager.WriteAllLinesAsync(new[] { StartingFilter.ToLine() }).ConfigureAwait(false);
 					}
