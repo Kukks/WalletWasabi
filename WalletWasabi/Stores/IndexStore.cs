@@ -42,7 +42,7 @@ namespace WalletWasabi.Stores
 		private Network Network { get; }
 		private DigestableSafeMutexIoManager MatureIndexFileManager { get; set; }
 		private DigestableSafeMutexIoManager ImmatureIndexFileManager { get; set; }
-		public SmartHeaderChain SmartHeaderChain { get; }
+		public SmartHeaderChain SmartHeaderChain { get; private set; }
 
 		private FilterModel StartingFilter { get; set; }
 		private uint StartingHeight { get; set; }
@@ -88,6 +88,24 @@ namespace WalletWasabi.Stores
 
 					await InitializeFiltersAsync().ConfigureAwait(false);
 				}
+			}
+		}
+
+		public async Task ResetFromHeaderAsync(SmartHeader startingHeader)
+		{
+			using (await IndexLock.LockAsync().ConfigureAwait(false))
+			using (await MatureIndexFileManager.Mutex.LockAsync().ConfigureAwait(false))
+			using (await ImmatureIndexFileManager.Mutex.LockAsync().ConfigureAwait(false))
+			{
+				StartingFilter = StartingFilters.GetStartingFilter(startingHeader);
+				StartingHeight = StartingFilter.Header.Height;
+				ImmatureFilters = new List<FilterModel>(150);
+
+				SmartHeaderChain = new SmartHeaderChain(); // must be reset
+				MatureIndexFileManager.DeleteMe();
+				ImmatureIndexFileManager.DeleteMe();
+				await MatureIndexFileManager.WriteAllLinesAsync(new[] { StartingFilter.ToLine() }).ConfigureAwait(false);
+				await InitializeFiltersAsync().ConfigureAwait(false);
 			}
 		}
 
