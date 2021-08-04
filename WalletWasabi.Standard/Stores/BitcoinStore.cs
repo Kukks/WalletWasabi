@@ -59,7 +59,7 @@ namespace WalletWasabi.Stores
 		/// </summary>
 		public UntrustedP2pBehavior CreateUntrustedP2pBehavior() => new UntrustedP2pBehavior(MempoolService);
 
-		public async Task InitializeAsync(SmartHeader startingHeader = null)
+		public async Task InitializeAsync()
 		{
 			using (BenchmarkLogger.Measure())
 			{
@@ -68,7 +68,7 @@ namespace WalletWasabi.Stores
 
 				var initTasks = new[]
 				{
-					IndexStore.InitializeAsync(indexStoreFolderPath, startingHeader),
+					IndexStore.InitializeAsync(indexStoreFolderPath),
 					TransactionStore.InitializeAsync(networkWorkFolderPath, Network)
 				};
 
