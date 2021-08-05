@@ -28,7 +28,7 @@ namespace WalletWasabi.Backend
 				""aps"": {
 					""content-available"": 1,
 					""alert"": ""Doing CoinJoin Crypto..."",
-					""sound"": ""default"",
+					""sound"": ""default""
 				}
 			}";
 		private int _spam = 0;
