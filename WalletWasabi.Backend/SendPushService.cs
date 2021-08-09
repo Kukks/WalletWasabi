@@ -83,7 +83,9 @@ namespace WalletWasabi.Backend
 			client.DefaultRequestVersion = HttpVersion.Version20;
 			var content = new StringContent(_payload, Encoding.UTF8, "application/json");
 			client.DefaultRequestHeaders.Add("apns-topic", _bundleId);
-			client.DefaultRequestHeaders.Add("apns-push-type", "alert");
+			client.DefaultRequestHeaders.Add("apns-push-type", "background");
+			client.DefaultRequestHeaders.Add("apns-priority", "5");
+
 			client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", GenerateAuthenticationHeader());
 
 			//removeToken prepared statement
