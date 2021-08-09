@@ -219,36 +219,18 @@ namespace WalletWasabi.CoinJoin.Coordinator
 		}
 
 #pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
-		public async Task MakeSureTwoRunningRoundsAsync(Money feePerInputs = null, Money feePerOutputs = null)
+		public async Task MakeSureInputregistrableRoundRunningAsync()
 		{
 			using (await RoundsListLock.LockAsync().ConfigureAwait(false))
 			{
-				int runningRoundCount = Rounds.Count(x => x.Status == CoordinatorRoundStatus.Running);
-
-				int confirmationTarget = await AdjustConfirmationTargetAsync(lockCoinJoins: true).ConfigureAwait(false);
-
-				if (runningRoundCount == 0)
+				if (!Rounds.Any(x => x.Status == CoordinatorRoundStatus.Running && x.Phase == RoundPhase.InputRegistration))
 				{
-					var round = new CoordinatorRound(RpcClient, UtxoReferee, RoundConfig, confirmationTarget, RoundConfig.ConfirmationTarget, RoundConfig.ConfirmationTargetReductionRate);
+					int confirmationTarget = await AdjustConfirmationTargetAsync(lockCoinJoins: true).ConfigureAwait(false);
+					var round = new CoordinatorRound(RpcClient, UtxoReferee, RoundConfig, confirmationTarget, RoundConfig.ConfirmationTarget, RoundConfig.ConfirmationTargetReductionRate, TimeSpan.FromSeconds(RoundConfig.InputRegistrationTimeout));
 					round.CoinJoinBroadcasted += Round_CoinJoinBroadcasted;
 					round.StatusChanged += Round_StatusChangedAsync;
-					await round.ExecuteNextPhaseAsync(RoundPhase.InputRegistration, feePerInputs, feePerOutputs).ConfigureAwait(false);
-					Rounds.Add(round);
-					SchedulePushAsync(round.InputRegistrationTimeout);
-
-					var round2 = new CoordinatorRound(RpcClient, UtxoReferee, RoundConfig, confirmationTarget, RoundConfig.ConfirmationTarget, RoundConfig.ConfirmationTargetReductionRate);
-					round2.StatusChanged += Round_StatusChangedAsync;
-					round2.CoinJoinBroadcasted += Round_CoinJoinBroadcasted;
-					await round2.ExecuteNextPhaseAsync(RoundPhase.InputRegistration, feePerInputs, feePerOutputs).ConfigureAwait(false);
-					Rounds.Add(round2);
-					// Only schedule 1 notification since 2 rounds are simultaneous
-				}
-				else if (runningRoundCount == 1)
-				{
-					var round = new CoordinatorRound(RpcClient, UtxoReferee, RoundConfig, confirmationTarget, RoundConfig.ConfirmationTarget, RoundConfig.ConfirmationTargetReductionRate);
-					round.StatusChanged += Round_StatusChangedAsync;
-					round.CoinJoinBroadcasted += Round_CoinJoinBroadcasted;
-					await round.ExecuteNextPhaseAsync(RoundPhase.InputRegistration, feePerInputs, feePerOutputs).ConfigureAwait(false);
+					round.PhaseChanged += Round_PhaseChangedAsync;
+					await round.ExecuteNextPhaseAsync(RoundPhase.InputRegistration).ConfigureAwait(false);
 					Rounds.Add(round);
 					SchedulePushAsync(round.InputRegistrationTimeout);
 				}
@@ -271,6 +253,11 @@ namespace WalletWasabi.CoinJoin.Coordinator
 				Logger.LogInfo("PUSH NOTIFICATIONS! INPUT DONE IN 15.");
 				SendPushCallback.Invoke();
 			}
+		}
+
+		private async void Round_PhaseChangedAsync(object? sender, RoundPhase e)
+		{
+			await MakeSureInputregistrableRoundRunningAsync().ConfigureAwait(false);
 		}
 
 		/// <summary>
@@ -317,9 +304,6 @@ namespace WalletWasabi.CoinJoin.Coordinator
 			{
 				var round = sender as CoordinatorRound;
 
-				Money feePerInputs = null;
-				Money feePerOutputs = null;
-
 				// If success save the coinjoin.
 				if (status == CoordinatorRoundStatus.Succeded)
 				{
@@ -357,8 +341,8 @@ namespace WalletWasabi.CoinJoin.Coordinator
 
 							int currentConfirmationTarget = await AdjustConfirmationTargetAsync(lockCoinJoins: false).ConfigureAwait(false);
 							var fees = await CoordinatorRound.CalculateFeesAsync(RpcClient, currentConfirmationTarget).ConfigureAwait(false);
-							feePerInputs = fees.feePerInputs;
-							feePerOutputs = fees.feePerOutputs;
+							var feePerInputs = fees.feePerInputs;
+							var feePerOutputs = fees.feePerOutputs;
 
 							Money newDenominationToGetInWithactiveOutputs = activeOutputAmount - (feePerInputs + (2 * feePerOutputs));
 							if (newDenominationToGetInWithactiveOutputs < RoundConfig.Denomination)
@@ -417,8 +401,9 @@ namespace WalletWasabi.CoinJoin.Coordinator
 				if (status == CoordinatorRoundStatus.Aborted || status == CoordinatorRoundStatus.Succeded)
 				{
 					round.StatusChanged -= Round_StatusChangedAsync;
+					round.PhaseChanged -= Round_PhaseChangedAsync;
 					round.CoinJoinBroadcasted -= Round_CoinJoinBroadcasted;
-					await MakeSureTwoRunningRoundsAsync(feePerInputs, feePerOutputs).ConfigureAwait(false);
+					await MakeSureInputregistrableRoundRunningAsync().ConfigureAwait(false);
 				}
 			}
 			catch (Exception ex)
@@ -442,7 +427,7 @@ namespace WalletWasabi.CoinJoin.Coordinator
 		{
 			using (RoundsListLock.Lock())
 			{
-				return Rounds.Where(x => x.Status == CoordinatorRoundStatus.Running).ToArray();
+				return Rounds.Where(x => x.Status == CoordinatorRoundStatus.Running).OrderBy(x => x.RemainingInputRegistrationTime).ToArray();
 			}
 		}
 
