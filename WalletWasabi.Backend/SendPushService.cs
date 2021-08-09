@@ -26,12 +26,9 @@ namespace WalletWasabi.Backend
 		private string _bundleId = "cash.chaincase.testnet"; // APNs Development iOS
 		private string _payload = @"{
 				""aps"": {
-					""content-available"": 1,
-					""alert"": ""Doing CoinJoin Crypto..."",
-					""sound"": ""default""
+					""content-available"": 1
 				}
 			}";
-		private int _spam = 0;
 
 		public SendPushService(IDbContextFactory<WasabiBackendContext> contextFactory)
 		{
@@ -105,11 +102,6 @@ namespace WalletWasabi.Backend
 
 		public async Task SendNotificationAsync(AppleDeviceToken token, string server, WasabiBackendContext context, StringContent content, HttpClient client)
 		{
-			if (_spam++ % 2 == 1)
-			{
-				return;
-			}
-
 			var url = $"https://{server}.push.apple.com/3/device/{token.Token}";
 			var guid = Guid.NewGuid().ToString();
 			content.Headers.Add("apns-id", guid);
