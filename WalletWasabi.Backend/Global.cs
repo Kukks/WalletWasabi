@@ -1,19 +1,15 @@
-using NBitcoin;
-using NBitcoin.Protocol;
-using NBitcoin.RPC;
 using System;
 using System.IO;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using WalletWasabi.Backend.Data;
+using NBitcoin;
+using NBitcoin.RPC;
 using WalletWasabi.BitcoinCore;
 using WalletWasabi.Blockchain.BlockFilters;
 using WalletWasabi.Blockchain.Blocks;
 using WalletWasabi.Blockchain.Mempool;
-using WalletWasabi.Blockchain.P2p;
 using WalletWasabi.CoinJoin.Coordinator;
 using WalletWasabi.CoinJoin.Coordinator.Rounds;
 using WalletWasabi.Helpers;
@@ -97,7 +93,7 @@ namespace WalletWasabi.Backend
 			IndexBuilderService.Synchronize();
 			Logger.LogInfo($"{nameof(IndexBuilderService)} is successfully initialized and started synchronization.");
 
-			await Coordinator.MakeSureTwoRunningRoundsAsync();
+			await Coordinator.MakeSureInputregistrableRoundRunningAsync();
 			Logger.LogInfo("Chaumian CoinJoin Coordinator is successfully initialized and started two new rounds.");
 		}
 
