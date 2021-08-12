@@ -26,7 +26,9 @@ namespace WalletWasabi.Backend
 		private string _bundleId = "cash.chaincase.testnet"; // APNs Development iOS
 		private string _payload = @"{
 				""aps"": {
-					""content-available"": 1
+					""content-available"": 1,
+					""alert"": ""Finalising CoinJoin 🔀"",
+					""sound"": ""default""
 				}
 			}";
 
@@ -80,23 +82,20 @@ namespace WalletWasabi.Backend
 			client.DefaultRequestVersion = HttpVersion.Version20;
 			var content = new StringContent(_payload, Encoding.UTF8, "application/json");
 			client.DefaultRequestHeaders.Add("apns-topic", _bundleId);
-			client.DefaultRequestHeaders.Add("apns-push-type", "background");
+			client.DefaultRequestHeaders.Add("apns-push-type", "alert");
 			client.DefaultRequestHeaders.Add("apns-priority", "5");
 
-			client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", GenerateAuthenticationHeader());
+			client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("bearer", GenerateAuthenticationHeader());
 
-			//removeToken prepared statement
 			var server = isDebug ? "api.sandbox" : "api";
 			var tokens = context.Tokens
 				.Where(t => t.IsDebug == isDebug)
 				.Distinct();
 
-			Console.WriteLine(tokens.Count());
 			foreach(var token in tokens)
 			{
 				await SendNotificationAsync(token, server, context, content, client);
 			}
-			//await Task.WhenAll(tokens.Select(token => SendNotificationAsync(token, server, context, content, client)));
 			await context.SaveChangesAsync();
 		}
 
@@ -123,4 +122,3 @@ namespace WalletWasabi.Backend
 	}
 }
 
-//{ StatusCode: 403, ReasonPhrase: 'Forbidden', Version: 2.0, Content: System.Net.Http.HttpConnectionResponseContent, Headers: { apns - id: 79FFDC32 - BAA9 - 17E3 - B5A7 - F67C24157B52 } }
