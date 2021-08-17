@@ -247,7 +247,10 @@ namespace WalletWasabi.CoinJoin.Coordinator
 			}
 
 			await Task.Delay(pushDelay);
-			if (inputRegistrationTimeout == GetCurrentInputRegisterableRoundOrDefault().InputRegistrationTimeout)
+			if (inputRegistrationTimeout == GetCurrentInputRegisterableRoundOrDefault().InputRegistrationTimeout
+				&& Rounds.Any(x => x.Status == CoordinatorRoundStatus.Running
+					&& x.Phase == RoundPhase.InputRegistration
+					&& x.CountAlices() >= 2))
 			{
 				// this sends 2 notifications for two rounds, so make sure the notifications are rate limited
 				Logger.LogInfo("PUSH NOTIFICATIONS! INPUT DONE IN 15.");
