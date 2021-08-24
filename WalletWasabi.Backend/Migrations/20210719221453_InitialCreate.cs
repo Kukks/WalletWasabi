@@ -19,7 +19,6 @@ namespace WalletWasabi.Backend.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Tokens", x => x.Id);
-                    table.UniqueConstraint("PK_Tokens", x => x.Token);
                 });
         }
 
