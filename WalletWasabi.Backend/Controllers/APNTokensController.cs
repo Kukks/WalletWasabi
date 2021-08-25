@@ -22,14 +22,18 @@ namespace WalletWasabi.Backend.Controllers
 		[HttpPost]
 		[ProducesResponseType(200)]
 		[ProducesResponseType(400)]
-		public async Task<IActionResult> StoreTokenAsync([FromBody] AppleDeviceToken token)
+		public async Task<IActionResult> StoreTokenAsync([FromBody] DeviceToken token)
 		{
 			if (!ModelState.IsValid)
 			{
-				return BadRequest("Invalid Apple device token.");
+				return BadRequest("Invalid device token.");
 			}
 
 			await using var context = ContextFactory.CreateDbContext();
+			if((await context.Tokens.FindAsync(token.Token))!= null)
+			{
+				return BadRequest("Token already exists");
+			}
 			await context.Tokens.AddAsync(token);
 			await context.SaveChangesAsync();
 			return Ok("Device token stored.");
@@ -45,7 +49,7 @@ namespace WalletWasabi.Backend.Controllers
 		public async Task<IActionResult> DeleteTokenAsync([FromRoute] string tokenString)
 		{
 			await using var context = ContextFactory.CreateDbContext();
-			var token = await context.Tokens.FirstOrDefaultAsync(token => token.Token == tokenString);
+			var token = await context.Tokens.FindAsync(tokenString);
 			if (token != null)
 			{
 				context.Tokens.Remove(token);
