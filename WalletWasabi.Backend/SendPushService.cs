@@ -89,7 +89,7 @@ namespace WalletWasabi.Backend
 			var server = isDebug ? "api.sandbox" : "api";
 			var tokenType = isDebug ? TokenType.AppleDebug : TokenType.Apple;
 			var tokens = await context.Tokens
-				.Where(t => t.Type == tokenType)
+				.Where(t => t.Status != TokenStatus.Invalid && t.Type == tokenType)
 				.ToListAsync();
 
 			var results = tokens.Select(token => SendNotificationAsync(token, server, context, content, client));
@@ -108,12 +108,16 @@ namespace WalletWasabi.Backend
 			{
 				Logger.LogError($"HttpPost to APNs failed: {res.Content}");
 			}
+			else
+			{
+				token.Status = TokenStatus.Valid;
+			}
 
 			if (res.StatusCode is HttpStatusCode.BadRequest || res.StatusCode is HttpStatusCode.Gone)
 			{
 				if (res.ReasonPhrase == "BadDeviceToken")
 				{
-					context.Tokens.Remove(token);
+					token.Status = TokenStatus.Invalid;
 				}
 			}
 		}

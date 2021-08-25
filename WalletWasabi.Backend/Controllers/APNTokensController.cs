@@ -26,10 +26,14 @@ namespace WalletWasabi.Backend.Controllers
 		{
 			if (!ModelState.IsValid)
 			{
-				return BadRequest("Invalid Apple device token.");
+				return BadRequest("Invalid device token.");
 			}
 
 			await using var context = ContextFactory.CreateDbContext();
+			if((await context.Tokens.FindAsync(token.Token))!= null)
+			{
+				return BadRequest("Token already exists");
+			}
 			await context.Tokens.AddAsync(token);
 			await context.SaveChangesAsync();
 			return Ok("Device token stored.");
