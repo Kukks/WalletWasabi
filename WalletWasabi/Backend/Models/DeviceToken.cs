@@ -14,6 +14,16 @@ namespace WalletWasabi.Backend.Models
 
 		[JsonConverter(typeof(StringEnumConverter))]
 		public TokenType Type { get; set; }
+
+		[JsonIgnore]
+		public TokenStatus Status { get; set; } = TokenStatus.New;
+	}
+
+	public enum TokenStatus
+	{
+		New,
+		Valid,
+		Invalid
 	}
 
 	public enum TokenType
