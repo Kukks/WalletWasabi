@@ -87,18 +87,17 @@ namespace WalletWasabi.Backend
 			client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("bearer", GenerateAuthenticationHeader());
 
 			var server = isDebug ? "api.sandbox" : "api";
-			var tokens = context.Tokens
-				.Where(t => t.IsDebug == isDebug)
-				.Distinct();
+			var tokenType = isDebug ? TokenType.AppleDebug : TokenType.Apple;
+			var tokens = await context.Tokens
+				.Where(t => t.Type == tokenType)
+				.ToListAsync();
 
-			foreach(var token in tokens)
-			{
-				await SendNotificationAsync(token, server, context, content, client);
-			}
+			var results = tokens.Select(token => SendNotificationAsync(token, server, context, content, client));
+			await Task.WhenAll(results);
 			await context.SaveChangesAsync();
 		}
 
-		public async Task SendNotificationAsync(AppleDeviceToken token, string server, WasabiBackendContext context, StringContent content, HttpClient client)
+		public async Task SendNotificationAsync(DeviceToken token, string server, WasabiBackendContext context, StringContent content, HttpClient client)
 		{
 			var url = $"https://{server}.push.apple.com/3/device/{token.Token}";
 			var guid = Guid.NewGuid().ToString();
