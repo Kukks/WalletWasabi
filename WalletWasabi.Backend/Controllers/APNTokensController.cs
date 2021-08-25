@@ -22,7 +22,7 @@ namespace WalletWasabi.Backend.Controllers
 		[HttpPost]
 		[ProducesResponseType(200)]
 		[ProducesResponseType(400)]
-		public async Task<IActionResult> StoreTokenAsync([FromBody] AppleDeviceToken token)
+		public async Task<IActionResult> StoreTokenAsync([FromBody] DeviceToken token)
 		{
 			if (!ModelState.IsValid)
 			{
@@ -45,7 +45,7 @@ namespace WalletWasabi.Backend.Controllers
 		public async Task<IActionResult> DeleteTokenAsync([FromRoute] string tokenString)
 		{
 			await using var context = ContextFactory.CreateDbContext();
-			var token = await context.Tokens.FirstOrDefaultAsync(token => token.Token == tokenString);
+			var token = await context.Tokens.FindAsync(tokenString);
 			if (token != null)
 			{
 				context.Tokens.Remove(token);
