@@ -26,10 +26,9 @@ namespace WalletWasabi.Backend
 		private string _bundleId = "cash.chaincase.testnet"; // APNs Development iOS
 		private string _payload = @"{
 				""aps"": {
-					""content-available"": 1,
-					""alert"": ""Finalising CoinJoin 🔀"",
-					""sound"": ""default""
-				}
+					""content-available"": 1
+				},
+				""cj"": 1
 			}";
 
 		public SendPushService(IDbContextFactory<WasabiBackendContext> contextFactory)
@@ -82,7 +81,7 @@ namespace WalletWasabi.Backend
 			client.DefaultRequestVersion = HttpVersion.Version20;
 			var content = new StringContent(_payload, Encoding.UTF8, "application/json");
 			client.DefaultRequestHeaders.Add("apns-topic", _bundleId);
-			client.DefaultRequestHeaders.Add("apns-push-type", "alert");
+			client.DefaultRequestHeaders.Add("apns-push-type", "background");
 			client.DefaultRequestHeaders.Add("apns-priority", "5");
 
 			client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("bearer", GenerateAuthenticationHeader());
