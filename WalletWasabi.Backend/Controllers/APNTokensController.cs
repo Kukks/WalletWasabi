@@ -19,7 +19,7 @@ namespace WalletWasabi.Backend.Controllers
 			ContextFactory = contextFactory;
 		}
 
-		[HttpPost]
+		[HttpPut]
 		[ProducesResponseType(200)]
 		[ProducesResponseType(400)]
 		public async Task<IActionResult> StoreTokenAsync([FromBody] DeviceToken token)
@@ -30,9 +30,12 @@ namespace WalletWasabi.Backend.Controllers
 			}
 
 			await using var context = ContextFactory.CreateDbContext();
-			if((await context.Tokens.FindAsync(token.Token))!= null)
+			var existingToken = await context.Tokens.FindAsync(token.Token);
+			if(existingToken != null)
 			{
-				return BadRequest("Token already exists");
+				existingToken.Status = token.Status;
+				existingToken.Type = token.Type;
+				return Ok("Device token stored.");
 			}
 			await context.Tokens.AddAsync(token);
 			await context.SaveChangesAsync();
