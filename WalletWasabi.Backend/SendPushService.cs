@@ -106,7 +106,7 @@ namespace WalletWasabi.Backend
 
 			if (!res.IsSuccessStatusCode)
 			{
-				Logger.LogError($"HttpPost to APNs failed: {res.Content}");
+				Logger.LogError($"HttpPost to APNs failed: {await res.Content.ReadAsStringAsync()} {token.Token}");
 			}
 			else
 			{
