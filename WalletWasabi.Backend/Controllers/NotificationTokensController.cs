@@ -7,14 +7,14 @@ using WalletWasabi.Helpers;
 
 namespace WalletWasabi.Backend.Controllers
 {
-	[Route("api/v" + Constants.BackendMajorVersion + "/btc/[controller]")]
+	[Route("api/v" + Constants.BackendMajorVersion + "/[controller]")]
 	[ApiController]
 	[Produces("application/json")]
-	public class APNTokensController : ControllerBase
+	public class NotificationTokensController : ControllerBase
 	{
 		private readonly IDbContextFactory<WasabiBackendContext> ContextFactory;
 
-		public APNTokensController(IDbContextFactory<WasabiBackendContext> contextFactory)
+		public NotificationTokensController(IDbContextFactory<WasabiBackendContext> contextFactory)
 		{
 			ContextFactory = contextFactory;
 		}
@@ -31,13 +31,15 @@ namespace WalletWasabi.Backend.Controllers
 
 			await using var context = ContextFactory.CreateDbContext();
 			var existingToken = await context.Tokens.FindAsync(token.Token);
-			if(existingToken != null)
+			if (existingToken != null)
 			{
 				existingToken.Status = token.Status;
 				existingToken.Type = token.Type;
-				return Ok("Device token stored.");
 			}
-			await context.Tokens.AddAsync(token);
+			else
+			{
+				await context.Tokens.AddAsync(token);
+			}
 			await context.SaveChangesAsync();
 			return Ok("Device token stored.");
 		}
