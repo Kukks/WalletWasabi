@@ -92,8 +92,10 @@ namespace WalletWasabi.Backend
 				.Where(t => t.Status != TokenStatus.Invalid && t.Type == tokenType)
 				.ToListAsync();
 
-			var results = tokens.Select(token => SendNotificationAsync(token, server, context, content, client));
-			await Task.WhenAll(results);
+			foreach (var token in tokens)
+			{
+				await SendNotificationAsync(token, server, context, content, client);
+			}
 			await context.SaveChangesAsync();
 		}
 
