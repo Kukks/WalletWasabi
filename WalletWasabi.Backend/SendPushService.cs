@@ -20,7 +20,7 @@ namespace WalletWasabi.Backend
 	{
 		private readonly IDbContextFactory<WasabiBackendContext> ContextFactory;
 
-		private string _keyPath = "/Users/Dan/Downloads/AuthKey_4L3728R8LJ.p8";
+		private string _keyPath = "/home/staging/AuthKey_4L3728R8LJ.p8";
 		private string _auth_key_id = "4L3728R8LJ";
 		private string _teamId = "9Z72DXKVXK"; // Chaincase LLC
 		private string _bundleId = "cash.chaincase.testnet"; // APNs Development iOS
@@ -88,6 +88,7 @@ namespace WalletWasabi.Backend
 
 			var server = isDebug ? "api.sandbox" : "api";
 			var tokenType = isDebug ? TokenType.AppleDebug : TokenType.Apple;
+			Logger.LogInfo($"SendNotificationsAsync isDebug: {isDebug}");
 			var tokens = await context.Tokens
 				.Where(t => t.Status != TokenStatus.Invalid && t.Type == tokenType)
 				.ToListAsync();
@@ -102,8 +103,6 @@ namespace WalletWasabi.Backend
 		public async Task SendNotificationAsync(DeviceToken token, string server, WasabiBackendContext context, StringContent content, HttpClient client)
 		{
 			var url = $"https://{server}.push.apple.com/3/device/{token.Token}";
-			var guid = Guid.NewGuid().ToString();
-			content.Headers.Add("apns-id", guid);
 			var res = await client.PostAsync(url, content);
 
 			if (!res.IsSuccessStatusCode)
