@@ -1207,13 +1207,8 @@ namespace WalletWasabi.CoinJoin.Coordinator.Rounds
 			foreach (var inputProof in inputProofs)
 			{
 				var outpoint = inputProof.Input;
-				foreach (var alice in QueuedAlices)
-				{
-					if (alice.Inputs.Any(x => x.Outpoint == outpoint))
-					{
-						QueuedAlices.Remove(alice);
-					}
-				}
+				QueuedAlices.RemoveAll(
+					alice => alice.Inputs.Any(input => input.Outpoint == outpoint));
 			}
 		}
 
