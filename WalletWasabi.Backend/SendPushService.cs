@@ -74,6 +74,7 @@ namespace WalletWasabi.Backend
 			return Convert.FromBase64String(base64Key);
 		}
 
+		// https://developer.apple.com/documentation/usernotifications/setting_up_a_remote_notification_server/sending_notification_requests_to_apns/
 		public async Task SendNotificationsAsync(bool isDebug)
 		{
 			await using var context = ContextFactory.CreateDbContext();
@@ -82,7 +83,8 @@ namespace WalletWasabi.Backend
 			var content = new StringContent(_payload, Encoding.UTF8, "application/json");
 			client.DefaultRequestHeaders.Add("apns-topic", _bundleId);
 			client.DefaultRequestHeaders.Add("apns-push-type", "background");
-			client.DefaultRequestHeaders.Add("apns-priority", "5");
+			client.DefaultRequestHeaders.Add("apns-priority", "5"); // background push MUST be 5
+			client.DefaultRequestHeaders.Add("apns-expiration", "0"); // attempt delivery only once
 
 			client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("bearer", GenerateAuthenticationHeader());
 
