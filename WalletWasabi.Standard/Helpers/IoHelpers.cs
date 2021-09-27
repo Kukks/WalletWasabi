@@ -60,7 +60,7 @@ namespace System.IO
 		{
 			try
 			{
-				ZipFile.ExtractToDirectory(src, dest);
+				ZipFile.ExtractToDirectory(src, dest, true);
 			}
 			catch (UnauthorizedAccessException)
 			{
