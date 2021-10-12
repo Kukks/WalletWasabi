@@ -90,7 +90,7 @@ namespace WalletWasabi.Helpers
 			{
 				return false;
 			}
-			if (!string.IsNullOrEmpty(parts[5]) && (isSeedValid is null || isSeedValid(parts[5])))
+			if (string.IsNullOrEmpty(parts[5]) || !(isSeedValid is null || isSeedValid(parts[5])))
 			{
 				return false;
 			}
