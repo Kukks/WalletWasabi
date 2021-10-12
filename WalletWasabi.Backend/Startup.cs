@@ -14,6 +14,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore.Internal;
+using NicolasDorier.RateLimits;
 using WalletWasabi.Backend.Middlewares;
 using WalletWasabi.Backend.Data;
 using WalletWasabi.Helpers;
@@ -35,6 +36,7 @@ namespace WalletWasabi.Backend
 		// This method gets called by the runtime. Use this method to add services to the container.
 		public void ConfigureServices(IServiceCollection services)
 		{
+			services.AddRateLimits();
 			services.AddMemoryCache();
 
 			services.AddMvc(options => options.ModelMetadataDetailsProviders.Add(new SuppressChildValidationMetadataProvider(typeof(BitcoinAddress))))
@@ -88,7 +90,7 @@ namespace WalletWasabi.Backend
 		// This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
 #pragma warning disable IDE0060 // Remove unused parameter
 
-		public void Configure(IApplicationBuilder app, IWebHostEnvironment env, Global global)
+		public void Configure(IApplicationBuilder app, IWebHostEnvironment env, Global global, RateLimitService rates)
 #pragma warning restore IDE0060 // Remove unused parameter
 		{
 			app.UseStaticFiles();
@@ -107,7 +109,7 @@ namespace WalletWasabi.Backend
 			app.UseMiddleware<HeadMethodMiddleware>();
 
 			app.UseResponseCompression();
-
+			rates.SetZone($"zone={ZoneLimits.NotificationTokens} rate=10r/m burst=3 nodelay");
 			app.UseEndpoints(endpoints => endpoints.MapControllers());
 
 			var applicationLifetime = app.ApplicationServices.GetRequiredService<IHostApplicationLifetime>();

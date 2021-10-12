@@ -1,6 +1,11 @@
+using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
+using NicolasDorier.RateLimits;
 using WalletWasabi.Backend.Data;
 using WalletWasabi.Backend.Models;
 using WalletWasabi.Helpers;
@@ -12,6 +17,24 @@ namespace WalletWasabi.Backend.Controllers
 	[Produces("application/json")]
 	public class NotificationTokensController : ControllerBase
 	{
+		private class DeviceTokenHashCashFilter : HashCashFilter
+		{
+			public override int MinPow => 10;
+			public override TimeSpan MaxDifference { get; } = TimeSpan.FromMinutes(5);
+			public override string GetResource(ActionExecutingContext context)
+			{
+				switch (context.HttpContext.Request.Method)
+				{
+					case "PUT":
+						var dt = context.ActionArguments.Values.SingleOrDefault(pair => pair is DeviceToken) as DeviceToken;
+						return dt?.Token;
+					case "DELETE":
+						return context.RouteData.Values.TryGetValue("tokenString", out var tokenString) ? $"{tokenString}_delete" : null;
+				}
+				return base.GetResource(context);
+			}
+		}
+
 		private readonly IDbContextFactory<WasabiBackendContext> ContextFactory;
 
 		public NotificationTokensController(IDbContextFactory<WasabiBackendContext> contextFactory)
@@ -22,13 +45,14 @@ namespace WalletWasabi.Backend.Controllers
 		[HttpPut]
 		[ProducesResponseType(200)]
 		[ProducesResponseType(400)]
+		[RateLimitsFilter(ZoneLimits.NotificationTokens, Scope = RateLimitsScope.RemoteAddress)]
+		[DeviceTokenHashCashFilter]
 		public async Task<IActionResult> StoreTokenAsync([FromBody] DeviceToken token)
 		{
 			if (!ModelState.IsValid)
 			{
 				return BadRequest("Invalid device token.");
 			}
-
 			await using var context = ContextFactory.CreateDbContext();
 			var existingToken = await context.Tokens.FindAsync(token.Token);
 			if (existingToken != null)
@@ -51,6 +75,8 @@ namespace WalletWasabi.Backend.Controllers
 		/// <response code="200">Always return Ok, we should not confirm whether a token is in the db or not here</response>
 		[HttpDelete("{tokenString}")]
 		[ProducesResponseType(200)]
+		[DeviceTokenHashCashFilter]
+		[RateLimitsFilter(ZoneLimits.NotificationTokens, Scope = RateLimitsScope.RouteData, DataKey = "tokenString")]
 		public async Task<IActionResult> DeleteTokenAsync([FromRoute] string tokenString)
 		{
 			await using var context = ContextFactory.CreateDbContext();
