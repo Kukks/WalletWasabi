@@ -266,5 +266,33 @@ namespace WalletWasabi.Tests.RegressionTests
 		#endregion BackendTests
 
 #pragma warning restore IDE0059 // Value assigned to symbol is never used
+
+		#region Chaincase Backend Tests
+
+		[Fact]
+		public async Task NotificationsTests()
+		{
+			using var client = new WasabiClient(new Uri(RegTestFixture.BackendEndPoint), null);
+			_ = await client.RegisterNotificationTokenAsync(new DeviceToken()
+			{
+				Status = TokenStatus.New,
+				Token = "123456",
+				Type = TokenType.AppleDebug
+			}, CancellationToken.None);
+			var x = await Assert.ThrowsAsync<HttpRequestException>(async () =>
+			{
+				_ = await client.RegisterNotificationTokenAsync(new DeviceToken()
+				{
+					Status = TokenStatus.New,
+					Token = "123456",
+					Type = TokenType.AppleDebug
+				}, CancellationToken.None);
+			});
+			Assert.Contains(HttpStatusCode.BadRequest.ToReasonString(), x.Message);
+
+		}
+
+		#endregion
+
 	}
 }
