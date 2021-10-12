@@ -279,16 +279,7 @@ namespace WalletWasabi.Tests.RegressionTests
 				Token = "123456",
 				Type = TokenType.AppleDebug
 			}, CancellationToken.None);
-			var x = await Assert.ThrowsAsync<HttpRequestException>(async () =>
-			{
-				_ = await client.RegisterNotificationTokenAsync(new DeviceToken()
-				{
-					Status = TokenStatus.New,
-					Token = "123456",
-					Type = TokenType.AppleDebug
-				}, CancellationToken.None);
-			});
-			Assert.Contains(HttpStatusCode.BadRequest.ToReasonString(), x.Message);
+			_ = await client.RemoveNotificationTokenAsync("123456", CancellationToken.None);
 
 		}
 

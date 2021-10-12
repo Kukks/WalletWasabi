@@ -10,6 +10,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using WalletWasabi.Backend.Models;
 using WalletWasabi.Backend.Models.Responses;
 using WalletWasabi.Bases;
@@ -297,9 +298,9 @@ namespace WalletWasabi.WebClients.Wasabi
 
 		public async Task<string>  RegisterNotificationTokenAsync(DeviceToken deviceToken,CancellationToken cancel)
 		{
-			var request = new HttpRequestMessage(HttpMethod.Put, $"/api/v{ApiVersion}/notificationTokens")
+			var request = new HttpRequestMessage(HttpMethod.Put, new Uri(TorClient.DestinationUri, $"/api/v{ApiVersion}/notificationTokens"))
 			{
-				Content = new StringContent(JsonConvert.ToString(deviceToken), Encoding.UTF8, "application/json"),
+				Content = new StringContent(JObject.FromObject(deviceToken).ToString(), Encoding.UTF8, "application/json"),
 				Headers = { { "X-Hashcash", new[] { HashCashUtils.Compute(10, deviceToken.Token) } } }
 			};
 
@@ -320,7 +321,7 @@ namespace WalletWasabi.WebClients.Wasabi
 
 		public async Task<string>  RemoveNotificationTokenAsync(string deviceToken,CancellationToken cancel)
 		{
-			var request = new HttpRequestMessage(HttpMethod.Delete, $"/api/v{ApiVersion}/notificationTokens/{deviceToken}")
+			var request = new HttpRequestMessage(HttpMethod.Delete, new Uri(TorClient.DestinationUri,$"/api/v{ApiVersion}/notificationTokens/{deviceToken}"))
 			{
 				Headers = { { "X-Hashcash", new[] { HashCashUtils.Compute(10, $"{deviceToken}_delete") } } }
 			};
