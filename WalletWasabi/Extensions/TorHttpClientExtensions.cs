@@ -33,4 +33,28 @@ public static class TorHttpClientExtensions
 		}
 		return response;
 	}
+
+	public static async Task<HttpResponseMessage> SendAndRetryAsync(this ITorHttpClient client, HttpRequestMessage requestMessage, HttpStatusCode expectedCode, int retry = 2, CancellationToken cancel = default)
+	{
+		HttpResponseMessage response = null;
+		while (retry-- > 0)
+		{
+			response?.Dispose();
+			cancel.ThrowIfCancellationRequested();
+			response = await client.SendAsync(requestMessage, cancel);
+			if (response.StatusCode == expectedCode)
+			{
+				break;
+			}
+			try
+			{
+				await Task.Delay(1000, cancel);
+			}
+			catch (TaskCanceledException ex)
+			{
+				throw new OperationCanceledException(ex.Message, ex, cancel);
+			}
+		}
+		return response;
+	}
 }

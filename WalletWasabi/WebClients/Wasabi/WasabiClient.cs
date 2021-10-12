@@ -9,6 +9,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
 using WalletWasabi.Backend.Models;
 using WalletWasabi.Backend.Models.Responses;
 using WalletWasabi.Bases;
@@ -291,5 +292,55 @@ namespace WalletWasabi.WebClients.Wasabi
 		}
 
 		#endregion wasabi
+
+		#region Chaincase
+
+		public async Task<string>  RegisterNotificationTokenAsync(DeviceToken deviceToken,CancellationToken cancel)
+		{
+			var request = new HttpRequestMessage(HttpMethod.Put, $"/api/v{ApiVersion}/notificationTokens")
+			{
+				Content = new StringContent(JsonConvert.ToString(deviceToken), Encoding.UTF8, "application/json"),
+				Headers = { { "X-Hashcash", new[] { HashCashUtils.Compute(10, deviceToken.Token) } } }
+			};
+
+			using var response = await TorClient.SendAndRetryAsync(
+				request,
+				HttpStatusCode.OK,
+				2, cancel).ConfigureAwait(false);
+
+			if (response.StatusCode != HttpStatusCode.OK)
+			{
+				await response.ThrowRequestExceptionFromContentAsync();
+			}
+
+			using HttpContent content = response.Content;
+			var ret = await content.ReadAsStringAsync().ConfigureAwait(false);
+			return ret;
+		}
+
+		public async Task<string>  RemoveNotificationTokenAsync(string deviceToken,CancellationToken cancel)
+		{
+			var request = new HttpRequestMessage(HttpMethod.Delete, $"/api/v{ApiVersion}/notificationTokens/{deviceToken}")
+			{
+				Headers = { { "X-Hashcash", new[] { HashCashUtils.Compute(10, $"{deviceToken}_delete") } } }
+			};
+
+			using var response = await TorClient.SendAndRetryAsync(
+				request,
+				HttpStatusCode.OK,
+				2, cancel).ConfigureAwait(false);
+
+			if (response.StatusCode != HttpStatusCode.OK)
+			{
+				await response.ThrowRequestExceptionFromContentAsync();
+			}
+
+			using HttpContent content = response.Content;
+			var ret = await content.ReadAsStringAsync().ConfigureAwait(false);
+			return ret;
+		}
+
+
+		#endregion
 	}
 }
