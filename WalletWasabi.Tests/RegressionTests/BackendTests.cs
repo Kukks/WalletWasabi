@@ -22,6 +22,7 @@ using WalletWasabi.Backend.Controllers;
 using WalletWasabi.Backend.Data;
 using WalletWasabi.Backend.Models;
 using WalletWasabi.Backend.Models.Responses;
+using WalletWasabi.Backend.Polyfills;
 using WalletWasabi.BitcoinCore;
 using WalletWasabi.Blockchain.Analysis.Clustering;
 using WalletWasabi.Blockchain.BlockFilters;
