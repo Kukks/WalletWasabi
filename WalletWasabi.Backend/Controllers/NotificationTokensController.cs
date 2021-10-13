@@ -8,6 +8,7 @@ using Microsoft.Extensions.Caching.Memory;
 using NicolasDorier.RateLimits;
 using WalletWasabi.Backend.Data;
 using WalletWasabi.Backend.Models;
+using WalletWasabi.Backend.Polyfills;
 using WalletWasabi.Helpers;
 
 namespace WalletWasabi.Backend.Controllers
@@ -81,11 +82,13 @@ namespace WalletWasabi.Backend.Controllers
 		{
 			await using var context = ContextFactory.CreateDbContext();
 			var token = await context.Tokens.FindAsync(tokenString);
-			if (token != null)
+			if (token == null)
 			{
-				context.Tokens.Remove(token);
-				await context.SaveChangesAsync();
+				return Ok();
 			}
+
+			context.Tokens.Remove(token);
+			await context.SaveChangesAsync();
 			return Ok();
 		}
 	}

@@ -63,41 +63,63 @@ namespace WalletWasabi.Helpers
 			return GetStampHashDenomination(hash) == bits;
 		}
 
-		public static bool Verify(string header, int bitsMin, TimeSpan allowedDiff, string resource, Func<string, bool> isSeedValid = null)
+		public static bool Verify(string header, int bitsMin, TimeSpan allowedDiff, string resource, out string error, out byte[] hash )
 		{
+			hash = null;
+			error = null;
 			var parts = header.Split(':');
 			if (parts[0] != "1")
 			{
+				error = "Only Hashcash v1 is supported";
 				return false;
 			}
 			var zbits = int.Parse(parts[1]);
 			if (zbits < bitsMin)
 			{
+				error = $"Insufficient pow ({zbits} instead of {bitsMin})";
 				return false;
 			}
 
-			if (DateTime.UtcNow - DateTime.ParseExact(parts[2], "yyMMddhhmmss", null ) < allowedDiff)
+			var timestamp = DateTime.ParseExact(parts[2], "yyMMddhhmmss", null);
+			if (timestamp > DateTime.UtcNow)
 			{
+				error = $"timestamp is in the future";
+				return false;
+			}
+			var diff = DateTime.UtcNow - timestamp;
+			if (allowedDiff < diff)
+			{
+				error = $"timestamp too old ({diff} instead of {allowedDiff})";
 				return false;
 			}
 
 			if (resource != parts[3])
 			{
+				error = $"resource mismatch too old ({parts[3]} instead of {resource})";
 				return false;
 			}
 
 			if (!string.IsNullOrEmpty(parts[4]))
 			{
+				error = $"extension not used in v1, not empty";
 				return false;
 			}
-			if (string.IsNullOrEmpty(parts[5]) || !(isSeedValid is null || isSeedValid(parts[5])))
+			if (string.IsNullOrEmpty(parts[5]))
 			{
+				error = $"seed invalid";
 				return false;
 			}
 
 			var sha = new SHA1CryptoServiceProvider();
-			var hash = sha.ComputeHash(Encoding.UTF8.GetBytes(header));
-			return GetStampHashDenomination(hash) == zbits;
+			hash = sha.ComputeHash(Encoding.UTF8.GetBytes(header));
+			var pow =  GetStampHashDenomination(hash);
+			if (pow == zbits)
+			{
+				return true;
+			}
+
+			error = $"actual pow invalid (expected {zbits} but found {zbits})";
+			return false;
 		}
 
 		private static int GetStampHashDenomination(byte[] stampHash)
