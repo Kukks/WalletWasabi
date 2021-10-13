@@ -1,9 +1,12 @@
 ﻿using System;
 using System.Linq;
+using System.Text;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Primitives;
+using NBitcoin.DataEncoders;
 using WalletWasabi.Helpers;
 
 namespace WalletWasabi.Backend
@@ -38,34 +41,33 @@ namespace WalletWasabi.Backend
 
 		public void OnActionExecuting(ActionExecutingContext context)
 		{
+			var pow = MinPow;
+			var resource = GetResource(context);
+			if (resource is null || pow <= 0)
+			{
+				return;
+			}
+			context.HttpContext.Response.Headers.Add("X-Hashcash-Challenge", new StringValues($"1:{pow}:{DateTime.UtcNow:yyMMddhhmmss}:{resource}:whatever:0"));
 			if (!context.HttpContext.Request.Headers.TryGetValue("X-Hashcash", out var xhashcash))
 			{
 				context.Result = new BadRequestObjectResult("Missing X-Hashcash header");
 			}
 
-			var resource = GetResource(context);
-			if (resource is null)
-			{
-				return;
-			}
-
 			var memoryCache = context.HttpContext.RequestServices.GetRequiredService<IMemoryCache>();
 
-			if (!HashCashUtils.Verify(xhashcash, MinPow, MaxDifference, resource, s =>
-			{
-				var cacheKey = $"{nameof(HashCashFilter)}_seed_{s}";
-				if(memoryCache.TryGetValue(cacheKey, out _))
-				{
-					return false;
-				}
-
-				memoryCache.CreateEntry(cacheKey).SlidingExpiration = TimeSpan.FromHours(1);
-				return true;
-			}))
+			if (!HashCashUtils.Verify(xhashcash, MinPow, MaxDifference, resource, out var error, out var hash))
 			{
 				context.Result = new BadRequestObjectResult(
-					$"Invalid hashcash computation ({MinPow} pow min with utc datetime less than {MaxDifference.ToString()} ago)");
+					$"Invalid hashcash: {error}");
 			}
+			var cacheKey = $"{nameof(HashCashFilter)}_hash_{Encoders.Hex.EncodeData(hash)}";
+			if(memoryCache.TryGetValue(cacheKey, out _))
+			{
+				context.Result = new BadRequestObjectResult(
+					$"Invalid hashcash: hash seen before");
+			}
+
+			memoryCache.CreateEntry(cacheKey).SlidingExpiration = MaxDifference;
 		}
 	}
 }
