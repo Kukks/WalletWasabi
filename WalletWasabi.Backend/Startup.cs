@@ -17,6 +17,7 @@ using Microsoft.EntityFrameworkCore.Internal;
 using NicolasDorier.RateLimits;
 using WalletWasabi.Backend.Middlewares;
 using WalletWasabi.Backend.Data;
+using WalletWasabi.Backend.Polyfills;
 using WalletWasabi.Helpers;
 using WalletWasabi.Interfaces;
 using WalletWasabi.Logging;
@@ -68,7 +69,7 @@ namespace WalletWasabi.Backend
 			services.AddLogging(logging => logging.AddFilter((s, level) => level >= Microsoft.Extensions.Logging.LogLevel.Warning));
 
 
-			services.AddDbContextFactory<WasabiBackendContext>((provider, builder) =>
+			services.AddDbContextFactory<WasabiBackendContext>(builder =>
 			{
 				var connString = "User ID=postgres;Host=127.0.0.1;Port=65466;Database=wasabibackend;";
 				if (string.IsNullOrEmpty(connString))
