@@ -8,7 +8,7 @@ namespace WalletWasabi.Backend.Polyfills
 	{
 		public static IServiceCollection AddDbContextFactory<TContext>(
 			this IServiceCollection collection,
-			Action<DbContextOptionsBuilder> optionsAction = null,
+			Action<DbContextOptionsBuilder, IServiceProvider> optionsAction = null,
 			ServiceLifetime contextAndOptionsLifetime = ServiceLifetime.Singleton)
 			where TContext : DbContext
 		{
@@ -33,7 +33,7 @@ namespace WalletWasabi.Backend.Polyfills
 		/// <param name="sp">The scoped <see cref="IServiceProvider"/>.</param>
 		/// <returns>The newly configured <see cref="DbContextOptions{TContext}"/>.</returns>
 		private static DbContextOptions<TContext> GetOptions<TContext>(
-			Action<DbContextOptionsBuilder> action,
+			Action<DbContextOptionsBuilder, IServiceProvider> action,
 			IServiceProvider sp = null) where TContext : DbContext
 		{
 			var optionsBuilder = new DbContextOptionsBuilder<TContext>();
@@ -41,7 +41,8 @@ namespace WalletWasabi.Backend.Polyfills
 			{
 				optionsBuilder.UseApplicationServiceProvider(sp);
 			}
-			action?.Invoke(optionsBuilder);
+			action?.Invoke(optionsBuilder, sp);
+
 			return optionsBuilder.Options;
 		}
 
