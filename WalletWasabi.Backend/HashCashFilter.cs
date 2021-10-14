@@ -22,13 +22,13 @@ namespace WalletWasabi.Backend
 		}
 
 		public virtual TimeSpan MaxDifference { get; }
-		public virtual int MinPow { get; }
+		public virtual int? MinPow { get; }
 
 		protected HashCashFilter()
 		{
 		}
 
-		public HashCashFilter(string resource, TimeSpan maxDifference, int minPow)
+		public HashCashFilter(string resource, TimeSpan maxDifference, int? minPow)
 		{
 			_resource = resource;
 			MaxDifference = maxDifference;
@@ -41,7 +41,9 @@ namespace WalletWasabi.Backend
 
 		public void OnActionExecuting(ActionExecutingContext context)
 		{
-			var pow = MinPow;
+
+			var config = context.HttpContext.RequestServices.GetRequiredService<Config>();
+			var pow = MinPow?? config.HashCashDifficulty;
 			var resource = GetResource(context);
 			if (resource is null || pow <= 0)
 			{

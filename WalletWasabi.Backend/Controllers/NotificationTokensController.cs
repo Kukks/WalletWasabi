@@ -20,7 +20,6 @@ namespace WalletWasabi.Backend.Controllers
 	{
 		private class DeviceTokenHashCashFilter : HashCashFilter
 		{
-			public override int MinPow => 20;
 			public override TimeSpan MaxDifference { get; } = TimeSpan.FromMinutes(5);
 			public override string GetResource(ActionExecutingContext context)
 			{
