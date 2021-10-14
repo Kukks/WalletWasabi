@@ -8,118 +8,70 @@ namespace WalletWasabi.Helpers
 {
 	public static class HashCashUtils
 	{
-		private static string GenerateString(int length)
+		public static string GenerateChallenge(string subject, DateTimeOffset expiry, int difficulty)
 		{
-			var r = new Random(RandomUtils.GetInt32());
-
-			var letters = new char[length];
-
-			for (var i = 0; i < length; i++)
-			{
-				letters[i] = (char) (r.Next('A', 'Z' + 1));
-			}
-			return new string(letters);
+			return
+				$"H:{difficulty}:{expiry.ToUnixTimeSeconds()}:{subject}:SHA-256:{Convert.ToBase64String(Encoding.UTF8.GetBytes(GenerateString(5)))}";
 		}
-		public static string Compute(int bits, string resource)
+
+		public static string ComputeFromChallenge(string challenge)
 		{
-			var counter = int.MinValue;
-			var headerParts = new[]
+			var parts = challenge.Split(":");
+			string version = parts[0];
+			int difficulty = int.Parse(parts[1]);
+			var expiry = DateTimeOffset.FromUnixTimeSeconds(Convert.ToInt64(parts[2]));
+			var subject = parts[3];
+			var algo = parts[4].ToLowerInvariant().Replace("-", "");
+			var hashAlgo = algo == "sha256" ? (HashAlgorithm) new SHA256CryptoServiceProvider() : new SHA1CryptoServiceProvider();
+			var nonce = parts[5];
+
+			string stamp = null;
+			int solution = int.MinValue;
+			string solutionPrefix = "";
+
+			while (!AcceptableHeader(stamp, difficulty, hashAlgo))
 			{
-				"1",
-				bits.ToString(),
-				DateTime.UtcNow.ToString("yyMMddhhmmss"),
-				resource,
-				"",
-				Convert.ToBase64String(Encoding.UTF8.GetBytes(GenerateString(10))),
-				Convert.ToBase64String(BitConverter.GetBytes(counter))
-			};
-
-			var currentStamp = string.Join(":", headerParts);
-
-			while (!AcceptableHeader(currentStamp, bits))
-			{
-				counter++;
-
-				// Failed
-				if (counter == int.MaxValue)
+				if (expiry <= DateTimeOffset.UtcNow)
 				{
-					headerParts[5] = Convert.ToBase64String(Encoding.UTF8.GetBytes(GenerateString(10)));
-					counter = int.MinValue;
+					throw new Exception("Hashcash challenge expired");
+				}
+				if (solution == int.MaxValue)
+				{
+					solutionPrefix += GenerateString(1);
+					solution = int.MinValue;
+				}
+				else
+				{
+					solution++;
 				}
 
-				headerParts[6] = Convert.ToBase64String(BitConverter.GetBytes(counter));
-				currentStamp = string.Join(":", headerParts);
-
-				++counter;
+				stamp = $"{challenge}:{solutionPrefix}{solution}";
 			}
 
-			return currentStamp;
+			return stamp;
 		}
 
-		private  static bool AcceptableHeader(string header, int bits)
+		private  static bool AcceptableHeader(string header, int bits, HashAlgorithm hashAlg)
 		{
-			var sha = new SHA1CryptoServiceProvider();
-			var hash = sha.ComputeHash(Encoding.UTF8.GetBytes(header));
+			if (header is null)
+			{
+				return false;
+			}
+
+			var hash = hashAlg.ComputeHash(Encoding.UTF8.GetBytes(header));
 			return GetStampHashDenomination(hash) == bits;
 		}
 
-		public static bool Verify(string header, int bitsMin, TimeSpan allowedDiff, string resource, out string error, out byte[] hash )
+		public static bool Verify(string stamp)
 		{
-			hash = null;
-			error = null;
-			var parts = header.Split(':');
-			if (parts[0] != "1")
-			{
-				error = "Only Hashcash v1 is supported";
-				return false;
-			}
-			var zbits = int.Parse(parts[1]);
-			if (zbits < bitsMin)
-			{
-				error = $"Insufficient pow ({zbits} instead of {bitsMin})";
-				return false;
-			}
+			var parts = stamp.Split(":");
+			var algo = parts[4].ToLowerInvariant().Replace("-", "");
+			var hashAlgo = algo == "sha256"
+				? (HashAlgorithm)new SHA256CryptoServiceProvider()
+				: new SHA1CryptoServiceProvider();
 
-			var timestamp = DateTime.ParseExact(parts[2], "yyMMddhhmmss", null);
-			if (timestamp > DateTime.UtcNow)
-			{
-				error = $"timestamp is in the future";
-				return false;
-			}
-			var diff = DateTime.UtcNow - timestamp;
-			if (allowedDiff < diff)
-			{
-				error = $"timestamp too old ({diff} instead of {allowedDiff})";
-				return false;
-			}
-
-			if (resource != parts[3])
-			{
-				error = $"resource mismatch too old ({parts[3]} instead of {resource})";
-				return false;
-			}
-
-			if (!string.IsNullOrEmpty(parts[4]))
-			{
-				error = $"extension not used in v1, not empty";
-				return false;
-			}
-			if (string.IsNullOrEmpty(parts[5]))
-			{
-				error = $"seed invalid";
-				return false;
-			}
-
-			var sha = new SHA1CryptoServiceProvider();
-			hash = sha.ComputeHash(Encoding.UTF8.GetBytes(header));
-			var pow =  GetStampHashDenomination(hash);
-			if (pow == zbits)
-			{
-				return true;
-			}
-
-			error = $"actual pow invalid (expected {zbits} but found {zbits})";
-			return false;
+			var difficulty = int.Parse(parts[1]);
+			return difficulty <= GetStampHashDenomination(hashAlgo.ComputeHash(Encoding.UTF8.GetBytes(stamp)));
 		}
 
 		private static int GetStampHashDenomination(byte[] stampHash)
@@ -139,6 +91,19 @@ namespace WalletWasabi.Helpers
 			}
 
 			return denomination;
+		}
+
+		private static string GenerateString(int length)
+		{
+			var r = new Random(RandomUtils.GetInt32());
+
+			var letters = new char[length];
+
+			for (var i = 0; i < length; i++)
+			{
+				letters[i] = (char) (r.Next('A', 'Z' + 1));
+			}
+			return new string(letters);
 		}
 	}
 }
