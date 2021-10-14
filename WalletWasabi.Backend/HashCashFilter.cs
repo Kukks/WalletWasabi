@@ -49,27 +49,50 @@ namespace WalletWasabi.Backend
 			{
 				return;
 			}
-			context.HttpContext.Response.Headers.Add("X-Hashcash-Challenge", new StringValues($"1:{pow}:{DateTime.UtcNow:yyMMddhhmmss}:{resource}:whatever:0"));
-			if (!context.HttpContext.Request.Headers.TryGetValue("X-Hashcash", out var xhashcash))
-			{
-				context.Result = new BadRequestObjectResult("Missing X-Hashcash header");
-			}
 
 			var memoryCache = context.HttpContext.RequestServices.GetRequiredService<IMemoryCache>();
 
-			if (!HashCashUtils.Verify(xhashcash, MinPow, MaxDifference, resource, out var error, out var hash))
+			if (!context.HttpContext.Request.Headers.TryGetValue("X-Hashcash", out var xhashcashValue))
 			{
-				context.Result = new BadRequestObjectResult(
-					$"Invalid hashcash: {error}");
-			}
-			var cacheKey = $"{nameof(HashCashFilter)}_hash_{Encoders.Hex.EncodeData(hash)}";
-			if(memoryCache.TryGetValue(cacheKey, out _))
-			{
-				context.Result = new BadRequestObjectResult(
-					$"Invalid hashcash: hash seen before");
+
+				context.HttpContext.Response.Headers.Add("X-Hashcash-Error", "hashcash-not-provided");
+				context.Result = new BadRequestObjectResult("Missing X-Hashcash header");
+				CreateChallenge(resource, pow, memoryCache, context);
+				return;
 			}
 
-			memoryCache.CreateEntry(cacheKey).SlidingExpiration = MaxDifference;
+			var fValue = xhashcashValue.First();
+			var challenge = fValue.Substring(0, fValue.LastIndexOf(":", StringComparison.InvariantCultureIgnoreCase) + 1);
+			var cacheKey = $"{nameof(HashCashFilter)}_challenge_{challenge}";
+			if(!memoryCache.TryGetValue(cacheKey, out _))
+			{
+				context.HttpContext.Response.Headers.Add("X-Hashcash-Error", "challenge-invalid");
+				context.Result = new BadRequestObjectResult(
+					$"Invalid hashcash: challenge not found");
+				CreateChallenge(resource, pow, memoryCache, context);
+				return;
+			}
+
+			memoryCache.Remove(cacheKey);
+			if (HashCashUtils.Verify(fValue))
+			{
+				return;
+			}
+			CreateChallenge(resource, pow, memoryCache, context);
+
+			context.HttpContext.Response.Headers.Add("X-Hashcash-Error", "hashcash-invalid");
+			context.Result = new BadRequestObjectResult(
+				$"Invalid hashcash");
+		}
+
+		private void CreateChallenge(string resource, int pow, IMemoryCache memoryCache, ActionExecutingContext context)
+		{
+			var expiry = DateTimeOffset.UtcNow.Add(MaxDifference);
+			var challenge = HashCashUtils.GenerateChallenge(resource, expiry, pow);
+
+			var cacheKey = $"{nameof(HashCashFilter)}_challenge_{challenge}";
+			memoryCache.CreateEntry(cacheKey).AbsoluteExpiration = expiry;
+			context.HttpContext.Response.Headers.Add("X-Hashcash-Challenge", new StringValues(challenge));
 		}
 	}
 }

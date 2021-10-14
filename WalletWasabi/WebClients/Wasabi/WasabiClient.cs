@@ -296,18 +296,16 @@ namespace WalletWasabi.WebClients.Wasabi
 
 		#region Chaincase
 
-		public async Task<string>  RegisterNotificationTokenAsync(DeviceToken deviceToken,CancellationToken cancel)
+		public async Task<string> RegisterNotificationTokenAsync(DeviceToken deviceToken, CancellationToken cancel)
 		{
-			var request = new HttpRequestMessage(HttpMethod.Put, new Uri(TorClient.DestinationUri, $"/api/v{ApiVersion}/notificationTokens"))
-			{
-				Content = new StringContent(JObject.FromObject(deviceToken).ToString(), Encoding.UTF8, "application/json"),
-				Headers = { { "X-Hashcash", new[] { HashCashUtils.Compute(10, deviceToken.Token) } } }
-			};
-
 			using var response = await TorClient.SendAndRetryAsync(
-				request,
+				HttpMethod.Put,
 				HttpStatusCode.OK,
-				2, cancel).ConfigureAwait(false);
+				$"/api/v{ApiVersion}/notificationTokens",
+				2,
+				new StringContent(JObject.FromObject(deviceToken).ToString(), Encoding.UTF8,
+					"application/json")
+				, cancel).ConfigureAwait(false);
 
 			if (response.StatusCode != HttpStatusCode.OK)
 			{
@@ -319,23 +317,18 @@ namespace WalletWasabi.WebClients.Wasabi
 			return ret;
 		}
 
-		public async Task<string>  RemoveNotificationTokenAsync(string deviceToken,CancellationToken cancel)
+		public async Task<string> RemoveNotificationTokenAsync(string deviceToken, CancellationToken cancel)
 		{
-			var request = new HttpRequestMessage(HttpMethod.Delete, new Uri(TorClient.DestinationUri,$"/api/v{ApiVersion}/notificationTokens/{deviceToken}"))
-			{
-				Headers = { { "X-Hashcash", new[] { HashCashUtils.Compute(10, $"{deviceToken}_delete") } } }
-			};
-
 			using var response = await TorClient.SendAndRetryAsync(
-				request,
+				HttpMethod.Delete,
 				HttpStatusCode.OK,
-				2, cancel).ConfigureAwait(false);
+				$"/api/v{ApiVersion}/notificationTokens/{deviceToken}",
+				2,null, cancel).ConfigureAwait(false);
 
 			if (response.StatusCode != HttpStatusCode.OK)
 			{
 				await response.ThrowRequestExceptionFromContentAsync();
 			}
-
 			using HttpContent content = response.Content;
 			var ret = await content.ReadAsStringAsync().ConfigureAwait(false);
 			return ret;
