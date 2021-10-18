@@ -313,7 +313,6 @@ namespace WalletWasabi.Backend.Controllers
 					// if alice is counted in queued count already, remove it
 					round.DequeueAnyFamiliarAlice(request.Inputs);
 					round.AddAlice(alice);
-
 					// All checks are good. Sign.
 					var blindSignatures = new List<uint256>();
 					for (int i = 0; i < acceptedBlindedOutputScripts.Count; i++)
