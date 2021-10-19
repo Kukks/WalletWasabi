@@ -20,7 +20,7 @@ namespace WalletWasabi.Backend.Controllers
 	{
 		private class DeviceTokenHashCashFilter : HashCashFilter
 		{
-			public override TimeSpan MaxDifference { get; } = TimeSpan.FromMinutes(5);
+			public override TimeSpan ChallengeValidFor { get; } = TimeSpan.FromMinutes(5);
 			public override string GetResource(ActionExecutingContext context)
 			{
 				switch (context.HttpContext.Request.Method)

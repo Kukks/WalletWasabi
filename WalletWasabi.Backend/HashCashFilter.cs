@@ -21,7 +21,7 @@ namespace WalletWasabi.Backend
 			return _resource;
 		}
 
-		public virtual TimeSpan MaxDifference { get; }
+		public virtual TimeSpan ChallengeValidFor { get; }
 		public virtual int? MinPow { get; }
 
 		protected HashCashFilter()
@@ -31,7 +31,7 @@ namespace WalletWasabi.Backend
 		public HashCashFilter(string resource, TimeSpan maxDifference, int? minPow)
 		{
 			_resource = resource;
-			MaxDifference = maxDifference;
+			ChallengeValidFor = maxDifference;
 			MinPow = minPow;
 		}
 
@@ -87,7 +87,7 @@ namespace WalletWasabi.Backend
 
 		private void CreateChallenge(string resource, int pow, IMemoryCache memoryCache, ActionExecutingContext context)
 		{
-			var expiry = DateTimeOffset.UtcNow.Add(MaxDifference);
+			var expiry = DateTimeOffset.UtcNow.Add(ChallengeValidFor);
 			var challenge = HashCashUtils.GenerateChallenge(resource, expiry, pow);
 
 			var cacheKey = $"{nameof(HashCashFilter)}_challenge_{challenge}";
