@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using WalletWasabi.Backend.Data;
 using WalletWasabi.Backend.Models;
+using WalletWasabi.Backend.Polyfills;
 using WalletWasabi.Logging;
 
 namespace WalletWasabi.Backend

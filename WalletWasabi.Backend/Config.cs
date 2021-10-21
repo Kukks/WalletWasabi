@@ -87,6 +87,10 @@ namespace WalletWasabi.Backend
 		[JsonProperty(PropertyName = "DatabaseConnectionStringName", DefaultValueHandling = DefaultValueHandling.Populate)]
 		public string DatabaseConnectionStringName { get; internal set; }
 
+		[DefaultValue(0)]
+		[JsonProperty(PropertyName = "HashCashDifficulty", DefaultValueHandling = DefaultValueHandling.Populate)]
+		public int HashCashDifficulty { get; internal set; }
+
 		[DefaultValue("/home/Dan/Downloads/AuthKey_4L3728R8LJ.p8")]
 		[JsonProperty(PropertyName = "APNsAuthKeyFile", DefaultValueHandling = DefaultValueHandling.Populate)]
 		public string APNsAuthKeyFile { get; internal set; }
