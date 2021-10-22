@@ -22,13 +22,6 @@
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="3.1.18" />
     <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="3.1.18" />
   </ItemGroup>
-    
-  <ItemGroup>
-    <None Remove="Npgsql" />
-    <None Remove="Microsoft.EntityFrameworkCore" />
-    <None Remove="Microsoft.Extensions.Caching.Memory" />
-    <None Remove="Microsoft.Extensions.Caching.Abstractions" />
-  </ItemGroup>
   <ItemGroup>
     <None Update="Legal\Assets\LegalDocuments.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
