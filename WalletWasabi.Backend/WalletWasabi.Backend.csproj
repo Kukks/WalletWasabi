@@ -54,13 +54,6 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <None Remove="Npgsql.EntityFrameworkCore.PostgreSQL" />
-    <None Remove="Microsoft.EntityFrameworkCore" />
-    <None Remove="Microsoft.EntityFrameworkCore.Tools" />
-    <None Remove="Data\" />
-    <None Remove="Migrations\" />
-  </ItemGroup>
-  <ItemGroup>
     <Folder Include="Data\" />
     <Folder Include="Migrations\" />
   </ItemGroup>
