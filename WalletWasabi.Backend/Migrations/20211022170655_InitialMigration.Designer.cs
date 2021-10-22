@@ -9,16 +9,16 @@ using WalletWasabi.Backend.Data;
 namespace WalletWasabi.Backend.Migrations
 {
     [DbContext(typeof(WasabiBackendContext))]
-    [Migration("20210825104936_AddTokenStatus")]
-    partial class AddTokenStatus
+    [Migration("20211022170655_InitialMigration")]
+    partial class InitialMigration
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("Relational:MaxIdentifierLength", 63)
-                .HasAnnotation("ProductVersion", "5.0.8")
-                .HasAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn);
+                .HasAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn)
+                .HasAnnotation("ProductVersion", "3.1.20")
+                .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             modelBuilder.Entity("WalletWasabi.Backend.Models.DeviceToken", b =>
                 {
