@@ -28,7 +28,9 @@ namespace WalletWasabi.Stores
 			BlockRepository = blockRepository;
 		}
 
-		public bool IsInitialized { get; private set; }
+		public bool IsInitialized { get; protected set; }
+		private string WorkFolderPath { get; }
+		public Network Network { get; }
 
 		public IndexStore IndexStore { get; }
 		public AllTransactionStore TransactionStore { get; }
@@ -42,7 +44,7 @@ namespace WalletWasabi.Stores
 		/// </summary>
 		public UntrustedP2pBehavior CreateUntrustedP2pBehavior() => new UntrustedP2pBehavior(MempoolService);
 
-		public async Task InitializeAsync()
+		public virtual async Task InitializeAsync()
 		{
 			using (BenchmarkLogger.Measure())
 			{

@@ -32,6 +32,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WalletWasabi.Packager", "Wa
 EndProject
 Project("{930C7802-8A8C-48F9-8165-68863BCCD9DD}") = "WalletWasabi.WindowsInstaller", "WalletWasabi.WindowsInstaller\WalletWasabi.WindowsInstaller.wixproj", "{54654468-4F58-4253-84BD-6F53A8D3D2C4}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Chaincase.Common", "..\Chaincase.Common\Chaincase.Common.csproj", "{57F27506-AFA6-4795-B844-83C879C53C26}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -56,6 +58,35 @@ Global
 		{50BDFA09-7575-4EEE-B733-D41B65B06D00}.Release|Any CPU.Build.0 = Release|Any CPU
 		{50BDFA09-7575-4EEE-B733-D41B65B06D00}.Release|x64.ActiveCfg = Debug|Any CPU
 		{50BDFA09-7575-4EEE-B733-D41B65B06D00}.Release|x64.Build.0 = Debug|Any CPU
+		{526AC796-6CC0-4ADA-9A7E-C12267719A1A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{526AC796-6CC0-4ADA-9A7E-C12267719A1A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{526AC796-6CC0-4ADA-9A7E-C12267719A1A}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{526AC796-6CC0-4ADA-9A7E-C12267719A1A}.Debug|x64.Build.0 = Debug|Any CPU
+		{526AC796-6CC0-4ADA-9A7E-C12267719A1A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{526AC796-6CC0-4ADA-9A7E-C12267719A1A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{526AC796-6CC0-4ADA-9A7E-C12267719A1A}.Release|x64.ActiveCfg = Debug|Any CPU
+		{526AC796-6CC0-4ADA-9A7E-C12267719A1A}.Release|x64.Build.0 = Debug|Any CPU
+		{B007DC0F-8C86-439D-BE3C-283218D8308B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B007DC0F-8C86-439D-BE3C-283218D8308B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B007DC0F-8C86-439D-BE3C-283218D8308B}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{B007DC0F-8C86-439D-BE3C-283218D8308B}.Debug|x64.Build.0 = Debug|Any CPU
+		{B007DC0F-8C86-439D-BE3C-283218D8308B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B007DC0F-8C86-439D-BE3C-283218D8308B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B007DC0F-8C86-439D-BE3C-283218D8308B}.Release|x64.ActiveCfg = Debug|Any CPU
+		{B007DC0F-8C86-439D-BE3C-283218D8308B}.Release|x64.Build.0 = Debug|Any CPU
+		{8BE916A0-1F3F-4757-BAD9-BFBAB8EAC3C2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8BE916A0-1F3F-4757-BAD9-BFBAB8EAC3C2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8BE916A0-1F3F-4757-BAD9-BFBAB8EAC3C2}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{8BE916A0-1F3F-4757-BAD9-BFBAB8EAC3C2}.Debug|x64.Build.0 = Debug|Any CPU
+		{8BE916A0-1F3F-4757-BAD9-BFBAB8EAC3C2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8BE916A0-1F3F-4757-BAD9-BFBAB8EAC3C2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8BE916A0-1F3F-4757-BAD9-BFBAB8EAC3C2}.Release|x64.ActiveCfg = Debug|Any CPU
+		{8BE916A0-1F3F-4757-BAD9-BFBAB8EAC3C2}.Release|x64.Build.0 = Debug|Any CPU
+		{54654468-4F58-4253-84BD-6F53A8D3D2C4}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{54654468-4F58-4253-84BD-6F53A8D3D2C4}.Debug|x64.ActiveCfg = Release|x64
+		{54654468-4F58-4253-84BD-6F53A8D3D2C4}.Release|Any CPU.ActiveCfg = Release|x64
+		{54654468-4F58-4253-84BD-6F53A8D3D2C4}.Release|x64.ActiveCfg = Release|x64
+		{54654468-4F58-4253-84BD-6F53A8D3D2C4}.Release|x64.Build.0 = Debug|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
