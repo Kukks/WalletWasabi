@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Threading.Tasks;
+using Chaincase.Common.Models;
 using WalletWasabi.Backend.Models;
 using WalletWasabi.Backend.Models.Responses;
 using WalletWasabi.BitcoinCore;
@@ -61,18 +62,22 @@ namespace WalletWasabi.Backend.Controllers
 		public async Task<IActionResult> GetLatestMatureHeaderAsync()
 		{
 			var blockCount = await RpcClient.GetBlockCountAsync();
-			var matureBlockCount = blockCount - ImmatureBlockCount;
+			var matureBlockCount = Math.Max(0, blockCount - ImmatureBlockCount);
 			var matureHash = await RpcClient.GetBlockHashAsync(matureBlockCount);
-			var header = await RpcClient.GetBlockHeaderAsync(matureHash);
-			// var latestMatureHeader = new SmartHeader(header.GetHash(), header.HashPrevBlock, Convert.ToUInt32(matureBlockCount), header.BlockTime);
-			var ret = new
+			var matureHeader = await RpcClient.GetBlockHeaderAsync(matureHash);
+			var currentHeader = await RpcClient.GetBlockHeaderAsync(await RpcClient.GetBestBlockHashAsync());
+
+			var ret = new LatestMatureHeaderResponse
 			{
-				BlockHash = header.GetHash().ToString(),
-				PrevHash = header.HashPrevBlock.ToString(),
-				Height = Convert.ToUInt32(matureBlockCount),
-				Time = header.BlockTime
+				MatureHeaderHash = matureHash,
+				BestHeaderHash = currentHeader.GetHash(),
+				MatureHeaderPrevHash = matureHeader.HashPrevBlock,
+				MatureHeaderTime = matureHeader.BlockTime,
+				MatureHeight = (uint)matureBlockCount,
+				BestHeight = (uint)blockCount,
 			};
-			return Ok(ret);
+
+			return Json(ret);
 		}
 
 		/// <summary>

@@ -126,7 +126,7 @@ namespace WalletWasabi.Services
 
 		#region Initializers
 
-		private void CreateNew(Network network, BitcoinStore bitcoinStore, WasabiClient client)
+		protected void CreateNew(Network network, BitcoinStore bitcoinStore, WasabiClient client)
 		{
 			Network = Guard.NotNull(nameof(network), network);
 			WasabiClient = Guard.NotNull(nameof(client), client);
@@ -404,9 +404,8 @@ namespace WalletWasabi.Services
 
 			Cancel?.Dispose();
 			Cancel = null;
-			WasabiClient?.Dispose();
-			WasabiClient = null;
-
+			// WasabiClient?.Dispose();
+			// WasabiClient = null;
 			EnableRequests(); // Enable requests (it's possible something is being blocked outside the class by AreRequestsBlocked.
 		}
 	}

@@ -16,6 +16,7 @@ using System.Security;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Chaincase.Common.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -290,7 +291,7 @@ namespace WalletWasabi.Tests.RegressionTests
 			jobj["HashCashDifficulty"] = 10;
 			JsonConvert.PopulateObject(jobj.ToString(), RegTestFixture.Global.Config);
 			Assert.Equal(10, RegTestFixture.Global.Config.HashCashDifficulty);
-			using var client = new WasabiClient(new Uri(RegTestFixture.BackendEndPoint), null);
+			using var client = new ChaincaseClient(() => new Uri(RegTestFixture.BackendEndPoint), null);
 			_ = await client.RegisterNotificationTokenAsync(new DeviceToken()
 			{
 				Status = TokenStatus.New,

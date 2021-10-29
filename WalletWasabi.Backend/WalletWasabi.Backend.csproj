@@ -49,6 +49,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\Chaincase.Common\Chaincase.Common.csproj" />
     <ProjectReference Include="..\WalletWasabi.Standard\WalletWasabi.Standard.csproj">
       <GlobalPropertiesToRemove></GlobalPropertiesToRemove>
     </ProjectReference>
