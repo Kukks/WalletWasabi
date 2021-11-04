@@ -1,4 +1,5 @@
 ﻿FROM mcr.microsoft.com/dotnet/core/aspnet:3.1 AS base
+ENV DOTNET_CLI_TELEMETRY_OPTOUT=1
 WORKDIR /app
 EXPOSE 37127
 
