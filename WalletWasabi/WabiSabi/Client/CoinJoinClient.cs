@@ -27,6 +27,7 @@ namespace WalletWasabi.WabiSabi.Client;
 
 public class CoinJoinClient
 {
+	private readonly Action<BannedCoinEventArgs> _onCoinBan;
 	private readonly bool _batchPayments;
 	private const int MaxInputsRegistrableByWallet = 10; // how many
 	private const int MaxWeightedAnonLoss = 3; // Maximum tolerable WeightedAnonLoss.
@@ -43,6 +44,7 @@ public class CoinJoinClient
 	/// <param name="anonScoreTarget">Coins those have reached anonymity target, but still can be mixed if desired.</param>
 	/// <param name="consolidationMode">If true, then aggressively try to consolidate as many coins as it can.</param>
 	public CoinJoinClient(
+		Action<BannedCoinEventArgs> onCoinBan,
 		IWasabiHttpClientFactory httpClientFactory,
 		IKeyChain keyChain,
 		IDestinationProvider destinationProvider,
@@ -54,8 +56,9 @@ public class CoinJoinClient
 		bool redCoinIsolation = false,
 		TimeSpan feeRateMedianTimeFrame = default,
 		TimeSpan doNotRegisterInLastMinuteTimeLimit = default,
-		bool batchPayments = default)
+		IRoundCoinSelector? coinSelectionFunc = null , bool batchPayments = default)
 	{
+		_onCoinBan = onCoinBan;
 		_batchPayments = batchPayments;
 		HttpClientFactory = httpClientFactory;
 		KeyChain = keyChain;
@@ -69,7 +72,10 @@ public class CoinJoinClient
 		FeeRateMedianTimeFrame = feeRateMedianTimeFrame;
 		SecureRandom = new SecureRandom();
 		DoNotRegisterInLastMinuteTimeLimit = doNotRegisterInLastMinuteTimeLimit;
+		CoinSelectionFunc = coinSelectionFunc;
 	}
+
+	public IRoundCoinSelector? CoinSelectionFunc { get; set; }
 
 	public event EventHandler<CoinJoinProgressEventArgs>? CoinJoinClientProgress;
 
@@ -150,7 +156,16 @@ public class CoinJoinClient
 			var liquidityClue = LiquidityClueProvider.GetLiquidityClue(roundParameteers.MaxSuggestedAmount);
 			var utxoSelectionParameters = UtxoSelectionParameters.FromRoundParameters(roundParameteers);
 
-			coins = SelectCoinsForRound(coinCandidates, utxoSelectionParameters, ConsolidationMode, AnonScoreTarget, SemiPrivateThreshold, liquidityClue, SecureRandom);
+			if (CoinSelectionFunc is not null)
+			{
+				coins = await CoinSelectionFunc.SelectCoinsAsync(coinCandidates, utxoSelectionParameters, liquidityClue,
+					SecureRandom).ConfigureAwait(false);
+			}
+			else
+			{
+				coins = SelectCoinsForRound(coinCandidates, utxoSelectionParameters, ConsolidationMode, AnonScoreTarget, SemiPrivateThreshold, liquidityClue, SecureRandom);
+
+			}
 			
 			if (!roundParameteers.AllowedInputTypes.Contains(ScriptType.P2WPKH) || !roundParameteers.AllowedOutputTypes.Contains(ScriptType.P2WPKH))
 			{
@@ -256,6 +271,7 @@ public class CoinJoinClient
 			{
 				// Do nothing - if the actual state of the round is Ended we let the execution continue.
 			}
+
 
 			roundState = await waitRoundEndedTask.ConfigureAwait(false);
 
@@ -417,7 +433,7 @@ public class CoinJoinClient
 					CoordinatorIdentifier,
 					arenaRequestHandler);
 
-				var aliceClient = await AliceClient.CreateRegisterAndConfirmInputAsync(roundState, aliceArenaClient, coin, KeyChain, RoundStatusUpdater, linkedUnregisterCts.Token, linkedRegistrationsCts.Token, linkedConfirmationsCts.Token).ConfigureAwait(false);
+				var aliceClient = await AliceClient.CreateRegisterAndConfirmInputAsync(roundState, aliceArenaClient, coin, KeyChain, RoundStatusUpdater, linkedUnregisterCts.Token, linkedRegistrationsCts.Token, linkedConfirmationsCts.Token, _onCoinBan).ConfigureAwait(false);
 
 				// Right after the first real-cred confirmation happened we entered into critical phase.
 				if (Interlocked.Exchange(ref eventInvokedAlready, 1) == 0)
@@ -691,7 +707,9 @@ public class CoinJoinClient
 		roundState.LogDebug(string.Join(Environment.NewLine, summary));
 	}
 
-	/// <param name="consolidationMode">If true it attempts to select as many coins as it can.</param>
+
+
+		/// <param name="consolidationMode">If true it attempts to select as many coins as it can.</param>
 	/// <param name="anonScoreTarget">Tries to select few coins over this threshold.</param>
 	/// <param name="semiPrivateThreshold">Minimum anonymity of coins that can be selected together.</param>
 	/// <param name="liquidityClue">Weakly prefer not to select inputs over this.</param>
@@ -757,7 +775,7 @@ public class CoinJoinClient
 
 		int inputCount = Math.Min(
 			privateCoins.Length + allowedNonPrivateCoins.Count,
-			consolidationMode ? MaxInputsRegistrableByWallet : GetInputTarget(rnd));
+			consolidationMode ? MaxInputsRegistrableByWallet : GetInputTarget(rnd, MaxInputsRegistrableByWallet));
 		if (consolidationMode)
 		{
 			Logger.LogDebug($"Consolidation mode is on.");
@@ -1082,13 +1100,13 @@ public class CoinJoinClient
 	/// Note: random biasing is applied.
 	/// </summary>
 	/// <returns>Desired input count.</returns>
-	private static int GetInputTarget(WasabiRandom rnd)
+	private static int GetInputTarget(WasabiRandom rnd, int target)
 	{
 		// Until our UTXO count target isn't reached, let's register as few coins as we can to reach it.
-		int targetInputCount = MaxInputsRegistrableByWallet;
+		int targetInputCount = target;
 
 		var distance = new Dictionary<int, int>();
-		for (int i = 1; i <= MaxInputsRegistrableByWallet; i++)
+		for (int i = 1; i <= target; i++)
 		{
 			distance.TryAdd(i, Math.Abs(i - targetInputCount));
 		}
@@ -1192,14 +1210,19 @@ public class CoinJoinClient
 		{
 			outputValues = amountDecomposer.Decompose(registeredCoinEffectiveValues, theirCoinEffectiveValues);
 		}
+		var nonMixedOutputs = outputValues.Where(money => !BlockchainAnalyzer.StdDenoms.Contains(money));
+		var mixedOutputs = outputValues.Where(money => BlockchainAnalyzer.StdDenoms.Contains(money));
 		
 		// Get as many destinations as outputs we need.
 		var destinations = (await DestinationProvider
-			.GetNextDestinationsAsync(outputValues.Count(), preferTaprootOutputs).ConfigureAwait(false)).Zip(outputValues, (destination, money) => new TxOut(money, destination));
+			.GetNextDestinationsAsync(mixedOutputs.Count(), preferTaprootOutputs, true).ConfigureAwait(false)).Zip(mixedOutputs, (destination, money) => new TxOut(money, destination));
+		var destinationsNonMixed = (await DestinationProvider.GetNextDestinationsAsync(nonMixedOutputs.Count(), preferTaprootOutputs, false).ConfigureAwait(false)).Zip(nonMixedOutputs, (destination, money) => new TxOut(money, destination));
+
+		roundState.LogDebug($"Decomposed to {outputValues.Count()} outputs");
 
 		Dictionary<TxOut, PendingPayment> batchedPayments =
 			paymentsToBatch.ToDictionary(payment => new TxOut(payment.Value, payment.Destination.ScriptPubKey));
-		var outputTxOuts = destinations.Concat(batchedPayments.Keys);
+		var outputTxOuts = destinations.Concat(destinationsNonMixed).Concat(batchedPayments.Keys);
 		
 		DependencyGraph dependencyGraph = DependencyGraph.ResolveCredentialDependencies(inputEffectiveValuesAndSizes, outputTxOuts, roundParameters.MiningFeeRate, roundParameters.CoordinationFeeRate, roundParameters.MaxVsizeAllocationPerAlice);
 		DependencyGraphTaskScheduler scheduler = new(dependencyGraph);

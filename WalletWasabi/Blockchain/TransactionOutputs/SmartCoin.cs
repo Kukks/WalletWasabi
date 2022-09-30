@@ -53,6 +53,18 @@ public class SmartCoin : NotifyPropertyChangedBase, IEquatable<SmartCoin>, IDest
 		Transaction.TryAddWalletOutput(this);
 	}
 
+	public SmartCoin(TxIn transactionInput, Money value, Script script,  HdPubKey pubKey)
+	{
+		
+		Index = transactionInput.PrevOut.N;
+		_transactionId = new Lazy<uint256>(() => transactionInput.PrevOut.Hash, true);
+		_outPoint = new Lazy<OutPoint>(() => transactionInput.PrevOut, true);
+		_txOut = new Lazy<TxOut>(() => new TxOut(value, script ), true);
+		
+		_hashCode = new Lazy<int>(() => _outPoint.GetHashCode(), true);
+		HdPubKey = pubKey;
+	}
+
 	public SmartTransaction Transaction { get; }
 	public uint Index { get; }
 	public uint256 TransactionId => _transactionId.Value;
@@ -96,17 +108,17 @@ public class SmartCoin : NotifyPropertyChangedBase, IEquatable<SmartCoin>, IDest
 		set => RaiseAndSetIfChanged(ref _coinJoinInProgress, value);
 	}
 
-	public DateTimeOffset? BannedUntilUtc
-	{
-		get => _bannedUntilUtc;
-		set
-		{
-			if (RaiseAndSetIfChanged(ref _bannedUntilUtc, value))
-			{
-				RefreshAndGetIsBanned();
-			}
-		}
-	}
+	// public DateTimeOffset? BannedUntilUtc
+	// {
+	// 	get => _bannedUntilUtc;
+	// 	set
+	// 	{
+	// 		if (RaiseAndSetIfChanged(ref _bannedUntilUtc, value))
+	// 		{
+	// 			RefreshAndGetIsBanned();
+	// 		}
+	// 	}
+	// }
 
 	/// <summary>
 	/// If the backend thinks it's spent, but Wasabi does not yet know.
@@ -138,11 +150,11 @@ public class SmartCoin : NotifyPropertyChangedBase, IEquatable<SmartCoin>, IDest
 	/// <summary>
 	/// If you want to have a notification about a coin is released, then you have to periodically read IsBanned.
 	/// </summary>
-	public bool IsBanned
-	{
-		get => RefreshAndGetIsBanned();
-		private set => RaiseAndSetIfChanged(ref _isBanned, value);
-	}
+	// public bool IsBanned
+	// {
+	// 	get => RefreshAndGetIsBanned();
+	// 	private set => RaiseAndSetIfChanged(ref _isBanned, value);
+	// }
 
 	public bool IsExcludedFromCoinJoin
 	{
@@ -155,19 +167,19 @@ public class SmartCoin : NotifyPropertyChangedBase, IEquatable<SmartCoin>, IDest
 		return Transaction.Transaction.IsCoinBase && Height < bestHeight - 100;
 	}
 
-	public bool RefreshAndGetIsBanned()
-	{
-		if (BannedUntilUtc is { } && BannedUntilUtc > DateTimeOffset.UtcNow)
-		{
-			IsBanned = true;
-			return true;
-		}
-
-		IsBanned = false;
-		BannedUntilUtc = null;
-
-		return false;
-	}
+	// public bool RefreshAndGetIsBanned()
+	// {
+	// 	if (BannedUntilUtc is { } && BannedUntilUtc > DateTimeOffset.UtcNow)
+	// 	{
+	// 		IsBanned = true;
+	// 		return true;
+	// 	}
+	//
+	// 	IsBanned = false;
+	// 	BannedUntilUtc = null;
+	//
+	// 	return false;
+	// }
 
 	[MemberNotNullWhen(returnValue: true, nameof(SpenderTransaction))]
 	public bool IsSpent() => SpenderTransaction is not null;

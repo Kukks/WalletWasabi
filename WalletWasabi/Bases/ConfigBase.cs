@@ -52,7 +52,10 @@ public abstract class ConfigBase : NotifyPropertyChangedBase, IConfig
 		{
 			string jsonString = ReadFileNoLock();
 			object newConfigObject = Activator.CreateInstance(GetType())!;
-			JsonConvert.PopulateObject(jsonString, newConfigObject, JsonSerializationOptions.Default.Settings);
+			JsonConvert.PopulateObject(jsonString, newConfigObject, new JsonSerializerSettings()
+		{
+			Converters = JsonSerializationOptions.Default.Settings.Converters, ObjectCreationHandling = ObjectCreationHandling.Replace
+		});
 
 			return !AreDeepEqual(newConfigObject);
 		}		
@@ -79,12 +82,14 @@ public abstract class ConfigBase : NotifyPropertyChangedBase, IConfig
 				}
 				catch (Exception ex)
 				{
-					Logger.LogInfo($"{GetType().Name} file has been deleted because it was corrupted. Recreated default version at path: `{FilePath}`.");
+					Logger.LogInfo(
+						$"{GetType().Name} file has been deleted because it was corrupted. Recreated default version at path: `{FilePath}`.");
 					Logger.LogWarning(ex);
 				}
 			}
 
 			ToFileNoLock();
+
 		}
 	}
 
@@ -107,6 +112,7 @@ public abstract class ConfigBase : NotifyPropertyChangedBase, IConfig
 	public bool AreDeepEqual(object otherConfig)
 	{
 		var serializer = JsonSerializer.Create(JsonSerializationOptions.Default.Settings);
+		serializer.ObjectCreationHandling = ObjectCreationHandling.Replace;
 		var currentConfig = JObject.FromObject(this, serializer);
 		var otherConfigJson = JObject.FromObject(otherConfig, serializer);
 		return JToken.DeepEquals(otherConfigJson, currentConfig);
@@ -115,10 +121,32 @@ public abstract class ConfigBase : NotifyPropertyChangedBase, IConfig
 	/// <inheritdoc />
 	public void ToFile()
 	{
+		AssertFilePathSet();
+		string jsonString = ToString();
 		lock (FileLock)
 		{
 			ToFileNoLock();
 		}
+	}
+
+	public void Update(string json, bool persist)
+	{
+		
+		var serializer = JsonSerializer.Create(JsonSerializationOptions.Default.Settings);
+		serializer.ObjectCreationHandling = ObjectCreationHandling.Replace;
+		
+		JsonConvert.PopulateObject(json, this, new JsonSerializerSettings()
+		{
+			Converters = JsonSerializationOptions.Default.Settings.Converters, ObjectCreationHandling = ObjectCreationHandling.Replace
+		});
+		if (persist)
+		{
+			ToFile();
+		}
+	}
+	public override string ToString()
+	{
+		return JsonConvert.SerializeObject(this, Formatting.Indented, JsonSerializationOptions.Default.Settings);
 	}
 
 	protected virtual bool TryEnsureBackwardsCompatibility(string jsonString) => true;

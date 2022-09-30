@@ -19,23 +19,36 @@ using WalletWasabi.Wallets;
 using WalletWasabi.WebClients.Wasabi;
 
 namespace WalletWasabi.WabiSabi.Client;
+public class BannedCoinEventArgs : EventArgs
+{
+	public OutPoint Utxo { get; }
+	public DateTimeOffset BannedTime { get; }
+
+	public BannedCoinEventArgs(OutPoint utxo, DateTimeOffset bannedTime)
+	{
+		Utxo = utxo;
+		BannedTime = bannedTime;
+	}
+}
 
 public class CoinJoinManager : BackgroundService
 {
 	private record CoinJoinCommand(IWallet Wallet);
 	private record StartCoinJoinCommand(IWallet Wallet, bool StopWhenAllMixed, bool OverridePlebStop) : CoinJoinCommand(Wallet);
-	private record StopCoinJoinCommand(IWallet Wallet) : CoinJoinCommand(Wallet);
+	private record StopCoinJoinCommand(IWallet Wallet, string walletName) : CoinJoinCommand(Wallet);
 
-	public CoinJoinManager(IWalletProvider walletProvider, RoundStateUpdater roundStatusUpdater, IWasabiHttpClientFactory coordinatorHttpClientFactory, IWasabiBackendStatusProvider wasabiBackendStatusProvider, string coordinatorIdentifier)
+	public CoinJoinManager(string coordinatorName ,IWalletProvider walletProvider, RoundStateUpdater roundStatusUpdater, IWasabiHttpClientFactory backendHttpClientFactory, IWasabiBackendStatusProvider wasabiBackendStatusProvider, string coordinatorIdentifier)
 	{
-		WasabiBackendStatusProvide = wasabiBackendStatusProvider;
+		CoordinatorName = coordinatorName;
+		WasabiBackendStatusProvider = wasabiBackendStatusProvider;
 		WalletProvider = walletProvider;
 		HttpClientFactory = coordinatorHttpClientFactory;
 		RoundStatusUpdater = roundStatusUpdater;
 		CoordinatorIdentifier = coordinatorIdentifier;
 	}
 
-	private IWasabiBackendStatusProvider WasabiBackendStatusProvide { get; }
+	public string CoordinatorName { get; }
+	private IWasabiBackendStatusProvider WasabiBackendStatusProvider { get; }
 
 	public IWalletProvider WalletProvider { get; }
 	public IWasabiHttpClientFactory HttpClientFactory { get; }
@@ -50,6 +63,7 @@ public class CoinJoinManager : BackgroundService
 	private ConcurrentDictionary<string, byte> WalletsInSendWorkflow { get; } = new();
 
 	public event EventHandler<StatusChangedEventArgs>? StatusChanged;
+	public event EventHandler<BannedCoinEventArgs>? OnBan;
 
 	public CoinJoinClientState HighestCoinJoinClientState { get; private set; }
 
@@ -71,7 +85,12 @@ public class CoinJoinManager : BackgroundService
 
 	public async Task StopAsync(Wallet wallet, CancellationToken cancellationToken)
 	{
-		await CommandChannel.Writer.WriteAsync(new StopCoinJoinCommand(wallet), cancellationToken).ConfigureAwait(false);
+		await CommandChannel.Writer.WriteAsync(new StopCoinJoinCommand(wallet, wallet.WalletName), cancellationToken).ConfigureAwait(false);
+	}
+
+	public async Task StopAsyncByName(string wallet, CancellationToken cancellationToken)
+	{
+		await CommandChannel.Writer.WriteAsync(new StopCoinJoinCommand(null, wallet), cancellationToken).ConfigureAwait(false);
 	}
 
 	#endregion Public API (Start | Stop | )
@@ -99,8 +118,9 @@ public class CoinJoinManager : BackgroundService
 				? await GetMixableWalletsAsync().ConfigureAwait(false)
 				: ImmutableDictionary<string, IWallet>.Empty;
 
-			// Notifies when a wallet meets the criteria for participating in a coinjoin.
+			// Notifies when a wallet meets the criteria for participating in a coinjoin.W
 			var openedWallets = mixableWallets.Where(x => !trackedWallets.ContainsKey(x.Key)).ToImmutableList();
+
 			foreach (var openedWallet in openedWallets.Select(x => x.Value))
 			{
 				trackedWallets.Add(openedWallet.WalletName, openedWallet);
@@ -137,7 +157,11 @@ public class CoinJoinManager : BackgroundService
 
 	private async Task HandleCoinJoinCommandsAsync(ConcurrentDictionary<string, CoinJoinTracker> trackedCoinJoins, ConcurrentDictionary<IWallet, TrackedAutoStart> trackedAutoStarts, CancellationToken stoppingToken)
 	{
-		var coinJoinTrackerFactory = new CoinJoinTrackerFactory(HttpClientFactory, RoundStatusUpdater, CoordinatorIdentifier, stoppingToken);
+		var coinJoinTrackerFactory = new CoinJoinTrackerFactory(HttpClientFactory, RoundStatusUpdater, CoordinatorIdentifier, stoppingToken,
+			args =>
+			{
+				OnBan?.Invoke(this,args);
+			});
 
 		async void StartCoinJoinCommand(StartCoinJoinCommand startCommand)
 		{
@@ -176,7 +200,7 @@ public class CoinJoinManager : BackgroundService
 				return;
 			}
 
-			if (WasabiBackendStatusProvide.LastResponse is not { } synchronizerResponse)
+			if (!WasabiBackendStatusProvider.Connected )
 			{
 				ScheduleRestartAutomatically(walletToStart, trackedAutoStarts, startCommand.StopWhenAllMixed, startCommand.OverridePlebStop, stoppingToken);
 
@@ -197,9 +221,8 @@ public class CoinJoinManager : BackgroundService
 				return;
 			}
 
-			var coinCandidates = (await SelectCandidateCoinsAsync(walletToStart, synchronizerResponse.BestHeight).ConfigureAwait(false)).ToArray();
-			if (coinCandidates.Length == 0 || 
-			    coinCandidates.All(x => x.IsPrivate(walletToStart.AnonScoreTarget))) // If all selectable coins are already private, then don't mix.
+			var coinCandidates = (await SelectCandidateCoinsAsync(walletToStart).ConfigureAwait(false)).ToArray();
+			if (coinCandidates.Length == 0)
 			{
 				walletToStart.LogDebug("No candidate coins available to mix.");
 				ScheduleRestartAutomatically(walletToStart, trackedAutoStarts, startCommand.StopWhenAllMixed, startCommand.OverridePlebStop, stoppingToken);
@@ -233,19 +256,32 @@ public class CoinJoinManager : BackgroundService
 
 		void StopCoinJoinCommand(StopCoinJoinCommand stopCommand)
 		{
-			var walletToStop = stopCommand.Wallet;
-
+			IWallet walletToStop = null;
+			if (stopCommand.Wallet is null)
+			{
+				var w = trackedAutoStarts.Where(pair => pair.Key.WalletName == stopCommand.walletName);
+				
+				if (w.Any())
+				{
+					walletToStop = w.First().Key;
+				}
+			}
+			else
+			{
+				
+				walletToStop = stopCommand.Wallet;
+			}
 			var autoStartRemoved = TryRemoveTrackedAutoStart(walletToStop);
 
-			if (trackedCoinJoins.TryGetValue(walletToStop.WalletName, out var coinJoinTrackerToStop))
+			if (trackedCoinJoins.TryGetValue(stopCommand.walletName, out var coinJoinTrackerToStop))
 			{
 				coinJoinTrackerToStop.Stop();
-				if (coinJoinTrackerToStop.InCriticalCoinJoinState)
+				if (coinJoinTrackerToStop.InCriticalCoinJoinState && walletToStop is not null)
 				{
 					walletToStop.LogWarning($"Coinjoin is in critical phase, it cannot be stopped - it won't restart later.");
 				}
 			}
-			else if (autoStartRemoved)
+			else if (autoStartRemoved && walletToStop is not null)
 			{
 				NotifyWalletStoppedCoinJoin(walletToStop);
 			}
@@ -253,6 +289,10 @@ public class CoinJoinManager : BackgroundService
 
 		bool TryRemoveTrackedAutoStart(IWallet wallet)
 		{
+			if (wallet is null)
+			{
+				return false;
+			}
 			if (trackedAutoStarts.TryRemove(wallet, out var trackedAutoStart))
 			{
 				trackedAutoStart.CancellationTokenSource.Cancel();
@@ -339,18 +379,29 @@ public class CoinJoinManager : BackgroundService
 			foreach (var finishedCoinJoin in finishedCoinJoins)
 			{
 				await HandleCoinJoinFinalizationAsync(finishedCoinJoin, trackedCoinJoins, stoppingToken).ConfigureAwait(false);
-
-				NotifyCoinJoinCompletion(finishedCoinJoin);
-
-				if (!finishedCoinJoin.IsStopped && !stoppingToken.IsCancellationRequested)
+				try
 				{
+					NotifyCoinJoinCompletion(finishedCoinJoin);
+
+					if (!finishedCoinJoin.IsStopped && !stoppingToken.IsCancellationRequested)
+					{
+						finishedCoinJoin.Wallet.LogInfo($"{nameof(CoinJoinClient)} restart automatically.");
+
+						ScheduleRestartAutomatically(finishedCoinJoin.Wallet, trackedAutoStarts,
+							finishedCoinJoin.StopWhenAllMixed, finishedCoinJoin.OverridePlebStop, stoppingToken);
+					}
+					else
+					{
+						NotifyWalletStoppedCoinJoin(finishedCoinJoin.Wallet);
+					}
+				}
+				catch (Exception e)
+				{
+					finishedCoinJoin.Wallet.LogError($"{nameof(CoinJoinClient)} {e.Message} \n {e.StackTrace}");
 					finishedCoinJoin.Wallet.LogInfo($"{nameof(CoinJoinClient)} restart automatically.");
 
-					ScheduleRestartAutomatically(finishedCoinJoin.Wallet, trackedAutoStarts, finishedCoinJoin.StopWhenAllMixed, finishedCoinJoin.OverridePlebStop, stoppingToken);
-				}
-				else
-				{
-					NotifyWalletStoppedCoinJoin(finishedCoinJoin.Wallet);
+					ScheduleRestartAutomatically(finishedCoinJoin.Wallet, trackedAutoStarts,
+						finishedCoinJoin.StopWhenAllMixed, finishedCoinJoin.OverridePlebStop, stoppingToken);
 				}
 			}
 			// Updates the highest coinjoin client state.
@@ -491,7 +542,8 @@ public class CoinJoinManager : BackgroundService
 				TaskStatus.Canceled => CompletionStatus.Canceled,
 				TaskStatus.Faulted => CompletionStatus.Failed,
 				_ => CompletionStatus.Unknown,
-			}));
+			},
+			finishedCoinJoin.CoinJoinTask.Result));
 
 	private void NotifyCoinJoinStatusChanged(IWallet wallet, CoinJoinProgressEventArgs coinJoinProgressEventArgs) =>
 		StatusChanged.SafeInvoke(this, new CoinJoinStatusEventArgs(
@@ -500,17 +552,16 @@ public class CoinJoinManager : BackgroundService
 
 	private async Task<ImmutableDictionary<string, IWallet>> GetMixableWalletsAsync() =>
 		(await WalletProvider.GetWalletsAsync().ConfigureAwait(false))
-			.Where(x => x.IsMixable)
+			.Where(x => x.IsMixable(CoordinatorName))
 			.ToImmutableDictionary(x => x.WalletName, x => x);
 
-	private async Task<IEnumerable<SmartCoin>> SelectCandidateCoinsAsync(IWallet openedWallet, int bestHeight)
-		=> new CoinsView(await openedWallet.GetCoinjoinCoinCandidatesAsync().ConfigureAwait(false))
+	private async Task<IEnumerable<SmartCoin>> SelectCandidateCoinsAsync(IWallet openedWallet)
+		=> new CoinsView(await openedWallet.GetCoinjoinCoinCandidatesAsync(CoordinatorName).ConfigureAwait(false))
 			.Available()
 			.Confirmed()
-			.Where(coin => !coin.IsExcludedFromCoinJoin)
-			.Where(coin => !coin.IsImmature(bestHeight))
-			.Where(coin => !coin.IsBanned)
-			.Where(coin => !CoinRefrigerator.IsFrozen(coin));
+			// .Where(x => !x.IsImmature(bestHeight))
+			// .Where(x => !x.IsBanned)
+			.Where(x => !CoinRefrigerator.IsFrozen(x));
 
 	private static async Task WaitAndHandleResultOfTasksAsync(string logPrefix, params Task[] tasks)
 	{

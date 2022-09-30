@@ -88,9 +88,9 @@ public class Wallet : BackgroundService, IWallet
 
 	public Task<bool> IsWalletPrivateAsync() => Task.FromResult(IsWalletPrivate());
 
-	public bool IsWalletPrivate() => GetPrivacyPercentage(new CoinsView(Coins), AnonScoreTarget) >= 1;
+	public bool IsWalletPrivate() => GetPrivacyPercentage(new CoinsView(Coins), AnonymitySetTarget) >= 1;
 
-	public Task<IEnumerable<SmartCoin>> GetCoinjoinCoinCandidatesAsync() => Task.FromResult(GetCoinjoinCoinCandidates());
+	public Task<IEnumerable<SmartCoin>> GetCoinjoinCoinCandidatesAsync(string coordinatorname) => Task.FromResult(GetCoinjoinCoinCandidates());
 
 	public Task<IEnumerable<SmartTransaction>> GetTransactionsAsync() => Task.FromResult(GetTransactions());
 
@@ -526,22 +526,24 @@ public class Wallet : BackgroundService, IWallet
 		wallet.RegisterServices(bitcoinStore, synchronizer, serviceConfiguration, feeProvider, blockProvider);
 		return wallet;
 	}
-
+	
 	public void UpdateExcludedCoinFromCoinJoin()
 	{
 		var excludedOutpoints = Coins.Where(c => c.IsExcludedFromCoinJoin).Select(c => c.Outpoint);
 		KeyManager.SetExcludedCoinsFromCoinJoin(excludedOutpoints);
 	}
 
-	public bool IsMixable =>
-		State == WalletState.Started // Only running wallets
-		&& !KeyManager.IsWatchOnly // that are not watch-only wallets
-		&& Kitchen.HasIngredients;
+	bool IWallet.IsMixable(string coordinator)
+	{
+		return State == WalletState.Started // Only running wallets
+			&& !KeyManager.IsWatchOnly // that are not watch-only wallets
+			&& Kitchen.HasIngredients;
+	}
 
 	public IKeyChain? KeyChain { get; }
 
 	public IDestinationProvider DestinationProvider { get; }
-	public int AnonScoreTarget => KeyManager.AnonScoreTarget;
+	public int AnonymitySetTarget => KeyManager.AnonScoreTarget;
 	public bool ConsolidationMode => false;
 	public TimeSpan FeeRateMedianTimeFrame => TimeSpan.FromHours(KeyManager.FeeRateMedianTimeFrameHours);
 }

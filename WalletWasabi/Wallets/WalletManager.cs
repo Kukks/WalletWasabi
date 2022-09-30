@@ -93,7 +93,7 @@ public class WalletManager : IWalletProvider
 		}
 	}
 
-	public Task<IEnumerable<IWallet>> GetWalletsAsync() => Task.FromResult<IEnumerable<IWallet>>(GetWallets(refreshWalletList: true));
+	public Task<IEnumerable<IWallet>> GetWalletsAsync(string coordinatorName) => Task.FromResult<IEnumerable<IWallet>>(GetWallets(refreshWalletList: true));
 
 	public IEnumerable<Wallet> GetWallets(bool refreshWalletList = true)
 	{
@@ -410,5 +410,10 @@ public class WalletManager : IWalletProvider
 		{
 			return Wallets.Single(x => x.KeyManager.WalletName == walletName);
 		}
+	}
+
+	public Task<IEnumerable<IWallet>> GetWalletsAsync()
+	{
+		throw new NotImplementedException();
 	}
 }
