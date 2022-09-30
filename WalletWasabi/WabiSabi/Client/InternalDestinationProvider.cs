@@ -1,7 +1,9 @@
 using NBitcoin;
 using System.Linq;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using WalletWasabi.Blockchain.Keys;
+using WalletWasabi.WabiSabi.Backend.Rounds;
 
 namespace WalletWasabi.WabiSabi.Client;
 
@@ -14,7 +16,7 @@ public class InternalDestinationProvider : IDestinationProvider
 
 	private KeyManager KeyManager { get; }
 
-	public IEnumerable<IDestination> GetNextDestinations(int count, bool preferTaproot)
+	public Task<IEnumerable<IDestination>> GetNextDestinationsAsync(int count, bool preferTaproot)
 	{
 		// Get all locked internal keys we have and assert we have enough.
 		KeyManager.AssertLockedInternalKeysIndexedAndPersist(count, preferTaproot);
@@ -31,6 +33,11 @@ public class InternalDestinationProvider : IDestinationProvider
 		var destinations = preferTaproot && taprootKeys.Count >= count
 			? taprootKeys
 			: segwitKeys;
-		return destinations.Select(x => x.GetAddress(KeyManager.GetNetwork()));
+		return Task.FromResult(destinations.Select(x => (IDestination) x.GetAddress(KeyManager.GetNetwork())));
+	}
+
+	public Task<IEnumerable<PendingPayment>> GetPendingPaymentsAsync(UtxoSelectionParameters roundParameters)
+	{
+		return Task.FromResult(Enumerable.Empty<PendingPayment>());
 	}
 }

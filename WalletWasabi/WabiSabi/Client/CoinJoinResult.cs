@@ -9,7 +9,8 @@ public abstract record CoinJoinResult;
 public record SuccessfulCoinJoinResult(
 	ImmutableList<SmartCoin> Coins,
 	ImmutableList<Script> OutputScripts,
-	Transaction UnsignedCoinJoin) : CoinJoinResult;
+	ImmutableDictionary<TxOut, PendingPayment> HandledPayments,
+	Transaction UnsignedCoinJoin, uint256 RoundId) : CoinJoinResult;
 
 public record FailedCoinJoinResult : CoinJoinResult;
 
