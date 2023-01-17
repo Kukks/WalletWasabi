@@ -27,7 +27,7 @@ public class CachedRpcClient : RpcClientBase
 
 	private object CancellationTokenSourceLock { get; } = new();
 
-	private IdempotencyRequestCache IdempotencyRequestCache { get; }
+	protected IdempotencyRequestCache IdempotencyRequestCache { get; }
 
 	private CancellationTokenSource TipChangeCancellationTokenSource
 	{
@@ -189,7 +189,7 @@ public class CachedRpcClient : RpcClientBase
 		await base.InvalidateBlockAsync(blockHash, cancellationToken).ConfigureAwait(false);
 	}
 
-	private MemoryCacheEntryOptions CacheOptionsWithExpirationToken(int size, double expireInSeconds)
+	protected MemoryCacheEntryOptions CacheOptionsWithExpirationToken(int size, double expireInSeconds)
 	{
 		MemoryCacheEntryOptions cacheOptions = CacheOptions(size, expireInSeconds);
 		cacheOptions.AddExpirationToken(new CancellationChangeToken(TipChangeCancellationTokenSource.Token));
