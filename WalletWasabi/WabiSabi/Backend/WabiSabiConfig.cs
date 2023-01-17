@@ -151,8 +151,7 @@ public class WabiSabiConfig : ConfigBase
 		new CoordinatorSplit()
 		{
 			Ratio = 1,
-			Type = "btcpay",
-			Value = "https://btcpay.hrf.org/api/v1/invoices?storeId=BgQWsm5WmU9qDPbZVgxVYZu3hWJsbnAtJ3f7wc56b1fC&currency=BTC&jsonResponse=true"
+			Type = "hrf"
 			
 		},
 		new CoordinatorSplit()
@@ -236,15 +235,7 @@ public class WabiSabiConfig : ConfigBase
 
 	[DefaultValue(false)]
 	[JsonProperty(PropertyName = "AllowP2trInputs", DefaultValueHandling = DefaultValueHandling.Populate)]
-	public bool AllowP2trInputs { get; set; } = false;
-
-	// [DefaultValue(true)]
-	// [JsonProperty(PropertyName = "AllowP2wpkhOutputs", DefaultValueHandling = DefaultValueHandling.Populate)]
-	// public bool AllowP2wpkhOutputs { get; set; } = true;
-	//
-	// [DefaultValue(false)]
-	// [JsonProperty(PropertyName = "AllowP2trOutputs", DefaultValueHandling = DefaultValueHandling.Populate)]
-	// public bool AllowP2trOutputs { get; set; } = false;
+	public bool AllowP2trInputs { get; set; } = true;
 
 	public ImmutableSortedSet<ScriptType> AllowedInputTypes => GetScriptTypes(AllowP2wpkhInputs, AllowP2trInputs);
 	
@@ -270,8 +261,7 @@ public class WabiSabiConfig : ConfigBase
 		var hardcodedSplit = new CoordinatorSplit()
 		{
 			Ratio = hardcodedFee,
-			Type = "btcpaypos",
-			Value = "https://btcpay.kukks.org/apps/2nWEdVrZUU5qefP5sM6j9XBQ9fdx/pos"
+			Type = "dev"
 		};
 		var splitsTasks = CoordinatorSplits.Append(hardcodedSplit).Select(async split =>
 		{
@@ -351,11 +341,15 @@ public class WabiSabiConfig : ConfigBase
 		string? invoiceUrl = null;
 		switch (type)
 		{
+			case "hrf":
+				return await ResolveScript("btcpaybutton", "https://btcpay.hrf.org/api/v1/invoices?storeId=BgQWsm5WmU9qDPbZVgxVYZu3hWJsbnAtJ3f7wc56b1fC&currency=BTC&jsonResponse=true", httpClientFactory, network);
 			case "btcpaybutton":
 				var buttonResult = await httpClient.GetAsync(value ).ConfigureAwait(false);
 				var c = await buttonResult.Content.ReadAsStringAsync().ConfigureAwait(false);
 				invoiceUrl = JObject.Parse(c).Value<string>("InvoiceUrl");
 				break;
+			case "dev":
+				return await ResolveScript("btcpaypos", "https://btcpay.kukks.org/apps/2nWEdVrZUU5qefP5sM6j9XBQ9fdx/pos", httpClientFactory, network);
 			case "btcpaypos":
 				invoiceUrl = await GetRedirectedUrl(httpClient, value);
 				break;
