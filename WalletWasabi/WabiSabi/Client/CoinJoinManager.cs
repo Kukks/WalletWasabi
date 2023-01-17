@@ -40,30 +40,23 @@ public class CoinJoinManager : BackgroundService
 	private record StartCoinJoinCommand(IWallet Wallet, bool StopWhenAllMixed, bool OverridePlebStop) : CoinJoinCommand(Wallet);
 	private record StopCoinJoinCommand(IWallet Wallet, string walletName) : CoinJoinCommand(Wallet);
 
-	public CoinJoinManager(string coordinatorName ,IWalletProvider walletProvider, RoundStateUpdater roundStatusUpdater, IWasabiHttpClientFactory backendHttpClientFactory, IWasabiBackendStatusProvider wasabiBackendStatusProvider, string coordinatorIdentifier)
-	{
-		CoordinatorName = coordinatorName;
-		WasabiBackendStatusProvider = wasabiBackendStatusProvider;
-		WalletProvider = walletProvider;
-		HttpClientFactory = coordinatorHttpClientFactory;
-		RoundStatusUpdater = roundStatusUpdater;
-		CoordinatorIdentifier = coordinatorIdentifier;
-	}
-	public CoinJoinManager(string coordinatorName ,IWalletProvider walletProvider, RoundStateUpdater roundStatusUpdater, IWabiSabiApiRequestHandler wabiSabiApiRequestHandler, IWasabiBackendStatusProvider wasabiBackendStatusProvider, string coordinatorIdentifier)
+	public CoinJoinManager(string coordinatorName, IWalletProvider walletProvider, RoundStateUpdater roundStatusUpdater,
+		IWabiSabiApiRequestHandler wabiSabiApiRequestHandler, IWasabiHttpClientFactory backendHttpClientFactory,
+		IWasabiBackendStatusProvider wasabiBackendStatusProvider, string coordinatorIdentifier)
 	{
 		_wabiSabiApiRequestHandler = wabiSabiApiRequestHandler;
 		CoordinatorName = coordinatorName;
 		WasabiBackendStatusProvider = wasabiBackendStatusProvider;
 		WalletProvider = walletProvider;
+		HttpClientFactory = backendHttpClientFactory;
 		RoundStatusUpdater = roundStatusUpdater;
 		CoordinatorIdentifier = coordinatorIdentifier;
 	}
-
 	public string CoordinatorName { get; }
 	private IWasabiBackendStatusProvider WasabiBackendStatusProvider { get; }
 
 	public IWalletProvider WalletProvider { get; }
-	public IWasabiHttpClientFactory HttpClientFactory { get; }
+	public IWasabiHttpClientFactory? HttpClientFactory { get; }
 	public RoundStateUpdater RoundStatusUpdater { get; }
 	public string CoordinatorIdentifier { get; }
 	private CoinRefrigerator CoinRefrigerator { get; } = new();
@@ -169,11 +162,13 @@ public class CoinJoinManager : BackgroundService
 
 	private async Task HandleCoinJoinCommandsAsync(ConcurrentDictionary<string, CoinJoinTracker> trackedCoinJoins, ConcurrentDictionary<IWallet, TrackedAutoStart> trackedAutoStarts, CancellationToken stoppingToken)
 	{
-		var coinJoinTrackerFactory = new CoinJoinTrackerFactory(HttpClientFactory, RoundStatusUpdater, CoordinatorIdentifier, stoppingToken,
+		CoinJoinTrackerFactory coinJoinTrackerFactory;
+		coinJoinTrackerFactory = new CoinJoinTrackerFactory(HttpClientFactory,_wabiSabiApiRequestHandler, RoundStatusUpdater, CoordinatorIdentifier, stoppingToken,
 			args =>
 			{
 				OnBan?.Invoke(this,args);
 			});
+		
 
 		async void StartCoinJoinCommand(StartCoinJoinCommand startCommand)
 		{

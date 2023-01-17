@@ -439,7 +439,7 @@ public class CoinJoinClient
 			try
 			{
 				IWabiSabiApiRequestHandler arenaRequestHandler;
-				if (HttpClientFactory is null)
+				if (_wabiSabiApiRequestHandler is not null)
 				{
 					arenaRequestHandler = _wabiSabiApiRequestHandler;
 				}

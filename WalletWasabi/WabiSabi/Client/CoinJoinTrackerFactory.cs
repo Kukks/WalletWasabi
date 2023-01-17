@@ -16,31 +16,17 @@ public class CoinJoinTrackerFactory
 {
 	private readonly IWabiSabiApiRequestHandler _wabiSabiApiRequestHandler;
 	private readonly Action<BannedCoinEventArgs> _onCoinBan;
-
+	
 	public CoinJoinTrackerFactory(
 		IWasabiHttpClientFactory httpClientFactory,
-		RoundStateUpdater roundStatusUpdater,
-		string coordinatorIdentifier,
-		CancellationToken cancellationToken,
-		
-		Action<BannedCoinEventArgs> onCoinBan)
-	{
-		_onCoinBan = onCoinBan;
-		HttpClientFactory = httpClientFactory;
-		RoundStatusUpdater = roundStatusUpdater;
-		CoordinatorIdentifier = coordinatorIdentifier;
-		CancellationToken = cancellationToken;
-		LiquidityClueProvider = new LiquidityClueProvider();
-	}
-	public CoinJoinTrackerFactory(
 		IWabiSabiApiRequestHandler wabiSabiApiRequestHandler,
 		RoundStateUpdater roundStatusUpdater,
 		string coordinatorIdentifier,
 		CancellationToken cancellationToken,
-		
 		Action<BannedCoinEventArgs> onCoinBan)
 	{
 		_wabiSabiApiRequestHandler = wabiSabiApiRequestHandler;
+		HttpClientFactory = httpClientFactory;
 		_onCoinBan = onCoinBan;
 		RoundStatusUpdater = roundStatusUpdater;
 		CoordinatorIdentifier = coordinatorIdentifier;
