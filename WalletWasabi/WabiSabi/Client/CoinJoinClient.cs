@@ -14,6 +14,7 @@ using WalletWasabi.Helpers;
 using WalletWasabi.Logging;
 using WalletWasabi.Tor.Socks5.Pool.Circuits;
 using WalletWasabi.WabiSabi.Backend.Models;
+using WalletWasabi.WabiSabi.Backend.PostRequests;
 using WalletWasabi.WabiSabi.Backend.Rounds;
 using WalletWasabi.WabiSabi.Client.CoinJoinProgressEvents;
 using WalletWasabi.WabiSabi.Client.CredentialDependencies;
@@ -28,6 +29,7 @@ namespace WalletWasabi.WabiSabi.Client;
 public class CoinJoinClient
 {
 	private readonly Action<BannedCoinEventArgs> _onCoinBan;
+	private readonly IWabiSabiApiRequestHandler _wabiSabiApiRequestHandler;
 	private readonly bool _batchPayments;
 	private const int MaxInputsRegistrableByWallet = 10; // how many
 	private const int MaxWeightedAnonLoss = 3; // Maximum tolerable WeightedAnonLoss.
@@ -41,11 +43,24 @@ public class CoinJoinClient
 	// This is a maximum cap the delay can be smaller if the remaining time is less.
 	private static readonly TimeSpan MaximumRequestDelay = TimeSpan.FromSeconds(10);
 
+	/// <param name="onCoinBan"></param>
+	/// <param name="httpClientFactory"></param>
+	/// <param name="wabiSabiApiRequestHandler"></param>
+	/// <param name="keyChain"></param>
+	/// <param name="destinationProvider"></param>
+	/// <param name="roundStatusUpdater"></param>
+	/// <param name="coordinatorIdentifier"></param>
+	/// <param name="liquidityClueProvider"></param>
 	/// <param name="anonScoreTarget">Coins those have reached anonymity target, but still can be mixed if desired.</param>
 	/// <param name="consolidationMode">If true, then aggressively try to consolidate as many coins as it can.</param>
-	public CoinJoinClient(
-		Action<BannedCoinEventArgs> onCoinBan,
+	/// <param name="redCoinIsolation"></param>
+	/// <param name="feeRateMedianTimeFrame"></param>
+	/// <param name="doNotRegisterInLastMinuteTimeLimit"></param>
+	/// <param name="coinSelectionFunc"></param>
+	/// <param name="batchPayments"></param>
+	public CoinJoinClient(Action<BannedCoinEventArgs> onCoinBan,
 		IWasabiHttpClientFactory httpClientFactory,
+		IWabiSabiApiRequestHandler wabiSabiApiRequestHandler,
 		IKeyChain keyChain,
 		IDestinationProvider destinationProvider,
 		RoundStateUpdater roundStatusUpdater,
@@ -56,9 +71,10 @@ public class CoinJoinClient
 		bool redCoinIsolation = false,
 		TimeSpan feeRateMedianTimeFrame = default,
 		TimeSpan doNotRegisterInLastMinuteTimeLimit = default,
-		IRoundCoinSelector? coinSelectionFunc = null , bool batchPayments = default)
+		IRoundCoinSelector? coinSelectionFunc = null, bool batchPayments = default)
 	{
 		_onCoinBan = onCoinBan;
+		_wabiSabiApiRequestHandler = wabiSabiApiRequestHandler;
 		_batchPayments = batchPayments;
 		HttpClientFactory = httpClientFactory;
 		KeyChain = keyChain;
@@ -422,11 +438,20 @@ public class CoinJoinClient
 
 			try
 			{
-				personCircuit = HttpClientFactory.NewHttpClientWithPersonCircuit(out Tor.Http.IHttpClient httpClient);
+				IWabiSabiApiRequestHandler arenaRequestHandler;
+				if (HttpClientFactory is null)
+				{
+					arenaRequestHandler = _wabiSabiApiRequestHandler;
+				}
+				else
+				{
+					
+					personCircuit = HttpClientFactory.NewHttpClientWithPersonCircuit(out Tor.Http.IHttpClient httpClient);
 
-				// Alice client requests are inherently linkable to each other, so the circuit can be reused
-				var arenaRequestHandler = new WabiSabiHttpApiClient(httpClient);
+					// Alice client requests are inherently linkable to each other, so the circuit can be reused
+					arenaRequestHandler = new WabiSabiHttpApiClient(httpClient);
 
+				}
 				var aliceArenaClient = new ArenaClient(
 					roundState.CreateAmountCredentialClient(SecureRandom),
 					roundState.CreateVsizeCredentialClient(SecureRandom),
@@ -560,7 +585,15 @@ public class CoinJoinClient
 
 	private BobClient CreateBobClient(RoundState roundState)
 	{
-		var arenaRequestHandler = new WabiSabiHttpApiClient(HttpClientFactory.NewHttpClientWithCircuitPerRequest());
+		IWabiSabiApiRequestHandler arenaRequestHandler;
+		if (HttpClientFactory is null)
+		{
+			arenaRequestHandler = _wabiSabiApiRequestHandler;
+		}
+		else
+		{
+			arenaRequestHandler = new WabiSabiHttpApiClient(HttpClientFactory.NewHttpClientWithCircuitPerRequest());
+		}
 
 		return new BobClient(
 			roundState.Id,

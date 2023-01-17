@@ -12,6 +12,7 @@ using WalletWasabi.Blockchain.TransactionOutputs;
 using WalletWasabi.Extensions;
 using WalletWasabi.Helpers;
 using WalletWasabi.Logging;
+using WalletWasabi.WabiSabi.Backend.PostRequests;
 using WalletWasabi.WabiSabi.Client.CoinJoinProgressEvents;
 using WalletWasabi.WabiSabi.Client.RoundStateAwaiters;
 using WalletWasabi.WabiSabi.Client.StatusChangedEvents;
@@ -33,6 +34,8 @@ public class BannedCoinEventArgs : EventArgs
 
 public class CoinJoinManager : BackgroundService
 {
+	private readonly IWabiSabiApiRequestHandler _wabiSabiApiRequestHandler;
+
 	private record CoinJoinCommand(IWallet Wallet);
 	private record StartCoinJoinCommand(IWallet Wallet, bool StopWhenAllMixed, bool OverridePlebStop) : CoinJoinCommand(Wallet);
 	private record StopCoinJoinCommand(IWallet Wallet, string walletName) : CoinJoinCommand(Wallet);
@@ -43,6 +46,15 @@ public class CoinJoinManager : BackgroundService
 		WasabiBackendStatusProvider = wasabiBackendStatusProvider;
 		WalletProvider = walletProvider;
 		HttpClientFactory = coordinatorHttpClientFactory;
+		RoundStatusUpdater = roundStatusUpdater;
+		CoordinatorIdentifier = coordinatorIdentifier;
+	}
+	public CoinJoinManager(string coordinatorName ,IWalletProvider walletProvider, RoundStateUpdater roundStatusUpdater, IWabiSabiApiRequestHandler wabiSabiApiRequestHandler, IWasabiBackendStatusProvider wasabiBackendStatusProvider, string coordinatorIdentifier)
+	{
+		_wabiSabiApiRequestHandler = wabiSabiApiRequestHandler;
+		CoordinatorName = coordinatorName;
+		WasabiBackendStatusProvider = wasabiBackendStatusProvider;
+		WalletProvider = walletProvider;
 		RoundStatusUpdater = roundStatusUpdater;
 		CoordinatorIdentifier = coordinatorIdentifier;
 	}

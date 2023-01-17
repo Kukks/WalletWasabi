@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using WalletWasabi.Blockchain.TransactionOutputs;
 using WalletWasabi.Extensions;
+using WalletWasabi.WabiSabi.Backend.PostRequests;
 using WalletWasabi.WabiSabi.Client.RoundStateAwaiters;
 using WalletWasabi.Wallets;
 using WalletWasabi.WebClients.Wasabi;
@@ -13,6 +14,7 @@ namespace WalletWasabi.WabiSabi.Client;
 
 public class CoinJoinTrackerFactory
 {
+	private readonly IWabiSabiApiRequestHandler _wabiSabiApiRequestHandler;
 	private readonly Action<BannedCoinEventArgs> _onCoinBan;
 
 	public CoinJoinTrackerFactory(
@@ -25,6 +27,21 @@ public class CoinJoinTrackerFactory
 	{
 		_onCoinBan = onCoinBan;
 		HttpClientFactory = httpClientFactory;
+		RoundStatusUpdater = roundStatusUpdater;
+		CoordinatorIdentifier = coordinatorIdentifier;
+		CancellationToken = cancellationToken;
+		LiquidityClueProvider = new LiquidityClueProvider();
+	}
+	public CoinJoinTrackerFactory(
+		IWabiSabiApiRequestHandler wabiSabiApiRequestHandler,
+		RoundStateUpdater roundStatusUpdater,
+		string coordinatorIdentifier,
+		CancellationToken cancellationToken,
+		
+		Action<BannedCoinEventArgs> onCoinBan)
+	{
+		_wabiSabiApiRequestHandler = wabiSabiApiRequestHandler;
+		_onCoinBan = onCoinBan;
 		RoundStatusUpdater = roundStatusUpdater;
 		CoordinatorIdentifier = coordinatorIdentifier;
 		CancellationToken = cancellationToken;
@@ -49,6 +66,7 @@ public class CoinJoinTrackerFactory
 		var coinJoinClient = new CoinJoinClient(
 			_onCoinBan,
 			HttpClientFactory,
+			_wabiSabiApiRequestHandler,
 			wallet.KeyChain,
 			wallet.DestinationProvider,
 			RoundStatusUpdater,
