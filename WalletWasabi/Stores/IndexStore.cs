@@ -108,7 +108,7 @@ public class IndexStore : IAsyncDisposable
 						{
 							i++;
 							cancel.ThrowIfCancellationRequested();
-							string? line = await sr.ReadLineAsync(CancellationToken.None).ConfigureAwait(false);
+							string? line = await sr.ReadLineAsync().ConfigureAwait(false);
 
 							if (line is null)
 							{
@@ -369,7 +369,7 @@ public class IndexStore : IAsyncDisposable
 							break; // Let's use our the immature filters from here on. The content is the same, just someone else modified the file.
 						}
 
-						string? line = await sr.ReadLineAsync(CancellationToken.None).ConfigureAwait(false);
+						string? line = await sr.ReadLineAsync().ConfigureAwait(false);
 
 						if (line is null)
 						{

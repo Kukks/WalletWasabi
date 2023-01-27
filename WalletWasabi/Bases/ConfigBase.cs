@@ -52,10 +52,7 @@ public abstract class ConfigBase : NotifyPropertyChangedBase, IConfig
 		{
 			string jsonString = ReadFileNoLock();
 			object newConfigObject = Activator.CreateInstance(GetType())!;
-			JsonConvert.PopulateObject(jsonString, newConfigObject, new JsonSerializerSettings()
-		{
-			Converters = JsonSerializationOptions.Default.Settings.Converters, ObjectCreationHandling = ObjectCreationHandling.Replace
-		});
+			JsonConvert.PopulateObject(jsonString, newConfigObject, settings);
 
 			return !AreDeepEqual(newConfigObject);
 		}		
@@ -68,7 +65,7 @@ public abstract class ConfigBase : NotifyPropertyChangedBase, IConfig
 
 		lock (FileLock)
 		{
-			JsonConvert.PopulateObject("{}", this);
+			JsonConvert.PopulateObject("{}", this, settings);
 
 			if (!File.Exists(FilePath))
 			{
@@ -122,23 +119,22 @@ public abstract class ConfigBase : NotifyPropertyChangedBase, IConfig
 	public void ToFile()
 	{
 		AssertFilePathSet();
-		string jsonString = ToString();
 		lock (FileLock)
 		{
 			ToFileNoLock();
 		}
 	}
 
+	private static JsonSerializer serializer = JsonSerializer.Create(settings);
+
+	private static JsonSerializerSettings settings = new JsonSerializerSettings()
+	{
+		Converters = JsonSerializationOptions.Default.Settings.Converters,
+		ObjectCreationHandling = ObjectCreationHandling.Replace
+	};
 	public void Update(string json, bool persist)
 	{
-		
-		var serializer = JsonSerializer.Create(JsonSerializationOptions.Default.Settings);
-		serializer.ObjectCreationHandling = ObjectCreationHandling.Replace;
-		
-		JsonConvert.PopulateObject(json, this, new JsonSerializerSettings()
-		{
-			Converters = JsonSerializationOptions.Default.Settings.Converters, ObjectCreationHandling = ObjectCreationHandling.Replace
-		});
+		JsonConvert.PopulateObject(json, this,settings);
 		if (persist)
 		{
 			ToFile();
@@ -146,7 +142,7 @@ public abstract class ConfigBase : NotifyPropertyChangedBase, IConfig
 	}
 	public override string ToString()
 	{
-		return JsonConvert.SerializeObject(this, Formatting.Indented, JsonSerializationOptions.Default.Settings);
+		return JsonConvert.SerializeObject(this, Formatting.Indented, settings);
 	}
 
 	protected virtual bool TryEnsureBackwardsCompatibility(string jsonString) => true;
@@ -155,7 +151,7 @@ public abstract class ConfigBase : NotifyPropertyChangedBase, IConfig
 	{
 		string jsonString = ReadFileNoLock();
 
-		JsonConvert.PopulateObject(jsonString, this, JsonSerializationOptions.Default.Settings);
+		JsonConvert.PopulateObject(jsonString, this, settings);
 
 		if (TryEnsureBackwardsCompatibility(jsonString))
 		{
@@ -166,9 +162,7 @@ public abstract class ConfigBase : NotifyPropertyChangedBase, IConfig
 	protected void ToFileNoLock()
 	{
 		AssertFilePathSet();
-
-		string jsonString = JsonConvert.SerializeObject(this, Formatting.Indented, JsonSerializationOptions.Default.Settings);
-		WriteFileNoLock(jsonString);
+		WriteFileNoLock(ToString());
 	}
 
 	protected void WriteFileNoLock(string contents)

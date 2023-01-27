@@ -1,3 +1,4 @@
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using WalletWasabi.Bases;
@@ -20,13 +21,21 @@ public class ConfigWatcher : PeriodicRunner
 
 	protected override Task ActionAsync(CancellationToken cancel)
 	{
-		if (Config.CheckFileChange())
+		try
 		{
-			cancel.ThrowIfCancellationRequested();
-			Config.LoadOrCreateDefaultFile();
+			if (Config.CheckFileChange())
+			{
+				cancel.ThrowIfCancellationRequested();
+				Config.LoadOrCreateDefaultFile();
 
-			ExecuteWhenChanged();
+				ExecuteWhenChanged();
+			}
 		}
+		catch (FileNotFoundException)
+		{
+			Config.LoadOrCreateDefaultFile();
+		}
+		
 		return Task.CompletedTask;
 	}
 }
