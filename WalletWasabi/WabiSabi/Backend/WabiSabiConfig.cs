@@ -355,6 +355,11 @@ public class WabiSabiConfig : ConfigBase
 				break;
 			case "opensats":
 			{
+				if (value is null)
+				{
+					value = "btcpayserver";
+				}
+				
 				var content = new StringContent(JObject.FromObject(new
 				{
 					amount = 10,

@@ -407,7 +407,7 @@ public class CoinJoinClient
 			foreach (var aliceClientAndCircuit in registeredAliceClientAndCircuits)
 			{
 				aliceClientAndCircuit.AliceClient.Finish();
-				aliceClientAndCircuit.PersonCircuit.Dispose();
+				aliceClientAndCircuit.PersonCircuit?.Dispose();
 			}
 		}
 	}
@@ -570,7 +570,7 @@ public class CoinJoinClient
 
 		var successfulAlices = aliceClients
 			.Select(x => x.Result)
-			.Where(r => r.AliceClient is not null && r.PersonCircuit is not null)
+			.Where(r => r.AliceClient is not null && (_wabiSabiApiRequestHandler is not null || r.PersonCircuit is not null))
 			.Select(r => (r.AliceClient!, r.PersonCircuit!))
 			.ToImmutableArray();
 
