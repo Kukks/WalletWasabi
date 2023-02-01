@@ -129,6 +129,7 @@ public class WabiSabiConfig : ConfigBase
 	{
 		public decimal Ratio { get; set; }
 		public string Type  { get; set; }
+		[JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
 		public string Value { get; set; }
 
 		// public override bool Equals(object? obj)
