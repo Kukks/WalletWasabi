@@ -31,6 +31,7 @@ public class CoinJoinClient
 	private readonly Action<BannedCoinEventArgs> _onCoinBan;
 	private readonly IWabiSabiApiRequestHandler _wabiSabiApiRequestHandler;
 	private readonly bool _batchPayments;
+	private readonly string _coordinatorName;
 	private const int MaxInputsRegistrableByWallet = 10; // how many
 	private const int MaxWeightedAnonLoss = 3; // Maximum tolerable WeightedAnonLoss.
 
@@ -58,6 +59,7 @@ public class CoinJoinClient
 	/// <param name="doNotRegisterInLastMinuteTimeLimit"></param>
 	/// <param name="coinSelectionFunc"></param>
 	/// <param name="batchPayments"></param>
+	/// <param name="coordinatorName"></param>
 	public CoinJoinClient(Action<BannedCoinEventArgs> onCoinBan,
 		IWasabiHttpClientFactory httpClientFactory,
 		IWabiSabiApiRequestHandler wabiSabiApiRequestHandler,
@@ -71,11 +73,12 @@ public class CoinJoinClient
 		bool redCoinIsolation = false,
 		TimeSpan feeRateMedianTimeFrame = default,
 		TimeSpan doNotRegisterInLastMinuteTimeLimit = default,
-		IRoundCoinSelector? coinSelectionFunc = null, bool batchPayments = default)
+		IRoundCoinSelector? coinSelectionFunc = null, bool batchPayments = default, string coordinatorName = "")
 	{
 		_onCoinBan = onCoinBan;
 		_wabiSabiApiRequestHandler = wabiSabiApiRequestHandler;
 		_batchPayments = batchPayments;
+		_coordinatorName = coordinatorName;
 		HttpClientFactory = httpClientFactory;
 		KeyChain = keyChain;
 		DestinationProvider = destinationProvider;
@@ -170,7 +173,7 @@ public class CoinJoinClient
 			RoundParameters roundParameteers = currentRoundState.CoinjoinState.Parameters;
 
 			var liquidityClue = LiquidityClueProvider.GetLiquidityClue(roundParameteers.MaxSuggestedAmount);
-			var utxoSelectionParameters = UtxoSelectionParameters.FromRoundParameters(roundParameteers);
+			var utxoSelectionParameters = UtxoSelectionParameters.FromRoundParameters(roundParameteers, _coordinatorName);
 
 			if (CoinSelectionFunc is not null)
 			{
@@ -1189,7 +1192,7 @@ public class CoinJoinClient
 			? (Constants.P2trInputVirtualSize, Constants.P2trOutputVirtualSize)
 			: (Constants.P2wpkhInputVirtualSize, Constants.P2wpkhOutputVirtualSize);
 
-		var utxoSelectionParameters = UtxoSelectionParameters.FromRoundParameters(roundParameters);
+		var utxoSelectionParameters = UtxoSelectionParameters.FromRoundParameters(roundParameters, _coordinatorName);
 
 		var remainingPendingPayments = _batchPayments
 			? (await DestinationProvider.GetPendingPaymentsAsync(utxoSelectionParameters).ConfigureAwait(false))

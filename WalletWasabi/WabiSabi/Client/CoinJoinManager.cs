@@ -167,7 +167,7 @@ public class CoinJoinManager : BackgroundService
 			args =>
 			{
 				OnBan?.Invoke(this,args);
-			});
+			}, CoordinatorName);
 		
 
 		async void StartCoinJoinCommand(StartCoinJoinCommand startCommand)

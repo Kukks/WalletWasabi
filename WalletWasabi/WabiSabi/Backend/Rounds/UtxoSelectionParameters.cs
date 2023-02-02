@@ -10,14 +10,16 @@ public record UtxoSelectionParameters(
 	CoordinationFeeRate CoordinationFeeRate,
 	FeeRate MiningFeeRate,
 	ImmutableSortedSet<ScriptType> AllowedInputScriptTypes,
-	ImmutableSortedSet<ScriptType> AllowedOutputScriptTypes)
+	ImmutableSortedSet<ScriptType> AllowedOutputScriptTypes,
+	string CoordinatorName)
 {
-	public static UtxoSelectionParameters FromRoundParameters(RoundParameters roundParameters) =>
+	public static UtxoSelectionParameters FromRoundParameters(RoundParameters roundParameters, string coordinatorName) =>
 		new(
 			roundParameters.AllowedInputAmounts,
 			roundParameters.AllowedOutputAmounts,
 			roundParameters.CoordinationFeeRate,
 			roundParameters.MiningFeeRate,
 			roundParameters.AllowedInputTypes,
-			roundParameters.AllowedOutputTypes);
+			roundParameters.AllowedOutputTypes, 
+			coordinatorName);
 }
