@@ -227,6 +227,10 @@ public class CoinJoinClient
 			switch (result)
 			{
 				case DisruptedCoinJoinResult info:
+					if (info.abandonAndAllSubsequentBlames)
+					{
+						throw new InvalidOperationException("Skipping blame rounds as we were the only ones in the round.");
+					}
 					// Only use successfully registered coins in the blame round.
 					coins = info.SignedCoins;
 
@@ -271,11 +275,12 @@ public class CoinJoinClient
 			IEnumerable<TxOut> outputTxOuts = Enumerable.Empty<TxOut>();
 			Transaction unsignedCoinJoin = null;
 			ImmutableDictionary<TxOut, PendingPayment> batchedPayments = ImmutableDictionary<TxOut, PendingPayment>.Empty;
+			bool abandonAndAllSubsequentBlames = false;
 			try
 			{
 				using CancellationTokenSource cancelOrRoundEndedCts =
 					CancellationTokenSource.CreateLinkedTokenSource(roundEndedCts.Token, cancellationToken);
-				(aliceClientsThatSigned, outputTxOuts, unsignedCoinJoin, batchedPayments) = await ProceedWithRoundAsync(roundState, smartCoins, cancelOrRoundEndedCts.Token)
+				(aliceClientsThatSigned, outputTxOuts, unsignedCoinJoin, batchedPayments, abandonAndAllSubsequentBlames) = await ProceedWithRoundAsync(roundState, smartCoins, cancelOrRoundEndedCts.Token)
 					.ConfigureAwait(false);
 			}
 			catch (OperationCanceledException)
@@ -349,7 +354,7 @@ public class CoinJoinClient
 				UnsignedCoinJoin: unsignedCoinJoin!,
 				RoundId: roundId,
 				Coins: signedCoins),
-				EndRoundState.NotAllAlicesSign => new DisruptedCoinJoinResult(signedCoins),
+				EndRoundState.NotAllAlicesSign => new DisruptedCoinJoinResult(signedCoins, abandonAndAllSubsequentBlames),
 				_ => new FailedCoinJoinResult()
 			};
 		}
@@ -375,7 +380,7 @@ public class CoinJoinClient
 		}
 	}
 
-	private async Task<(ImmutableArray<AliceClient> aliceClientsThatSigned, IEnumerable<TxOut> OutputTxOuts, Transaction UnsignedCoinJoin, ImmutableDictionary<TxOut, PendingPayment> HandledPayments)> ProceedWithRoundAsync(RoundState roundState, IEnumerable<SmartCoin> smartCoins, CancellationToken cancellationToken)
+	private async Task<(ImmutableArray<AliceClient> aliceClientsThatSigned, IEnumerable<TxOut> OutputTxOuts, Transaction UnsignedCoinJoin, ImmutableDictionary<TxOut, PendingPayment> HandledPayments, bool abandonAndAllSubsequentBlames)> ProceedWithRoundAsync(RoundState roundState, IEnumerable<SmartCoin> smartCoins, CancellationToken cancellationToken)
 	{
 		ImmutableArray<(AliceClient AliceClient, PersonCircuit PersonCircuit)> registeredAliceClientAndCircuits = ImmutableArray<(AliceClient, PersonCircuit)>.Empty;
 		try
@@ -394,11 +399,11 @@ public class CoinJoinClient
 
 			var outputTxOuts = await ProceedWithOutputRegistrationPhaseAsync(roundId, registeredAliceClients, cancellationToken).ConfigureAwait(false);
 
-			var (unsignedCoinJoin, aliceClientsThatSigned) = await ProceedWithSigningStateAsync(roundId, registeredAliceClients, outputTxOuts.outputTxOuts, cancellationToken).ConfigureAwait(false);
+			var (unsignedCoinJoin, aliceClientsThatSigned, abandonAndAllSubsequentBlames) = await ProceedWithSigningStateAsync(roundId, registeredAliceClients, outputTxOuts.outputTxOuts, cancellationToken).ConfigureAwait(false);
 			LogCoinJoinSummary(registeredAliceClients, outputTxOuts, unsignedCoinJoin, roundState);
 
 			LiquidityClueProvider.UpdateLiquidityClue(roundState.CoinjoinState.Parameters.MaxSuggestedAmount, unsignedCoinJoin, outputTxOuts.outputTxOuts);
-			return new(aliceClientsThatSigned, outputTxOuts.outputTxOuts, unsignedCoinJoin,outputTxOuts.batchedPayments.ToImmutableDictionary());
+			return new(aliceClientsThatSigned, outputTxOuts.outputTxOuts, unsignedCoinJoin,outputTxOuts.batchedPayments.ToImmutableDictionary(), abandonAndAllSubsequentBlames);
 		}
 		finally
 		{
@@ -1295,7 +1300,7 @@ public class CoinJoinClient
 		return (outputTxOuts, batchedPayments);
 	}
 
-	private async Task<(Transaction UnsignedCoinJoin, ImmutableArray<AliceClient> AliceClientsThatSigned)> ProceedWithSigningStateAsync(
+	private async Task<(Transaction Transaction, ImmutableArray<AliceClient> alicesToSign, bool abandonAndAllSubsequentBlames)> ProceedWithSigningStateAsync(
 		uint256 roundId,
 		ImmutableArray<AliceClient> registeredAliceClients,
 		IEnumerable<TxOut> outputTxOuts,
@@ -1315,7 +1320,14 @@ public class CoinJoinClient
 
 		var signingState = roundState.Assert<SigningState>();
 		var unsignedCoinJoin = signingState.CreateUnsignedTransactionWithPrecomputedData();
-
+		var abandonAndAllSubsequentBlames = false;
+		if (unsignedCoinJoin.Transaction.Inputs.Count <= registeredAliceClients.Length)
+		{
+			//we're the only one in the coinjoin, fuck that.
+			roundState.LogInfo("We are the only ones in this coinjoin.");
+			abandonAndAllSubsequentBlames = true;
+		}
+		
 		// If everything is okay, then sign all the inputs. Otherwise, in case there are missing outputs, the server is
 		// lying (it lied us before when it responded with 200 OK to the OutputRegistration requests or it is lying us
 		// now when we identify as satoshi.
@@ -1329,14 +1341,14 @@ public class CoinJoinClient
 
 		// Send signature.
 		var combinedToken = linkedCts.Token;
-		var alicesToSign = mustSignAllInputs
+		var alicesToSign = mustSignAllInputs && !abandonAndAllSubsequentBlames
 			? registeredAliceClients
 			: registeredAliceClients.RemoveAt(SecureRandom.GetInt(0, registeredAliceClients.Length));
 
 		await SignTransactionAsync(alicesToSign, unsignedCoinJoin, signingStateEndTime, combinedToken).ConfigureAwait(false);
 		roundState.LogInfo($"{alicesToSign.Length} out of {registeredAliceClients.Length} Alices have signed the coinjoin tx.");
 
-		return (unsignedCoinJoin.Transaction, alicesToSign);
+		return (unsignedCoinJoin.Transaction, alicesToSign, abandonAndAllSubsequentBlames);
 	}
 
 	private async Task<ImmutableArray<(AliceClient, PersonCircuit)>> ProceedWithInputRegAndConfirmAsync(IEnumerable<SmartCoin> smartCoins, RoundState roundState, CancellationToken cancellationToken)

@@ -566,6 +566,7 @@ public class CoinJoinManager : BackgroundService
 		=> new CoinsView(await openedWallet.GetCoinjoinCoinCandidatesAsync(CoordinatorName).ConfigureAwait(false))
 			.Available()
 			.Confirmed()
+			.Where(coin => !coin.CoinJoinInProgress)
 			// .Where(x => !x.IsImmature(bestHeight))
 			// .Where(x => !x.IsBanned)
 			.Where(x => !CoinRefrigerator.IsFrozen(x));
