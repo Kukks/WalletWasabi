@@ -59,43 +59,42 @@ public abstract class ConfigBase : NotifyPropertyChangedBase, IConfig
 	}
 
 	/// <inheritdoc />
-	public virtual void LoadOrCreateDefaultFile()
+	public virtual void LoadFile(bool createIfMissing = false)
 	{
-		AssertFilePathSet();
-
-		lock (FileLock)
+		if (createIfMissing)
 		{
-			JsonConvert.PopulateObject("{}", this, settings);
+			AssertFilePathSet();
 
-			if (!File.Exists(FilePath))
+			lock (FileLock)
 			{
-				Logger.LogInfo($"{GetType().Name} file did not exist. Created at path: `{FilePath}`.");
-			}
-			else
-			{
-				try
-				{
-					LoadFileNoLock();
-				}
-				catch (Exception ex)
-				{
-					Logger.LogInfo(
-						$"{GetType().Name} file has been deleted because it was corrupted. Recreated default version at path: `{FilePath}`.");
-					Logger.LogWarning(ex);
-				}
-			}
+				JsonConvert.PopulateObject("{}", this, settings);
 
-			ToFileNoLock();
+				if (!File.Exists(FilePath))
+				{
+					Logger.LogInfo($"{GetType().Name} file did not exist. Created at path: `{FilePath}`.");
+				}
+				else
+				{
+					try
+					{
+						LoadFileNoLock();
+					}
+					catch (Exception ex)
+					{
+						Logger.LogInfo($"{GetType().Name} file has been deleted because it was corrupted. Recreated default version at path: `{FilePath}`.");
+						Logger.LogWarning(ex);
+					}
+				}
 
+				ToFileNoLock();
+			}
 		}
-	}
-
-	/// <inheritdoc />
-	public virtual void LoadFile()
-	{
-		lock (FileLock)
+		else
 		{
-			LoadFileNoLock();
+			lock (FileLock)
+			{
+				LoadFileNoLock();
+			}
 		}
 	}
 
@@ -107,9 +106,7 @@ public abstract class ConfigBase : NotifyPropertyChangedBase, IConfig
 
 	/// <inheritdoc />
 	public bool AreDeepEqual(object otherConfig)
-	{
-		var serializer = JsonSerializer.Create(JsonSerializationOptions.Default.Settings);
-		serializer.ObjectCreationHandling = ObjectCreationHandling.Replace;
+	{		
 		var currentConfig = JObject.FromObject(this, serializer);
 		var otherConfigJson = JObject.FromObject(otherConfig, serializer);
 		return JToken.DeepEquals(otherConfigJson, currentConfig);
@@ -145,18 +142,11 @@ public abstract class ConfigBase : NotifyPropertyChangedBase, IConfig
 		return JsonConvert.SerializeObject(this, Formatting.Indented, settings);
 	}
 
-	protected virtual bool TryEnsureBackwardsCompatibility(string jsonString) => true;
-
 	protected void LoadFileNoLock()
 	{
 		string jsonString = ReadFileNoLock();
 
-		JsonConvert.PopulateObject(jsonString, this, settings);
-
-		if (TryEnsureBackwardsCompatibility(jsonString))
-		{
-			ToFileNoLock();
-		}
+		JsonConvert.PopulateObject(jsonString, this, JsonSerializationOptions.Default.Settings);
 	}
 
 	protected void ToFileNoLock()
