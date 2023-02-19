@@ -106,7 +106,7 @@ public abstract class ConfigBase : NotifyPropertyChangedBase, IConfig
 
 	/// <inheritdoc />
 	public bool AreDeepEqual(object otherConfig)
-	{		
+	{
 		var currentConfig = JObject.FromObject(this, serializer);
 		var otherConfigJson = JObject.FromObject(otherConfig, serializer);
 		return JToken.DeepEquals(otherConfigJson, currentConfig);
@@ -115,7 +115,6 @@ public abstract class ConfigBase : NotifyPropertyChangedBase, IConfig
 	/// <inheritdoc />
 	public void ToFile()
 	{
-		AssertFilePathSet();
 		lock (FileLock)
 		{
 			ToFileNoLock();
@@ -124,7 +123,7 @@ public abstract class ConfigBase : NotifyPropertyChangedBase, IConfig
 
 	private static JsonSerializer serializer = JsonSerializer.Create(settings);
 
-	private static JsonSerializerSettings settings = new JsonSerializerSettings()
+	private static JsonSerializerSettings settings = new()
 	{
 		Converters = JsonSerializationOptions.Default.Settings.Converters,
 		ObjectCreationHandling = ObjectCreationHandling.Replace
@@ -146,7 +145,7 @@ public abstract class ConfigBase : NotifyPropertyChangedBase, IConfig
 	{
 		string jsonString = ReadFileNoLock();
 
-		JsonConvert.PopulateObject(jsonString, this, JsonSerializationOptions.Default.Settings);
+		JsonConvert.PopulateObject(jsonString, this, settings);
 	}
 
 	protected void ToFileNoLock()

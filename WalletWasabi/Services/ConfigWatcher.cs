@@ -21,9 +21,23 @@ public class ConfigWatcher : PeriodicRunner
 
 	protected override Task ActionAsync(CancellationToken cancel)
 	{
-		cancel.ThrowIfCancellationRequested();
-		Config.LoadFile(createIfMissing: true);
-		ExecuteWhenChanged();
+		try
+		{
+
+			if (Config.CheckFileChange())
+			{
+				cancel.ThrowIfCancellationRequested();
+				Config.LoadFile(createIfMissing: true);
+
+				ExecuteWhenChanged();
+			}
+		}
+		catch (FileNotFoundException)
+		{
+			Config.LoadFile(createIfMissing: true);
+			ExecuteWhenChanged();
+		}
+
 		return Task.CompletedTask;
 	}
 }

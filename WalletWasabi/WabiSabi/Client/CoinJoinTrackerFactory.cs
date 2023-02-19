@@ -59,7 +59,7 @@ public class CoinJoinTrackerFactory
 			RoundStatusUpdater,
 			CoordinatorIdentifier,
 			LiquidityClueProvider,
-			wallet.AnonymitySetTarget,
+			wallet.AnonScoreTarget,
 			consolidationMode: wallet.ConsolidationMode,
 			redCoinIsolation: wallet.RedCoinIsolation,
 			feeRateMedianTimeFrame: wallet.FeeRateMedianTimeFrame,

@@ -6,22 +6,16 @@ using System.ComponentModel;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
-using System.Net.Http.Json;
-using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Linq;
 using WalletWasabi.Bases;
-using WalletWasabi.Helpers;
 using WalletWasabi.JsonConverters;
 using WalletWasabi.JsonConverters.Bitcoin;
 using WalletWasabi.JsonConverters.Timing;
-using WalletWasabi.Tor.Http;
-using WalletWasabi.Tor.Http.Extensions;
 using WalletWasabi.WabiSabi.Backend.Rounds;
 using WalletWasabi.WabiSabi.Models;
-using WalletWasabi.WebClients.Wasabi;
 
 namespace WalletWasabi.WabiSabi.Backend;
 public class DefaultCoordinatorSplits : DefaultValueAttribute
@@ -241,17 +235,15 @@ public class WabiSabiConfig : ConfigBase
 	public ImmutableSortedSet<ScriptType> AllowedInputTypes => GetScriptTypes(AllowP2wpkhInputs, AllowP2trInputs);
 	
 	[JsonProperty(PropertyName = "AllowedOutputTypes", ItemConverterType = typeof(StringEnumConverter))]
-	public HashSet<ScriptType> AllowedOutputTypes { get; set; } = new HashSet<ScriptType>()
-	{
-		ScriptType.Witness,
+	public ImmutableSortedSet<ScriptType> AllowedOutputTypes { get; set; } = ImmutableSortedSet.Create(ScriptType.Witness,
 		ScriptType.P2PKH,
 		ScriptType.P2SH,
 		ScriptType.P2PK,
 		ScriptType.P2WPKH,
 		ScriptType.P2WSH,
 		ScriptType.MultiSig,
-		ScriptType.Taproot,
-	};
+		ScriptType.Taproot
+	);
 
 	public async Task<TxOut[]> GetNextCleanCoordinatorTxOuts(Money available, IHttpClientFactory httpClient, Round round)
 	{
@@ -315,8 +307,6 @@ public class WabiSabiConfig : ConfigBase
 	
 	private static async Task<string> GetRedirectedUrl(HttpClient client, string url)
 	{
-
-
 		string redirectedUrl = url;
 		using (HttpResponseMessage response = await client.PostAsync(url, new FormUrlEncodedContent(Array.Empty<KeyValuePair<string, string>>())))
 		using (HttpContent content = response.Content)

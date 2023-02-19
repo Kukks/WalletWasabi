@@ -92,7 +92,7 @@ public class HostedServices : IDisposable
 				Logger.LogError($"Error stopping {x.FriendlyName}.");
 				Logger.LogError(y.Exception);
 			}
-		}));
+		}, token));
 
 		await Task.WhenAll(tasks).ConfigureAwait(false);
 		IsStartAllAsyncStarted = false;

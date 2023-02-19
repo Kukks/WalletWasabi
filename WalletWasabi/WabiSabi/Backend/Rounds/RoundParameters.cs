@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using NBitcoin;
 using NBitcoin.Policy;
@@ -8,8 +9,6 @@ namespace WalletWasabi.WabiSabi.Backend.Rounds;
 
 public record RoundParameters
 {
-	public static readonly ImmutableSortedSet<ScriptType> OnlyP2WPKH = ImmutableSortedSet.Create(ScriptType.P2WPKH);
-
 	public RoundParameters(
 		Network network,
 		FeeRate miningFeeRate,
@@ -102,7 +101,7 @@ public record RoundParameters
 			new MoneyRange(wabiSabiConfig.MinRegistrableAmount, wabiSabiConfig.MaxRegistrableAmount),
 			new MoneyRange(wabiSabiConfig.MinRegistrableAmount, wabiSabiConfig.MaxRegistrableAmount),
 			wabiSabiConfig.AllowedInputTypes,
-			wabiSabiConfig.AllowedOutputTypes.ToImmutableSortedSet(),
+			wabiSabiConfig.AllowedOutputTypes,
 			wabiSabiConfig.StandardInputRegistrationTimeout,
 			wabiSabiConfig.ConnectionConfirmationTimeout,
 			wabiSabiConfig.OutputRegistrationTimeout,

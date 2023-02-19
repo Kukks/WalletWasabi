@@ -265,19 +265,22 @@ public static class Logger
 		}
 	}
 
-	private static ILogger _dotnetLogger = null;
-	private static List<Action> _pendingDotnetLogger = new List<Action>();
+	private static ILogger? _dotnetLogger;
+	private static List<Action> _pendingDotnetLogger = new();
 	public static ILogger? DotnetLogger
 	{
-		get { return _dotnetLogger;}
+		get => _dotnetLogger;
 		set
 		{
 			_dotnetLogger = value;
 
-			while (_dotnetLogger is not null && _pendingDotnetLogger.Any())
+			lock (Lock)
 			{
-				var action = _pendingDotnetLogger.First();
-				action.Invoke();
+				while (_dotnetLogger is not null && _pendingDotnetLogger.Any())
+				{
+					var action = _pendingDotnetLogger.First();
+					action.Invoke();
+				}
 			}
 		} } 
 

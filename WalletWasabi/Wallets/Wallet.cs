@@ -102,7 +102,7 @@ public class Wallet : BackgroundService, IWallet
 
 	public IDestinationProvider DestinationProvider { get; }
 	
-	public int AnonymitySetTarget => KeyManager.AnonScoreTarget;
+	public int AnonScoreTarget => KeyManager.AnonScoreTarget;
 	public bool ConsolidationMode => false;
 	
 	public bool IsMixable =>
@@ -116,7 +116,7 @@ public class Wallet : BackgroundService, IWallet
 	
 	public Task<bool> IsWalletPrivateAsync() => Task.FromResult(IsWalletPrivate());
 
-	public bool IsWalletPrivate() => GetPrivacyPercentage(new CoinsView(Coins), AnonymitySetTarget) >= 1;
+	public bool IsWalletPrivate() => GetPrivacyPercentage(new CoinsView(Coins), AnonScoreTarget) >= 1;
 
 	public Task<IEnumerable<SmartCoin>> GetCoinjoinCoinCandidatesAsync(string coordinatorname) => Task.FromResult(GetCoinjoinCoinCandidates());
 

@@ -23,7 +23,7 @@ public interface IWallet
 	IKeyChain? KeyChain { get; }
 
 	IDestinationProvider DestinationProvider { get; }
-	int AnonymitySetTarget { get; }
+	int AnonScoreTarget { get; }
 	bool ConsolidationMode { get; }
 	TimeSpan FeeRateMedianTimeFrame { get; }
 	bool RedCoinIsolation { get; }

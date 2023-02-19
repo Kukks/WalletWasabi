@@ -1,5 +1,3 @@
-using System.Diagnostics;
-
 namespace WalletWasabi.Logging;
 
 public enum LogMode
