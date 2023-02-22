@@ -14,8 +14,11 @@ using WalletWasabi.Bases;
 using WalletWasabi.JsonConverters;
 using WalletWasabi.JsonConverters.Bitcoin;
 using WalletWasabi.JsonConverters.Timing;
+using WalletWasabi.Affiliation;
 using WalletWasabi.WabiSabi.Backend.Rounds;
 using WalletWasabi.WabiSabi.Models;
+using WalletWasabi.Affiliation.Serialization;
+using WalletWasabi.Helpers;
 
 namespace WalletWasabi.WabiSabi.Backend;
 public class DefaultCoordinatorSplits : DefaultValueAttribute
@@ -231,6 +234,14 @@ public class WabiSabiConfig : ConfigBase
 	[DefaultValue(false)]
 	[JsonProperty(PropertyName = "AllowP2trInputs", DefaultValueHandling = DefaultValueHandling.Populate)]
 	public bool AllowP2trInputs { get; set; } = true;
+
+	[DefaultValue(Constants.FallbackAffiliationMessageSignerKey)]
+	[JsonProperty(PropertyName = "AffiliationMessageSignerKey", DefaultValueHandling = DefaultValueHandling.Populate)]
+	public string AffiliationMessageSignerKey { get; set; } = Constants.FallbackAffiliationMessageSignerKey;
+
+	[DefaultAffiliateServers]
+	[JsonProperty(PropertyName = "AffiliateServers", DefaultValueHandling = DefaultValueHandling.Populate)]
+	public ImmutableDictionary<string, string> AffiliateServers { get; set; } = ImmutableDictionary<string, string>.Empty;
 
 	public ImmutableSortedSet<ScriptType> AllowedInputTypes => GetScriptTypes(AllowP2wpkhInputs, AllowP2trInputs);
 	
