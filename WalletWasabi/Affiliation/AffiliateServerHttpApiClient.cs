@@ -100,10 +100,10 @@ public class AffiliateServerHttpApiClient
 		return Deserialize<TResponse>(responseSerialized);
 	}
 
-	private static string Serialize<T>(T obj) =>
+	public static string Serialize<T>(T obj) =>
 		JsonConvert.SerializeObject(obj, AffiliationJsonSerializationOptions.Settings);
 
-	private static TResponse Deserialize<TResponse>(string jsonString)
+	public static TResponse Deserialize<TResponse>(string jsonString)
 	{
 		try
 		{
