@@ -1229,7 +1229,14 @@ public class CoinJoinClient
 			while (potentialPayments.Any())
 			{
 				var payment = potentialPayments.RandomElement();
-				var cost = payment.ToTxOut().EffectiveCost(utxoSelectionParameters.MiningFeeRate)
+				var txout = payment.ToTxOut();
+				// we have to check that we fit at least one change output at the end if we batch this payment
+				if(availableVsize < (txout.ScriptPubKey.EstimateOutputVsize() + amountDecomposer.OutputSize))
+				{
+					potentialPayments.Remove(payment);
+					continue;
+				}
+				var cost = txout.EffectiveCost(utxoSelectionParameters.MiningFeeRate)
 					.ToDecimal(MoneyUnit.BTC);
 				if (!await payment.PaymentStarted.Invoke().ConfigureAwait(false))
 				{
