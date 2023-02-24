@@ -30,6 +30,7 @@ public class CoinJoinClient
 {
 	private readonly Action<BannedCoinEventArgs> _onCoinBan;
 	private readonly IWabiSabiApiRequestHandler _wabiSabiApiRequestHandler;
+	private readonly IWallet _wallet;
 	private readonly bool _batchPayments;
 	private readonly string _coordinatorName;
 	private const int MaxInputsRegistrableByWallet = 10; // how many
@@ -63,6 +64,7 @@ public class CoinJoinClient
 	public CoinJoinClient(Action<BannedCoinEventArgs> onCoinBan,
 		IWasabiHttpClientFactory httpClientFactory,
 		IWabiSabiApiRequestHandler wabiSabiApiRequestHandler,
+		IWallet wallet, 
 		IKeyChain keyChain,
 		IDestinationProvider destinationProvider,
 		RoundStateUpdater roundStatusUpdater,
@@ -77,6 +79,7 @@ public class CoinJoinClient
 	{
 		_onCoinBan = onCoinBan;
 		_wabiSabiApiRequestHandler = wabiSabiApiRequestHandler;
+		_wallet = wallet;
 		_batchPayments = batchPayments;
 		_coordinatorName = coordinatorName;
 		HttpClientFactory = httpClientFactory;
@@ -123,6 +126,7 @@ public class CoinJoinClient
 					&& roundState.CoinjoinState.Parameters.AllowedOutputAmounts.Min < MinimumOutputAmountSanity
 					&& roundState.Phase == Phase.InputRegistration
 					&& roundState.BlameOf == uint256.Zero
+					&& _wallet.IsRoundOk(roundState.CoinjoinState.Parameters, _coordinatorName)
 					&& IsRoundEconomic(roundState.CoinjoinState.Parameters.MiningFeeRate)
 					&& roundState.Id != excludeRound,
 				token)

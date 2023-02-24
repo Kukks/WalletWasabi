@@ -54,6 +54,7 @@ public class CoinJoinTrackerFactory
 			_onCoinBan,
 			HttpClientFactory,
 			_wabiSabiApiRequestHandler,
+			wallet,
 			wallet.KeyChain,
 			wallet.DestinationProvider,
 			RoundStatusUpdater,

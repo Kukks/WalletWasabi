@@ -39,6 +39,8 @@ public interface IWallet
 	{
 		return null;
 	}
+
+	bool IsRoundOk(RoundParameters coinjoinStateParameters, string coordinatorName);
 }
 
 

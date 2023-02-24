@@ -19,6 +19,7 @@ using WalletWasabi.Models;
 using WalletWasabi.Services;
 using WalletWasabi.Stores;
 using WalletWasabi.Userfacing;
+using WalletWasabi.WabiSabi.Backend.Rounds;
 using WalletWasabi.WabiSabi.Client;
 using WalletWasabi.WebClients.PayJoin;
 
@@ -121,6 +122,10 @@ public class Wallet : BackgroundService, IWallet
 	public Task<IEnumerable<SmartCoin>> GetCoinjoinCoinCandidatesAsync(string coordinatorname) => Task.FromResult(GetCoinjoinCoinCandidates());
 
 	public Task<IEnumerable<SmartTransaction>> GetTransactionsAsync() => Task.FromResult(GetTransactions());
+	public bool IsRoundOk(RoundParameters coinjoinStateParameters, string coordinatorName)
+	{
+		return true;
+	}
 
 	public IEnumerable<SmartCoin> GetCoinjoinCoinCandidates() => Coins;
 	

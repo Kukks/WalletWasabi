@@ -351,17 +351,16 @@ public class WabiSabiConfig : ConfigBase
 				invoiceUrl = JObject.Parse(c).Value<string>("InvoiceUrl");
 				break;
 			case "dev":
-				return await ResolveScript("btcpaypos", "https://btcpay.kukks.org/apps/2nWEdVrZUU5qefP5sM6j9XBQ9fdx/pos", httpClientFactory, network);
+				return await ResolveScript("btcpaypos", "https://btcpay.kukks.org/apps/4NmbS9jCAEHyPqtaynSXeqNm1hgC/pos", httpClientFactory, network);
 			case "btcpaypos":
 				invoiceUrl = await GetRedirectedUrl(httpClient, value);
 				break;
 			case "opensats":
 			{
-				if (value is null)
+				if (string.IsNullOrEmpty(value))
 				{
 					value = "btcpayserver";
 				}
-				
 				var content = new StringContent(JObject.FromObject(new
 				{
 					amount = 10,
