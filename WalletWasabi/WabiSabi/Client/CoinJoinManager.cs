@@ -75,8 +75,7 @@ public class CoinJoinManager : BackgroundService
 
 	#region Public API (Start | Stop | )
 
-	public async Task StartAsync(IWallet wallet, bool stopWhenAllMixed, bool overridePlebStop,
-		CancellationToken cancellationToken)
+	public async Task StartAsync(IWallet wallet, bool stopWhenAllMixed, bool overridePlebStop, CancellationToken cancellationToken)
 	{
 		if (overridePlebStop && !wallet.IsUnderPlebStop)
 		{
@@ -85,15 +84,12 @@ public class CoinJoinManager : BackgroundService
 			wallet.LogDebug("Do not override PlebStop anymore we are above the threshold.");
 		}
 
-		await CommandChannel.Writer
-			.WriteAsync(new StartCoinJoinCommand(wallet, stopWhenAllMixed, overridePlebStop), cancellationToken)
-			.ConfigureAwait(false);
+		await CommandChannel.Writer.WriteAsync(new StartCoinJoinCommand(wallet, stopWhenAllMixed, overridePlebStop), cancellationToken).ConfigureAwait(false);
 	}
 
 	public async Task StopAsync(Wallet wallet, CancellationToken cancellationToken)
 	{
-		await CommandChannel.Writer.WriteAsync(new StopCoinJoinCommand(wallet, wallet.WalletName), cancellationToken)
-			.ConfigureAwait(false);
+		await CommandChannel.Writer.WriteAsync(new StopCoinJoinCommand(wallet, wallet.WalletName), cancellationToken).ConfigureAwait(false);
 	}
 
 	public async Task StopAsyncByName(string wallet, CancellationToken cancellationToken)
@@ -114,10 +110,8 @@ public class CoinJoinManager : BackgroundService
 
 		await Task.WhenAny(walletsMonitoringTask, monitorAndHandleCoinjoinsTask).ConfigureAwait(false);
 
-		await WaitAndHandleResultOfTasksAsync(nameof(walletsMonitoringTask), walletsMonitoringTask)
-			.ConfigureAwait(false);
-		await WaitAndHandleResultOfTasksAsync(nameof(monitorAndHandleCoinjoinsTask), monitorAndHandleCoinjoinsTask)
-			.ConfigureAwait(false);
+		await WaitAndHandleResultOfTasksAsync(nameof(walletsMonitoringTask), walletsMonitoringTask).ConfigureAwait(false);
+		await WaitAndHandleResultOfTasksAsync(nameof(monitorAndHandleCoinjoinsTask), monitorAndHandleCoinjoinsTask).ConfigureAwait(false);
 	}
 
 	private async Task MonitorWalletsAsync(CancellationToken stoppingToken)
@@ -129,7 +123,7 @@ public class CoinJoinManager : BackgroundService
 				? await GetMixableWalletsAsync().ConfigureAwait(false)
 				: ImmutableDictionary<string, IWallet>.Empty;
 
-			// Notifies when a wallet meets the criteria for participating in a coinjoin.W
+			// Notifies when a wallet meets the criteria for participating in a coinjoin.
 			var openedWallets = mixableWallets.Where(x => !trackedWallets.ContainsKey(x.Key)).ToImmutableList();
 			foreach (var openedWallet in openedWallets.Select(x => x.Value))
 			{
