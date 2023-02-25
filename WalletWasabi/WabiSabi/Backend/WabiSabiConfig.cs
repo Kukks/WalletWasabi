@@ -363,7 +363,6 @@ public class WabiSabiConfig : ConfigBase
 				}
 				var content = new StringContent(JObject.FromObject(new
 				{
-					amount = 10,
 					project_name = value,
 					project_slug = value,
 					name = "kukks <3 you"
