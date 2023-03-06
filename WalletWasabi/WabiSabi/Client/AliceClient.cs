@@ -13,6 +13,7 @@ using WalletWasabi.WabiSabi.Client.RoundStateAwaiters;
 using System.Linq;
 using WalletWasabi.Extensions;
 using System.Net.Http;
+using WalletWasabi.Affiliation;
 using WalletWasabi.WabiSabi.Models.MultipartyTransaction;
 
 namespace WalletWasabi.WabiSabi.Client;
@@ -259,7 +260,7 @@ public class AliceClient
 
 	public async Task ReadyToSignAsync(CancellationToken cancellationToken)
 	{
-		await ArenaClient.ReadyToSignAsync(RoundId, AliceId, cancellationToken).ConfigureAwait(false);
+		await ArenaClient.ReadyToSignAsync(RoundId, AliceId, IsCoordinationFeeExempted? AffiliationConstants.DefaultAffiliationId: AffiliationConstants.NonDefaultAffiliationId ,cancellationToken).ConfigureAwait(false);
 		Logger.LogInfo($"Round ({RoundId}), Alice ({AliceId}): Ready to sign.");
 	}
 

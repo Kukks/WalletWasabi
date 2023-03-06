@@ -218,13 +218,14 @@ public class ArenaClient
 	public async Task ReadyToSignAsync(
 		uint256 roundId,
 		Guid aliceId,
+		string affiliationFlag,
 		CancellationToken cancellationToken)
 	{
 		await RequestHandler.ReadyToSignAsync(
 			new ReadyToSignRequestRequest(
 				roundId,
 				aliceId,
-				AffiliationConstants.DefaultAffiliationId),
+				affiliationFlag),
 			cancellationToken).ConfigureAwait(false);
 	}
 }
