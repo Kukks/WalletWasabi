@@ -87,15 +87,9 @@ public class CoinJoinManager : BackgroundService
 		await CommandChannel.Writer.WriteAsync(new StartCoinJoinCommand(wallet, stopWhenAllMixed, overridePlebStop), cancellationToken).ConfigureAwait(false);
 	}
 
-	public async Task StopAsync(Wallet wallet, CancellationToken cancellationToken)
+	public async Task StopAsync(IWallet wallet, CancellationToken cancellationToken)
 	{
-		await CommandChannel.Writer.WriteAsync(new StopCoinJoinCommand(wallet, wallet.WalletName), cancellationToken).ConfigureAwait(false);
-	}
-
-	public async Task StopAsyncByName(string wallet, CancellationToken cancellationToken)
-	{
-		await CommandChannel.Writer.WriteAsync(new StopCoinJoinCommand(null, wallet), cancellationToken)
-			.ConfigureAwait(false);
+		await CommandChannel.Writer.WriteAsync(new StopCoinJoinCommand(wallet), cancellationToken).ConfigureAwait(false);
 	}
 
 	#endregion Public API (Start | Stop | )
@@ -257,20 +251,7 @@ public class CoinJoinManager : BackgroundService
 
 		void StopCoinJoinCommand(StopCoinJoinCommand stopCommand)
 		{
-			IWallet walletToStop = null;
-			if (stopCommand.Wallet is null)
-			{
-				var w = trackedAutoStarts.Where(pair => pair.Key.WalletName == stopCommand.walletName);
-
-				if (w.Any())
-				{
-					walletToStop = w.First().Key;
-				}
-			}
-			else
-			{
-				walletToStop = stopCommand.Wallet;
-			}
+			IWallet walletToStop = stopCommand.Wallet;
 
 			var autoStartRemoved = false;
 			if (walletToStop is not null)
@@ -278,17 +259,17 @@ public class CoinJoinManager : BackgroundService
 				autoStartRemoved = TryRemoveTrackedAutoStart(trackedAutoStarts, walletToStop);
 			}
 
-			if (trackedCoinJoins.TryGetValue(stopCommand.walletName, out var coinJoinTrackerToStop))
+			if (trackedCoinJoins.TryGetValue(walletToStop.WalletName, out var coinJoinTrackerToStop))
 			{
 				coinJoinTrackerToStop.Stop();
-				if (coinJoinTrackerToStop.InCriticalCoinJoinState && walletToStop is not null)
+				if (coinJoinTrackerToStop.InCriticalCoinJoinState)
 				{
 					walletToStop.LogWarning(
 						"Coinjoin is in critical phase, it cannot be stopped - it won't restart later.");
 				}
 			}
 			
-			if (autoStartRemoved && walletToStop is not null)
+			if (autoStartRemoved)
 			{
 				NotifyWalletStoppedCoinJoin(walletToStop);
 			}
@@ -629,7 +610,7 @@ public class CoinJoinManager : BackgroundService
 	private record StartCoinJoinCommand
 		(IWallet Wallet, bool StopWhenAllMixed, bool OverridePlebStop) : CoinJoinCommand(Wallet);
 
-	private record StopCoinJoinCommand(IWallet Wallet, string walletName) : CoinJoinCommand(Wallet);
+	private record StopCoinJoinCommand(IWallet Wallet) : CoinJoinCommand(Wallet);
 
 	private record TrackedAutoStart(Task Task, bool StopWhenAllMixed, bool OverridePlebStop,
 		CancellationTokenSource CancellationTokenSource);
