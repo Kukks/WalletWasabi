@@ -260,7 +260,7 @@ public partial class Arena : PeriodicRunner
 					coinjoin = feeResult.coinjoin;
 					var highestFeeRateTask = async () => (await Rpc.EstimateSmartFeeAsync(2, EstimateSmartFeeMode.Conservative, simulateIfRegTest: true, cancellationToken).ConfigureAwait(false)).FeeRate;
 
-					coinjoin = await TryAddBlameScriptAsync(round, coinjoin, allReady, round.CoordinatorScript, highestFeeRateTask, cancellationToken).ConfigureAwait(false);
+					coinjoin = await TryAddBlameScriptAsync(round, coinjoin, allReady, feeResult.txouts, highestFeeRateTask, cancellationToken).ConfigureAwait(false);
 
 					round.CoinjoinState = FinalizeTransaction(round.Id, coinjoin);
 

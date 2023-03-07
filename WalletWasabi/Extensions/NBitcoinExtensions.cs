@@ -456,13 +456,27 @@ public static class NBitcoinExtensions
 			_ => throw new NotImplementedException($"Size estimation isn't implemented for provided script type.")
 		};
 
-	public static int EstimateOutputVsize(this ScriptType scriptType) =>
-		scriptType switch
+	public static int EstimateOutputVsize(this ScriptType scriptType) 
+	{
+		using var k = new Key();
+		switch (scriptType)
 		{
-			ScriptType.P2WPKH => Constants.P2wpkhOutputVirtualSize,
-			ScriptType.Taproot => Constants.P2trOutputVirtualSize,
-			_ => throw new NotImplementedException($"Size estimation isn't implemented for provided script type.")
-		};
+			case ScriptType.P2PKH:
+			case ScriptType.P2PK:
+				return EstimateOutputVsize(k.GetScriptPubKey(ScriptPubKeyType.Legacy));
+			case ScriptType.Witness:
+			case ScriptType.P2WPKH:
+			case ScriptType.P2SH:
+				return EstimateOutputVsize(k.GetScriptPubKey(ScriptPubKeyType.Segwit));
+			case ScriptType.Taproot:
+			case ScriptType.P2WSH:
+				return EstimateOutputVsize(k.GetScriptPubKey(ScriptPubKeyType.TaprootBIP86));
+			default:
+				 throw new NotImplementedException($"Size estimation isn't implemented for provided script type.");
+				
+		}
+
+	}
 
 	public static Money EffectiveCost(this TxOut output, FeeRate feeRate) =>
 		output.Value + feeRate.GetFee(output.ScriptPubKey.EstimateOutputVsize());

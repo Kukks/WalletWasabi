@@ -16,10 +16,10 @@ public class InternalDestinationProvider : IDestinationProvider
 
 	private KeyManager KeyManager { get; }
 
-	public Task<IEnumerable<IDestination>> GetNextDestinationsAsync(int count, bool preferTaproot, bool mixedOutputs)
+	public Task<IEnumerable<IDestination>> GetNextDestinationsAsync(int count, bool mixedOutputs)
 	{
 		// Get all locked internal keys we have and assert we have enough.
-		KeyManager.AssertLockedInternalKeysIndexedAndPersist(count, preferTaproot);
+		KeyManager.AssertLockedInternalKeysIndexedAndPersist(count, false);
 
 		var allKeys = KeyManager.GetNextCoinJoinKeys().ToList();
 		var taprootKeys = allKeys
@@ -30,7 +30,7 @@ public class InternalDestinationProvider : IDestinationProvider
 			.Where(x => x.FullKeyPath.GetScriptTypeFromKeyPath() == ScriptPubKeyType.Segwit)
 			.ToList();
 
-		var destinations = preferTaproot && taprootKeys.Count >= count
+		var destinations = taprootKeys.Count >= count
 			? taprootKeys
 			: segwitKeys;
 		return Task.FromResult(destinations.Select(x => (IDestination) x.GetAddress(KeyManager.GetNetwork())));
@@ -39,5 +39,10 @@ public class InternalDestinationProvider : IDestinationProvider
 	public Task<IEnumerable<PendingPayment>> GetPendingPaymentsAsync(UtxoSelectionParameters roundParameters)
 	{
 		return Task.FromResult(Enumerable.Empty<PendingPayment>());
+	}
+
+	public Task<ScriptType> GetScriptTypeAsync()
+	{
+		return Task.FromResult(ScriptType.P2WPKH);
 	}
 }

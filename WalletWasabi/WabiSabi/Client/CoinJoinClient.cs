@@ -354,7 +354,7 @@ public class CoinJoinClient
 			{
 				EndRoundState.TransactionBroadcasted => new SuccessfulCoinJoinResult(
 				OutputScripts: outputTxOuts.Select(o => o.ScriptPubKey).ToImmutableList(),
-				HandledPayments: batchedPayments.ToImmutableDictionary(),
+				HandledPayments: batchedPayments,
 				UnsignedCoinJoin: unsignedCoinJoin!,
 				RoundId: roundId,
 				Coins: signedCoins),
@@ -1195,9 +1195,6 @@ public class CoinJoinClient
 		// Calculate outputs values
 		var constructionState = roundState.Assert<ConstructionState>();
 
-		// Get the output's size and its of the input that will spend it in the future.
-		// Here we assume all the outputs share the same scriptpubkey type.
-		var isTaprootAllowed = roundParameters.AllowedOutputTypes.Contains(ScriptType.Taproot);
 
 		var utxoSelectionParameters = UtxoSelectionParameters.FromRoundParameters(roundParameters, _coordinatorName);
 
@@ -1207,13 +1204,13 @@ public class CoinJoinClient
 			.Where(payment => utxoSelectionParameters.AllowedInputAmounts.Contains(payment.Value))
 			.ToList()
 			: new List<PendingPayment>();
-		AmountDecomposer amountDecomposer = new(roundParameters.MiningFeeRate, roundParameters.AllowedOutputAmounts, outputVirtualSize, inputVirtualSize, (int)availableVsize);
+		AmountDecomposer amountDecomposer = new(roundParameters.MiningFeeRate, roundParameters.AllowedOutputAmounts, (int)availableVsize, await DestinationProvider.GetScriptTypeAsync(), Random.Shared);
 		var theirCoins = constructionState.Inputs.Where(x => registeredCoins.All(y => x.Outpoint != y.Outpoint));
 		
 		var registeredCoinEffectiveValues = registeredAliceClients.Select(x => x.EffectiveValue);
 		var theirCoinEffectiveValues = theirCoins.Select(x => x.EffectiveValue(roundParameters.MiningFeeRate, roundParameters.CoordinationFeeRate));
 
-		IEnumerable<Money> outputValues;
+		IEnumerable<Output> outputValues;
 		var paymentsToBatch = new List<PendingPayment>();
 		if (remainingPendingPayments.Any())
 		{
@@ -1231,7 +1228,7 @@ public class CoinJoinClient
 				var payment = potentialPayments.RandomElement();
 				var txout = payment.ToTxOut();
 				// we have to check that we fit at least one change output at the end if we batch this payment
-				if(availableVsize < (txout.ScriptPubKey.EstimateOutputVsize() + amountDecomposer.OutputSize))
+				if(availableVsize < txout.ScriptPubKey.EstimateOutputVsize() + amountDecomposer.ScriptType.EstimateOutputVsize())
 				{
 					potentialPayments.Remove(payment);
 					continue;
@@ -1260,13 +1257,13 @@ public class CoinJoinClient
 		{
 			outputValues = amountDecomposer.Decompose(registeredCoinEffectiveValues, theirCoinEffectiveValues);
 		}
-		var nonMixedOutputs = outputValues.Where(money => !BlockchainAnalyzer.StdDenoms.Contains(money));
-		var mixedOutputs = outputValues.Where(money => BlockchainAnalyzer.StdDenoms.Contains(money));
+		var nonMixedOutputs = outputValues.Where(output => !BlockchainAnalyzer.StdDenoms.Contains(output.EffectiveAmount));
+		var mixedOutputs = outputValues.Where(output => BlockchainAnalyzer.StdDenoms.Contains(output.EffectiveAmount));
 		
 		// Get as many destinations as outputs we need.
 		var destinations = (await DestinationProvider
-			.GetNextDestinationsAsync(mixedOutputs.Count(), preferTaprootOutputs, true).ConfigureAwait(false)).Zip(mixedOutputs, (destination, money) => new TxOut(money, destination));
-		var destinationsNonMixed = (await DestinationProvider.GetNextDestinationsAsync(nonMixedOutputs.Count(), preferTaprootOutputs, false).ConfigureAwait(false)).Zip(nonMixedOutputs, (destination, money) => new TxOut(money, destination));
+			.GetNextDestinationsAsync(mixedOutputs.Count(), true).ConfigureAwait(false)).Zip(mixedOutputs, (destination, output) => new TxOut(output.EffectiveAmount, destination));
+		var destinationsNonMixed = (await DestinationProvider.GetNextDestinationsAsync(nonMixedOutputs.Count(), false).ConfigureAwait(false)).Zip(nonMixedOutputs, (destination, output) => new TxOut(output.EffectiveAmount, destination));
 
 		roundState.LogDebug($"Decomposed to {outputValues.Count()} outputs");
 
