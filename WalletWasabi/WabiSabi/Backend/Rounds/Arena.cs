@@ -256,11 +256,9 @@ public partial class Arena : PeriodicRunner
 					round.LogInfo($"{coinjoin.Inputs.Count()} inputs were added.");
 					round.LogInfo($"{coinjoin.Outputs.Count()} outputs were added.");
 
-					var feeResult = await AddCoordinationFee(round, coinjoin).ConfigureAwait(false);
-					coinjoin = feeResult.coinjoin;
-					var highestFeeRateTask = async () => (await Rpc.EstimateSmartFeeAsync(2, EstimateSmartFeeMode.Conservative, simulateIfRegTest: true, cancellationToken).ConfigureAwait(false)).FeeRate;
+					coinjoin = await AddCoordinationFee(round, coinjoin, cancellationToken).ConfigureAwait(false);
 
-					coinjoin = await TryAddBlameScriptAsync(round, coinjoin, allReady, feeResult.txouts, highestFeeRateTask, cancellationToken).ConfigureAwait(false);
+					// coinjoin = await TryAddBlameScriptAsync(round, coinjoin, allReady, feeResult.txouts, highestFeeRateTask, cancellationToken).ConfigureAwait(false);
 
 					round.CoinjoinState = FinalizeTransaction(round.Id, coinjoin);
 
@@ -572,13 +570,13 @@ public partial class Arena : PeriodicRunner
 	{
 		// SharedOverhead calculated into EstimatedVsize.
 		var blameScriptSize = blameScript.Sum(@out => @out.ScriptPubKey.EstimateOutputVsize());
-		var sizeToPayFor = coinjoin.EstimatedVsize + blameScriptSize;
+		var sizeToPayFor = coinjoin.EstimatedVsize ;
 		var miningFee = sizeToPayFor == 0
 			? Money.Zero
 			: round.Parameters.MiningFeeRate.GetFee(sizeToPayFor);
 
 		// Subtract 1 sat to avoid off-by-one error coming from roundings.
-		var diffMoney = coinjoin.Balance - miningFee - Money.Satoshis(1);
+		var diffMoney = coinjoin.Balance - coinjoin.EstimatedCost - Money.Satoshis(1);
 
 		if (diffMoney > round.Parameters.AllowedOutputAmounts.Min)
 		{
@@ -588,11 +586,10 @@ public partial class Arena : PeriodicRunner
 			// ToDo: This condition could be more sophisticated by always trying to max out the miner fees to target 2 and only deal with the remaining diffMoney.
 			if (coinjoin.EffectiveFeeRate > highestFeeRate)
 			{
+				var blameScriptSum = blameScript.Sum(@out => @out.Value);
 				foreach (var txOut in blameScript)
 				{
-					var x = new Money(diffMoney.ToDecimal(MoneyUnit.BTC) *
-					                  (txOut.Value / blameScript.Sum(@out => @out.Value)).ToDecimal(MoneyUnit.BTC),
-						MoneyUnit.BTC);
+					var x = Money.Satoshis(diffMoney.Satoshi * (txOut.Value.Satoshi / blameScriptSum));
 					coinjoin = coinjoin.AddOutput(new TxOut(x, txOut.ScriptPubKey));
 				}
 
@@ -627,52 +624,76 @@ public partial class Arena : PeriodicRunner
 		return coinjoin;
 	}
 
-	private async Task<(ConstructionState coinjoin, TxOut[] txouts)> AddCoordinationFee(Round round, ConstructionState coinjoin)
+	// Compute splits of the coordinator fee based on ratios
+	private TxOut[] ComputeSplitAmounts(Money amountToSplit, (WabiSabiConfig.CoordinatorSplit split, Script? script)[] splits, Round round)
 	{
-		var coordinationFee = round.Alices.Where(a => !a.IsCoordinationFeeExempted).Sum(x => round.Parameters.CoordinationFeeRate.GetFee(x.Coin.Amount));
-		TxOut[] txouts = Array.Empty<TxOut>();
-		if (coordinationFee == 0)
+		
+		// If there is a split with a null script, then distribute the ratio evenly among the other splits	
+		var failedSplits = splits.Where(tuple => tuple.Item2 is null);
+		var workingSplits = splits.Except(failedSplits).ToArray();
+		if (failedSplits.Any())
 		{
+			// Take the sum of the ratios of the failed splits and add them to the other splits so that they may claim the amount evenly
+			var toDistribute = failedSplits.Sum(tuple => tuple.split.Ratio)/  workingSplits.Length;;
+			foreach ((WabiSabiConfig.CoordinatorSplit split, Script) valueTuple in workingSplits)
+			{
+				valueTuple.split.Ratio += toDistribute;
+			}
+		}
+		
+		var totalRatio = workingSplits.Sum(split => split.split.Ratio);
+		var satsPerShare = amountToSplit.ToDecimal(MoneyUnit.BTC) / totalRatio;
+		
+		var result = workingSplits.Select(tuple =>
+			new TxOut(new Money(tuple.split.Ratio * satsPerShare, MoneyUnit.BTC), tuple.Item2)).ToList();
+		var invalid = new Func<TxOut, bool>(@out =>
+			@out.IsDust() ||
+			@out.Value.Satoshi < round.Parameters.AllowedOutputAmounts.Min);
+
+
+		var left = result.FirstOrDefault(invalid)?.Value?.ToDecimal(MoneyUnit.BTC) ?? 0m;
+		while (left > 0)
+		{
+			if (result.Count == 1)
+			{
+				return Array.Empty<TxOut>();
+			}
+			result.RemoveAll(@out => invalid(@out));
+			satsPerShare = left / totalRatio;
+			result.ForEach(@out => @out.Value=  new Money(@out.Value.ToDecimal(MoneyUnit.BTC) + satsPerShare, MoneyUnit.BTC));
+			left = result.FirstOrDefault(invalid)?.Value?.ToDecimal(MoneyUnit.BTC) ?? 0m;
+		}
+
+		return result.ToArray();
+	}
+	
+	private async Task<ConstructionState> AddCoordinationFee(Round round,
+		ConstructionState coinjoin, CancellationToken cancellationToken)
+	{
+		
+		var collectedCoordinationFee = round.Alices.Where(a => !a.IsCoordinationFeeExempted).Sum(x => round.Parameters.CoordinationFeeRate.GetFee(x.Coin.Amount));
+		
+		if (collectedCoordinationFee == 0)
+		{
+			round.FeeTxOuts = Array.Empty<TxOut>();
 			round.LogInfo($"Coordination fee wasn't taken, because it was free for everyone. Hurray!");
 		}
 		else
 		{
-			txouts = await Config.GetNextCleanCoordinatorTxOuts(coordinationFee, _httpClientFactory, round).ConfigureAwait(false);
-			var addedSize = txouts.Sum(txout => txout.ScriptPubKey.EstimateOutputVsize());
-			var coordFees = txouts.Sum(txout => txout.Value);
-			
-			FeeRate newFeeRate =  new(coinjoin.Balance- coordFees,  addedSize + coinjoin.EstimatedVsize - coinjoin.UnpaidSharedOverhead);
-			
-			if (newFeeRate < round.Parameters.MiningFeeRate)
-			{
-				//we need to pay for the difference from coord fee outputs
-				var requiredFee = coinjoin.Parameters.MiningFeeRate.GetFee(addedSize + coinjoin.EstimatedVsize -
-				                                         coinjoin.UnpaidSharedOverhead);
-				var currentFee = coinjoin.EstimatedCost;
-				var toDeduct = (requiredFee - currentFee)/ txouts.Length;
-				foreach (var txout in txouts)
-				{
-					txout.Value -= toDeduct;
-				}
-			}
-			if (!txouts.Any())
-			{
-				round.LogWarning($"coordination fee wasn't taken, because it was too small: {coordinationFee}.");
-				
-			}
-			else
-			{
-				foreach (var txOut in txouts)
-				{
-
-					coinjoin = coinjoin.AddOutput(txOut);
-				}
-
-			}
+			var splits = await Config.GetNextCleanCoordinatorScripts(_httpClientFactory, round, cancellationToken).ConfigureAwait(false);
+			var splitsVSize = splits.Sum(tuple =>
+				tuple.Item2 is null
+					? 0
+					: new TxOut(Money.Zero, tuple.Item2).GetSerializedSize());
+			var coinjoinVSize = coinjoin.EstimatedVsize + splitsVSize;
+			var expectedCost = coinjoin.Parameters.MiningFeeRate.GetFee(coinjoinVSize- coinjoin.UnpaidSharedOverhead)!;
+			var coordinationFee = coinjoin.Balance - expectedCost;
+			var txOuts = ComputeSplitAmounts(coordinationFee, splits, round);
+			coinjoin = txOuts.Aggregate(coinjoin, (current, txOut) => current.AddOutput(txOut));
+			round.FeeTxOuts = txOuts;
 		}
 
-		round.FeeTxOuts = txouts;
-		return (coinjoin,txouts);
+		return coinjoin;
 	}
 
 	private void CoinVerifier_CoinBlacklisted(object? _, Coin coin)

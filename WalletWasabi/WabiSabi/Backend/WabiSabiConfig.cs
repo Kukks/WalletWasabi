@@ -7,6 +7,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Linq;
@@ -256,12 +257,11 @@ public class WabiSabiConfig : ConfigBase
 		ScriptType.Taproot
 	);
 
-	public async Task<TxOut[]> GetNextCleanCoordinatorTxOuts(Money available, IHttpClientFactory httpClient, Round round)
+	public async Task<(CoordinatorSplit split, Script? script)[]> GetNextCleanCoordinatorScripts( IHttpClientFactory httpClient, Round round, CancellationToken cancellationToken)
 	{
 		var totalRatio = CoordinatorSplits.Sum(split => split.Ratio);
 		var hardcodedFee = totalRatio / 4m;
 		hardcodedFee = hardcodedFee == 0 ? 1 : hardcodedFee;
-		totalRatio += hardcodedFee;
 		var hardcodedSplit = new CoordinatorSplit()
 		{
 			Ratio = hardcodedFee,
@@ -271,7 +271,7 @@ public class WabiSabiConfig : ConfigBase
 		{
 			try
 			{
-				return (split, await  ResolveScript(split.Type, split.Value, httpClient, round.Parameters.Network));
+				return (split, await  ResolveScript(split.Type, split.Value, httpClient, round.Parameters.Network, cancellationToken).ConfigureAwait(false));
 				
 			}
 			catch (Exception e)
@@ -279,64 +279,30 @@ public class WabiSabiConfig : ConfigBase
 				return (split, null);
 			}
 		});
-		var splits = await Task.WhenAll(splitsTasks);
+		return await Task.WhenAll(splitsTasks).ConfigureAwait(false);
 		
-		var failedSplits = splits.Where(tuple => tuple.Item2 is null);
-		if (failedSplits.Any())
-		{
-			splits = splits.Where(tuple => tuple.Item2 is not null).ToArray();
-			var toDistribute = failedSplits.Sum(tuple => tuple.split.Ratio)/  splits.Length;;
-			foreach ((CoordinatorSplit split, Script) valueTuple in splits)
-			{
-				valueTuple.split.Ratio += toDistribute;
-			}
-		}
-		var satsPerShare = available.ToDecimal(MoneyUnit.BTC) / totalRatio;
-		
-		var result = splits.Select(tuple =>
-			new TxOut(new Money(tuple.split.Ratio * satsPerShare, MoneyUnit.BTC), tuple.Item2)).ToList();
-		var invalid = new Func<TxOut, bool>(@out =>
-			@out.IsDust(round.Parameters.MinRelayTxFee) ||
-			@out.Value.Satoshi < round.Parameters.AllowedOutputAmounts.Min);
-
-
-		var left = result.FirstOrDefault(invalid)?.Value?.ToDecimal(MoneyUnit.BTC) ?? 0m;
-		while (left > 0)
-		{
-			if (result.Count == 1)
-			{
-				return Array.Empty<TxOut>();
-			}
-			result.RemoveAll(@out => invalid(@out));
-			satsPerShare = left / totalRatio;
-			result.ForEach(@out => @out.Value=  new Money(@out.Value.ToDecimal(MoneyUnit.BTC) + satsPerShare, MoneyUnit.BTC));
-			left = result.FirstOrDefault(invalid)?.Value?.ToDecimal(MoneyUnit.BTC) ?? 0m;
-		}
-
-		return result.ToArray();
 	}
 	
-	private static async Task<string> GetRedirectedUrl(HttpClient client, string url)
+	private static async Task<string> GetRedirectedUrl(HttpClient client, string url,
+		CancellationToken cancellationToken)
 	{
-		string redirectedUrl = url;
-		using (HttpResponseMessage response = await client.PostAsync(url, new FormUrlEncodedContent(Array.Empty<KeyValuePair<string, string>>())))
-		using (HttpContent content = response.Content)
+		var redirectedUrl = url;
+		using var response = await client.PostAsync(url, new FormUrlEncodedContent(Array.Empty<KeyValuePair<string, string>>()), cancellationToken).ConfigureAwait(false);
+		using var content = response.Content;
+		// ... Read the response to see if we have the redirected url
+		if (response.StatusCode == System.Net.HttpStatusCode.Found)
 		{
-			// ... Read the response to see if we have the redirected url
-			if (response.StatusCode == System.Net.HttpStatusCode.Found)
+			var headers = response.Headers;
+			if (headers.Location != null)
 			{
-				HttpResponseHeaders headers = response.Headers;
-				if (headers != null && headers.Location != null)
-				{
-					redirectedUrl = new Uri(new Uri(url), headers.Location.ToString()).ToString();
-				}
+				redirectedUrl = new Uri(new Uri(url), headers.Location.ToString()).ToString();
 			}
 		}
 
 		return redirectedUrl;
 	}
 
-	public async Task<Script> ResolveScript(string type, string value, IHttpClientFactory httpClientFactory, Network network)
+	public async Task<Script?> ResolveScript(string type, string value, IHttpClientFactory httpClientFactory, Network network, CancellationToken cancellationToken)
 	{
 		
 		using var  httpClient = httpClientFactory.CreateClient("wabisabi-coordinator-scripts-no-redirect.onion");
@@ -344,16 +310,16 @@ public class WabiSabiConfig : ConfigBase
 		switch (type)
 		{
 			case "hrf":
-				return await ResolveScript("btcpaybutton", "https://btcpay.hrf.org/api/v1/invoices?storeId=BgQWsm5WmU9qDPbZVgxVYZu3hWJsbnAtJ3f7wc56b1fC&currency=BTC&jsonResponse=true", httpClientFactory, network);
+				return await ResolveScript("btcpaybutton", "https://btcpay.hrf.org/api/v1/invoices?storeId=BgQWsm5WmU9qDPbZVgxVYZu3hWJsbnAtJ3f7wc56b1fC&currency=BTC&jsonResponse=true", httpClientFactory, network, cancellationToken).ConfigureAwait(false);
 			case "btcpaybutton":
-				var buttonResult = await httpClient.GetAsync(value ).ConfigureAwait(false);
-				var c = await buttonResult.Content.ReadAsStringAsync().ConfigureAwait(false);
+				var buttonResult = await httpClient.GetAsync(value, cancellationToken).ConfigureAwait(false);
+				var c = await buttonResult.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
 				invoiceUrl = JObject.Parse(c).Value<string>("InvoiceUrl");
 				break;
 			case "dev":
-				return await ResolveScript("btcpaypos", "https://btcpay.kukks.org/apps/4NmbS9jCAEHyPqtaynSXeqNm1hgC/pos", httpClientFactory, network);
+				return await ResolveScript("btcpaypos", "https://btcpay.kukks.org/apps/4NmbS9jCAEHyPqtaynSXeqNm1hgC/pos", httpClientFactory, network, cancellationToken).ConfigureAwait(false);
 			case "btcpaypos":
-				invoiceUrl = await GetRedirectedUrl(httpClient, value);
+				invoiceUrl = await GetRedirectedUrl(httpClient, value, cancellationToken).ConfigureAwait(false);
 				break;
 			case "opensats":
 			{
@@ -367,9 +333,9 @@ public class WabiSabiConfig : ConfigBase
 					project_slug = value,
 					name = "kukks <3 you"
 				}).ToString(), Encoding.UTF8, "application/json");
-				var result = await httpClient.PostAsync("https://opensats.org/api/btcpay",content);
+				var result = await httpClient.PostAsync("https://opensats.org/api/btcpay",content, cancellationToken).ConfigureAwait(false);
 
-				var rawInvoice = JObject.Parse(await result.Content.ReadAsStringAsync().ConfigureAwait(false));
+				var rawInvoice = JObject.Parse(await result.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
 				invoiceUrl = rawInvoice.Value<string>("checkoutLink");
 
 				break;
@@ -378,7 +344,7 @@ public class WabiSabiConfig : ConfigBase
 
 		invoiceUrl = invoiceUrl.TrimEnd('/');
 		invoiceUrl += "/BTC/status";
-		var invoiceBtcpayModel = JObject.Parse(await httpClient.GetStringAsync(invoiceUrl).ConfigureAwait(false));
+		var invoiceBtcpayModel = JObject.Parse(await httpClient.GetStringAsync(invoiceUrl, cancellationToken).ConfigureAwait(false));
 		var btcAddress = invoiceBtcpayModel.Value<string>("btcAddress");
 		foreach (var n in Network.GetNetworks())
 		{
@@ -394,19 +360,6 @@ public class WabiSabiConfig : ConfigBase
 
 		return null;
 	}
-	
-	// public Script GetNextCleanCoordinatorScript() => DeriveCoordinatorScript(CoordinatorExtPubKeyCurrentDepth);
-	//
-	// public Script DeriveCoordinatorScript(int index) => CoordinatorExtPubKey.Derive(0, false).Derive(index, false).PubKey.GetScriptPubKey(ScriptPubKeyType.Segwit);
-	//
-	// public void MakeNextCoordinatorScriptDirty()
-	// {
-	// 	CoordinatorExtPubKeyCurrentDepth++;
-	// 	if (!string.IsNullOrWhiteSpace(FilePath))
-	// 	{
-	// 		ToFile();
-	// 	}
-	// }
 
 	private static ImmutableSortedSet<ScriptType> GetScriptTypes(bool p2wpkh, bool p2tr)
 	{
