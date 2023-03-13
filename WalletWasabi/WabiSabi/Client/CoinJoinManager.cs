@@ -440,7 +440,7 @@ public class CoinJoinManager : BackgroundService
 			if (result is SuccessfulCoinJoinResult successfulCoinjoin)
 			{
 				CoinRefrigerator.Freeze(successfulCoinjoin.Coins);
-				await MarkDestinationsUsedAsync(successfulCoinjoin.OutputScripts).ConfigureAwait(false);
+				await MarkDestinationsUsedAsync(successfulCoinjoin.Outputs.Select(@out => @out.ScriptPubKey).ToImmutableList()).ConfigureAwait(false);
 				wallet.LogInfo($"{nameof(CoinJoinClient)} finished. Coinjoin transaction was broadcast.");
 			}
 			else

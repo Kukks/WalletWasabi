@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using NBitcoin;
 using System.Collections.Immutable;
 using WalletWasabi.Blockchain.TransactionOutputs;
@@ -8,7 +9,7 @@ public abstract record CoinJoinResult;
 
 public record SuccessfulCoinJoinResult(
 	ImmutableList<SmartCoin> Coins,
-	ImmutableList<Script> OutputScripts,
+	ImmutableList<TxOut> Outputs,
 	ImmutableDictionary<TxOut, PendingPayment> HandledPayments,
 	Transaction UnsignedCoinJoin, uint256 RoundId) : CoinJoinResult;
 

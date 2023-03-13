@@ -6,12 +6,16 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using WalletWasabi.Blockchain.Analysis;
+using WalletWasabi.Blockchain.Analysis.Clustering;
+using WalletWasabi.Blockchain.Keys;
 using WalletWasabi.Blockchain.TransactionBuilding.BnB;
 using WalletWasabi.Blockchain.TransactionOutputs;
+using WalletWasabi.Blockchain.Transactions;
 using WalletWasabi.Crypto.Randomness;
 using WalletWasabi.Extensions;
 using WalletWasabi.Helpers;
 using WalletWasabi.Logging;
+using WalletWasabi.Models;
 using WalletWasabi.Tor.Socks5.Pool.Circuits;
 using WalletWasabi.WabiSabi.Backend.Models;
 using WalletWasabi.WabiSabi.Backend.PostRequests;
@@ -353,7 +357,7 @@ public class CoinJoinClient
 			return roundState.EndRoundState switch
 			{
 				EndRoundState.TransactionBroadcasted => new SuccessfulCoinJoinResult(
-				OutputScripts: outputTxOuts.Select(o => o.ScriptPubKey).ToImmutableList(),
+				Outputs: outputTxOuts.ToImmutableList(),
 				HandledPayments: batchedPayments,
 				UnsignedCoinJoin: unsignedCoinJoin!,
 				RoundId: roundId,
@@ -403,7 +407,7 @@ public class CoinJoinClient
 
 			var outputTxOuts = await ProceedWithOutputRegistrationPhaseAsync(roundId, registeredAliceClients, cancellationToken).ConfigureAwait(false);
 
-			var (unsignedCoinJoin, aliceClientsThatSigned, abandonAndAllSubsequentBlames) = await ProceedWithSigningStateAsync(roundId, registeredAliceClients, outputTxOuts.outputTxOuts, cancellationToken).ConfigureAwait(false);
+			var (unsignedCoinJoin, aliceClientsThatSigned, abandonAndAllSubsequentBlames) = await ProceedWithSigningStateAsync(roundId, registeredAliceClients, outputTxOuts, cancellationToken).ConfigureAwait(false);
 			LogCoinJoinSummary(registeredAliceClients, outputTxOuts, unsignedCoinJoin, roundState);
 
 			LiquidityClueProvider.UpdateLiquidityClue(roundState.CoinjoinState.Parameters.MaxSuggestedAmount, unsignedCoinJoin, outputTxOuts.outputTxOuts);
@@ -1309,7 +1313,7 @@ public class CoinJoinClient
 	private async Task<(Transaction Transaction, ImmutableArray<AliceClient> alicesToSign, bool abandonAndAllSubsequentBlames)> ProceedWithSigningStateAsync(
 		uint256 roundId,
 		ImmutableArray<AliceClient> registeredAliceClients,
-		IEnumerable<TxOut> outputTxOuts,
+		(IEnumerable<TxOut> outputTxOuts, Dictionary<TxOut, PendingPayment> batchedPayments) outputTxOuts,
 		CancellationToken cancellationToken)
 	{
 		// Signing.
@@ -1327,23 +1331,66 @@ public class CoinJoinClient
 		var signingState = roundState.Assert<SigningState>();
 		var unsignedCoinJoin = signingState.CreateUnsignedTransactionWithPrecomputedData();
 		var abandonAndAllSubsequentBlames = false;
+		
+		var mustSignAllInputs = true;
 		if (unsignedCoinJoin.Transaction.Inputs.Count <= registeredAliceClients.Length)
 		{
 			//we're the only one in the coinjoin, fuck that.
 			roundState.LogInfo("We are the only ones in this coinjoin.");
 			abandonAndAllSubsequentBlames = true;
-		}
-		
-		// If everything is okay, then sign all the inputs. Otherwise, in case there are missing outputs, the server is
-		// lying (it lied us before when it responded with 200 OK to the OutputRegistration requests or it is lying us
-		// now when we identify as satoshi.
-		// In this scenario we should ban the coordinator and stop dealing with it.
-		// see more: https://github.com/zkSNACKs/WalletWasabi/issues/8171
-		bool mustSignAllInputs = SanityCheck(outputTxOuts, unsignedCoinJoin.Transaction.Outputs);
-		if (!mustSignAllInputs)
+		}else
 		{
-			roundState.LogInfo($"There are missing outputs. A subset of inputs will be signed.");
+			// If everything is okay, then sign all the inputs. Otherwise, in case there are missing outputs, the server is
+			// lying (it lied us before when it responded with 200 OK to the OutputRegistration requests or it is lying us
+			// now when we identify as satoshi.
+			// In this scenario we should ban the coordinator and stop dealing with it.
+			// see more: https://github.com/zkSNACKs/WalletWasabi/issues/8171
+			if (!SanityCheck(outputTxOuts.outputTxOuts, unsignedCoinJoin.Transaction.Outputs))
+			{
+				mustSignAllInputs = false;
+				
+
+				roundState.LogInfo($"There are missing outputs. A subset of inputs will be signed.");
+
+			}
+			
+			else
+			{
+			
+				var ourCoins = registeredAliceClients.Select(client => client.SmartCoin);
+				var ourOutputsThatAreNotPayments = outputTxOuts.outputTxOuts.ToList();
+				foreach (var batchedPayment in outputTxOuts.batchedPayments)
+				{
+					ourOutputsThatAreNotPayments.Remove(ourOutputsThatAreNotPayments.First(@out => @out.ScriptPubKey == batchedPayment.Key.ScriptPubKey && @out.Value == batchedPayment.Key.Value));
+				}
+				var smartTx = new SmartTransaction(unsignedCoinJoin.Transaction, new Height(HeightType.Unknown));
+				foreach (var smartCoin in ourCoins)
+				{
+					smartTx.TryAddWalletInput(smartCoin);
+				}
+
+				var outputCoins = new List<SmartCoin>();
+				var matchedIndexes = new List<uint>();
+				foreach (var txOut in ourOutputsThatAreNotPayments)
+				{
+					var index = unsignedCoinJoin.Transaction.Outputs.AsIndexedOutputs().First(@out => !matchedIndexes.Contains(@out.N) && @out.TxOut.ScriptPubKey == txOut.ScriptPubKey && @out.TxOut.Value == txOut.Value).N;
+					matchedIndexes.Add(index);
+					var coin = new SmartCoin(smartTx,  index, new HdPubKey(new Key().PubKey, new KeyPath(0,0,0,0,0,0),SmartLabel.Empty , KeyState.Clean));
+					smartTx.TryAddWalletOutput(coin);
+					outputCoins.Add(coin);
+				}
+			
+				BlockchainAnalyzer.Analyze(smartTx);
+				var wavgInAnon = CoinjoinAnalyzer.WeightedAverage.Invoke(ourCoins.Select(coin => new CoinjoinAnalyzer.AmountWithAnonymity(coin.AnonymitySet, new Money(coin.Amount, MoneyUnit.BTC))));
+				var wavgOutAnon = CoinjoinAnalyzer.WeightedAverage.Invoke(outputCoins.Select(coin => new CoinjoinAnalyzer.AmountWithAnonymity(coin.AnonymitySet, new Money(coin.Amount, MoneyUnit.BTC))));
+				if (wavgOutAnon < wavgInAnon)
+				{
+					roundState.LogInfo("We did not gain any anonymity, abandoning.");
+					mustSignAllInputs = false;
+				}
+			}
 		}
+
 
 		// Send signature.
 		var combinedToken = linkedCts.Token;
@@ -1356,6 +1403,7 @@ public class CoinJoinClient
 
 		return (unsignedCoinJoin.Transaction, alicesToSign, abandonAndAllSubsequentBlames);
 	}
+	private static BlockchainAnalyzer BlockchainAnalyzer { get; } = new();
 
 	private async Task<ImmutableArray<(AliceClient, PersonCircuit)>> ProceedWithInputRegAndConfirmAsync(IEnumerable<SmartCoin> smartCoins, RoundState roundState, CancellationToken cancellationToken)
 	{
