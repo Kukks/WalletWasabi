@@ -184,12 +184,12 @@ public class CoinJoinClient
 		do
 		{
 			// Sanity check if we would get coins at all otherwise this will throw.
-			var _ = coinCandidatesFunc();
+			var _ = await coinCandidatesFunc().ConfigureAwait(false);
 
 			currentRoundState = await WaitForRoundAsync(excludeRound, cancellationToken).ConfigureAwait(false);
 			RoundParameters roundParameters = currentRoundState.CoinjoinState.Parameters;
 
-			coinCandidates = await coinCandidatesFunc();
+			coinCandidates = await coinCandidatesFunc().ConfigureAwait(false);
 
 			var liquidityClue = LiquidityClueProvider.GetLiquidityClue(roundParameters.MaxSuggestedAmount);
 			var utxoSelectionParameters = UtxoSelectionParameters.FromRoundParameters(roundParameters, _coordinatorName);

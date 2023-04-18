@@ -114,6 +114,8 @@ public class Wallet : BackgroundService, IWallet
 
 	public bool IsUnderPlebStop => Coins.TotalAmount() <= KeyManager.PlebStopThreshold;
 
+	public Task<bool> IsWalletPrivateAsync() => Task.FromResult(IsWalletPrivate());
+
 	public bool IsWalletPrivate() => GetPrivacyPercentage(new CoinsView(Coins), AnonScoreTarget) >= 1;
 
 	public async Task<bool> IsWalletPrivateAsync()
@@ -128,6 +130,8 @@ public class Wallet : BackgroundService, IWallet
 	{
 		return true;
 	}
+
+	public Task<IEnumerable<SmartCoin>> GetCoinjoinCoinCandidatesAsync() => Task.FromResult(GetCoinjoinCoinCandidates());
 
 	public IEnumerable<SmartCoin> GetCoinjoinCoinCandidates() => Coins;
 
