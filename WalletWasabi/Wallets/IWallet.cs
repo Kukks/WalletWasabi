@@ -28,6 +28,7 @@ public interface IWallet
 	TimeSpan FeeRateMedianTimeFrame { get; }
 	bool RedCoinIsolation { get; }
 	bool BatchPayments { get; }
+	long? MinimumDenominationAmount { get; }
 
 	Task<bool> IsWalletPrivateAsync();
 

@@ -376,22 +376,14 @@ public static class NBitcoinExtensions
 
 	public static int EstimateOutputVsize(this ScriptType scriptType) 
 	{
-		using var k = new Key();
 		switch (scriptType)
 		{
-			case ScriptType.P2PKH:
-			case ScriptType.P2PK:
-				return EstimateOutputVsize(k.GetScriptPubKey(ScriptPubKeyType.Legacy));
-			case ScriptType.Witness:
-			case ScriptType.P2WPKH:
-			case ScriptType.P2SH:
-				return EstimateOutputVsize(k.GetScriptPubKey(ScriptPubKeyType.Segwit));
-			case ScriptType.Taproot:
-			case ScriptType.P2WSH:
-				return EstimateOutputVsize(k.GetScriptPubKey(ScriptPubKeyType.TaprootBIP86));
-			default:
-				 throw new NotImplementedException($"Size estimation isn't implemented for provided script type.");
-				
+				case ScriptType.P2WPKH: return Constants.P2wpkhOutputVirtualSize;
+				case ScriptType.Taproot: return Constants.P2trOutputVirtualSize;
+				case ScriptType.P2PKH: return Constants.P2pkhOutputVirtualSize;
+				case ScriptType.P2SH: return Constants.P2shOutputVirtualSize;
+				case ScriptType.P2WSH: return Constants.P2wshOutputVirtualSize;
+				default: throw new NotImplementedException($"Size estimation isn't implemented for provided script type.");
 		}
 
 	}

@@ -65,7 +65,7 @@ public class CoinJoinTrackerFactory
 			redCoinIsolation: wallet.RedCoinIsolation,
 			feeRateMedianTimeFrame: wallet.FeeRateMedianTimeFrame,
 			doNotRegisterInLastMinuteTimeLimit: TimeSpan.FromMinutes(1),
-			wallet.GetCoinSelector(), wallet.BatchPayments, _coordinatorName);
+			wallet.GetCoinSelector(), wallet.BatchPayments, wallet.MinimumDenominationAmount,_coordinatorName);
 
 		return new CoinJoinTracker(wallet, coinJoinClient, coinCandidatesFunc, stopWhenAllMixed, overridePlebStop, CancellationToken);
 	}

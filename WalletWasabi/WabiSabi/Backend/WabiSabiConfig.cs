@@ -129,20 +129,6 @@ public class WabiSabiConfig : ConfigBase
 		public string Type  { get; set; }
 		[JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
 		public string Value { get; set; }
-
-		// public override bool Equals(object? obj)
-		// {
-		// 	if (obj is not CoordinatorSplit coordinatorSplit)
-		// 	{
-		// 		return false;
-		// 	}
-		//
-		// 	return Type == coordinatorSplit.Type && Value == coordinatorSplit.Value;
-		// }
-		// public override int GetHashCode()
-		// {
-		// 	return HashCode.Combine(Type, Value);
-		// }
 	}
 	
 	public static List<CoordinatorSplit> DefaultCoordinatorSplits =new()
@@ -165,13 +151,6 @@ public class WabiSabiConfig : ConfigBase
 	[DefaultCoordinatorSplits(null)]
 	[JsonProperty(PropertyName = "CoordinatorSplits", DefaultValueHandling = DefaultValueHandling.Populate)]
 	public List<CoordinatorSplit> CoordinatorSplits { get; set; } = DefaultCoordinatorSplits;
-	
-	// [JsonProperty(PropertyName = "CoordinatorExtPubKey")]
-	// public ExtPubKey CoordinatorExtPubKey { get; private set; } = Constants.WabiSabiFallBackCoordinatorExtPubKey;
-	//
-	// [DefaultValue(1)]
-	// [JsonProperty(PropertyName = "CoordinatorExtPubKeyCurrentDepth", DefaultValueHandling = DefaultValueHandling.Populate)]
-	// public int CoordinatorExtPubKeyCurrentDepth { get; private set; } = 1;
 
 	[DefaultValueMoneyBtc("0.1")]
 	[JsonProperty(PropertyName = "MaxSuggestedAmountBase", DefaultValueHandling = DefaultValueHandling.Populate)]
@@ -247,13 +226,11 @@ public class WabiSabiConfig : ConfigBase
 	public ImmutableSortedSet<ScriptType> AllowedInputTypes => GetScriptTypes(AllowP2wpkhInputs, AllowP2trInputs);
 	
 	[JsonProperty(PropertyName = "AllowedOutputTypes", ItemConverterType = typeof(StringEnumConverter))]
-	public ImmutableSortedSet<ScriptType> AllowedOutputTypes { get; set; } = ImmutableSortedSet.Create(ScriptType.Witness,
+	public ImmutableSortedSet<ScriptType> AllowedOutputTypes { get; set; } = ImmutableSortedSet.Create(
 		ScriptType.P2PKH,
 		ScriptType.P2SH,
-		ScriptType.P2PK,
 		ScriptType.P2WPKH,
 		ScriptType.P2WSH,
-		ScriptType.MultiSig,
 		ScriptType.Taproot
 	);
 

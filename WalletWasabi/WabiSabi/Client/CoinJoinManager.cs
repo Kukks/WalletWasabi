@@ -256,17 +256,19 @@ public class CoinJoinManager : BackgroundService
 			if (walletToStop is not null)
 			{
 				autoStartRemoved = TryRemoveTrackedAutoStart(trackedAutoStarts, walletToStop);
-			}
 
-			if (trackedCoinJoins.TryGetValue(walletToStop.WalletName, out var coinJoinTrackerToStop))
-			{
-				coinJoinTrackerToStop.Stop();
-				if (coinJoinTrackerToStop.InCriticalCoinJoinState)
+
+				if (trackedCoinJoins.TryGetValue(walletToStop.WalletName, out var coinJoinTrackerToStop))
 				{
-					walletToStop.LogWarning("Coinjoin is in critical phase, it cannot be stopped - it won't restart later.");
+					coinJoinTrackerToStop.Stop();
+					if (coinJoinTrackerToStop.InCriticalCoinJoinState)
+					{
+						walletToStop.LogWarning(
+							"Coinjoin is in critical phase, it cannot be stopped - it won't restart later.");
+					}
 				}
 			}
-			
+
 			if (autoStartRemoved)
 			{
 				NotifyWalletStoppedCoinJoin(walletToStop);

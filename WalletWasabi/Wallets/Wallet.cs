@@ -85,6 +85,7 @@ public class Wallet : BackgroundService, IWallet
 
 	public bool RedCoinIsolation => KeyManager.RedCoinIsolation;
 	public bool BatchPayments { get; } = false;
+	public long? MinimumDenominationAmount { get; }
 
 	public Network Network { get; }
 	public TransactionProcessor TransactionProcessor { get; private set; }
@@ -117,11 +118,6 @@ public class Wallet : BackgroundService, IWallet
 	public Task<bool> IsWalletPrivateAsync() => Task.FromResult(IsWalletPrivate());
 
 	public bool IsWalletPrivate() => GetPrivacyPercentage(new CoinsView(Coins), AnonScoreTarget) >= 1;
-
-	public async Task<bool> IsWalletPrivateAsync()
-	{
-		return IsWalletPrivate();
-	}
 
 	public Task<IEnumerable<SmartCoin>> GetCoinjoinCoinCandidatesAsync(string coordinatorname) => Task.FromResult(GetCoinjoinCoinCandidates());
 

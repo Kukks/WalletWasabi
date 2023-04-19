@@ -1,6 +1,7 @@
 using NBitcoin;
 using System.Collections.Generic;
 using System.Linq;
+using WalletWasabi.Blockchain.Analysis;
 using WalletWasabi.Extensions;
 using WalletWasabi.WabiSabi.Models;
 
@@ -15,7 +16,7 @@ public class AmountDecomposer
 	/// <param name="allowedOutputAmount">Range of output amount that's allowed to be registered.</param>
 	/// <param name="availableVsize">Available virtual size for outputs.</param>
 	/// <param name="random">Allows testing by setting a seed value for the random number generator. Use <c>null</c> in production code.</param>
-	public AmountDecomposer(FeeRate feeRate, MoneyRange allowedOutputAmount, int availableVsize, ScriptType scriptType, Random? random = null)
+	public AmountDecomposer(FeeRate feeRate, MoneyRange allowedOutputAmount, int availableVsize, ScriptType scriptType, Random? random = null, long? minimumDenominationAmount = null)
 	{
 		FeeRate = feeRate;
 
@@ -27,7 +28,7 @@ public class AmountDecomposer
 		Random = random ?? Random.Shared;
 
 		// Create many standard denominations.
-		Denominations = CreateDenominations();
+		Denominations = CreateDenominations(minimumDenominationAmount);
 
 		ChangeScriptType = GetNextScriptType();
 	}
@@ -48,7 +49,7 @@ public class AmountDecomposer
 		return ScriptType;
 	}
 
-	private IOrderedEnumerable<Output> CreateDenominations()
+	private IOrderedEnumerable<Output> CreateDenominations(long? minimumDenominationAmount)
 	{
 		var denominations = new HashSet<Output>();
 
@@ -63,6 +64,10 @@ public class AmountDecomposer
 		{
 			var denom = CreateDenom(Math.Pow(2, i));
 
+			if (minimumDenominationAmount is { } min && denom.Amount < min)
+			{
+				continue;
+			}
 			if (denom.Amount < MinAllowedOutputAmount)
 			{
 				continue;
@@ -80,6 +85,11 @@ public class AmountDecomposer
 		for (int i = 0; i < int.MaxValue; i++)
 		{
 			var denom = CreateDenom(Math.Pow(3, i));
+
+			if (minimumDenominationAmount is { } min && denom.Amount < min)
+			{
+				continue;
+			}
 
 			if (denom.Amount < MinAllowedOutputAmount)
 			{
@@ -99,6 +109,11 @@ public class AmountDecomposer
 		{
 			var denom = CreateDenom(Math.Pow(3, i) * 2);
 
+			if (minimumDenominationAmount is { } min && denom.Amount < min)
+			{
+				continue;
+			}
+
 			if (denom.Amount < MinAllowedOutputAmount)
 			{
 				continue;
@@ -116,6 +131,11 @@ public class AmountDecomposer
 		for (int i = 0; i < int.MaxValue; i++)
 		{
 			var denom = CreateDenom(Math.Pow(10, i));
+
+			if (minimumDenominationAmount is { } min && denom.Amount < min)
+			{
+				continue;
+			}
 
 			if (denom.Amount < MinAllowedOutputAmount)
 			{
@@ -135,6 +155,11 @@ public class AmountDecomposer
 		{
 			var denom = CreateDenom(Math.Pow(10, i) * 2);
 
+			if (minimumDenominationAmount is { } min && denom.Amount < min)
+			{
+				continue;
+			}
+
 			if (denom.Amount < MinAllowedOutputAmount)
 			{
 				continue;
@@ -152,6 +177,11 @@ public class AmountDecomposer
 		for (int i = 0; i < int.MaxValue; i++)
 		{
 			var denom = CreateDenom(Math.Pow(10, i) * 5);
+
+			if (minimumDenominationAmount is { } min && denom.Amount < min)
+			{
+				continue;
+			}
 
 			if (denom.Amount < MinAllowedOutputAmount)
 			{
@@ -265,7 +295,7 @@ public class AmountDecomposer
 
 		// Create many decompositions for optimization.
 		var stdDenoms = denoms.Select(d => d.EffectiveCost.Satoshi).Where(x => x <= myInputSum.Satoshi).ToArray();
-		var smallestScriptType = Math.Min(ScriptType.P2WPKH.EstimateOutputVsize(), ScriptType.Taproot.EstimateOutputVsize());
+		var smallestScriptType = ScriptType.EstimateOutputVsize();
 		var maxNumberOfOutputsAllowed = Math.Min(AvailableVsize / smallestScriptType, 8); // The absolute max possible with the smallest script type.
 		var tolerance = (long)Math.Max(loss.Satoshi, 0.5 * (ulong)(MinAllowedOutputAmount + FeeRate.GetFee(ScriptType.Taproot.EstimateOutputVsize())).Satoshi); // Assume script type with higher cost to be more permissive.
 

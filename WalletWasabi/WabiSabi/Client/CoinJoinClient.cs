@@ -38,6 +38,7 @@ public class CoinJoinClient
 	private readonly IWabiSabiApiRequestHandler _wabiSabiApiRequestHandler;
 	private readonly IWallet _wallet;
 	private readonly bool _batchPayments;
+	private readonly long? _minimumDenominationAmount;
 	private readonly string _coordinatorName;
 
 	private static readonly Money MinimumOutputAmountSanity = Money.Coins(0.0001m); // ignore rounds with too big minimum denominations
@@ -79,12 +80,15 @@ public class CoinJoinClient
 		bool redCoinIsolation = false,
 		TimeSpan feeRateMedianTimeFrame = default,
 		TimeSpan doNotRegisterInLastMinuteTimeLimit = default,
-		IRoundCoinSelector? coinSelectionFunc = null, bool batchPayments = default, string coordinatorName = "")
+		IRoundCoinSelector? coinSelectionFunc = null, bool batchPayments = default,
+		long? minimumDenominationAmount = null,
+		string coordinatorName = "")
 	{
 		_onCoinBan = onCoinBan;
 		_wabiSabiApiRequestHandler = wabiSabiApiRequestHandler;
 		_wallet = wallet;
 		_batchPayments = batchPayments;
+		_minimumDenominationAmount = minimumDenominationAmount;
 		_coordinatorName = coordinatorName;
 		HttpClientFactory = httpClientFactory;
 		KeyChain = keyChain;
@@ -818,7 +822,7 @@ public class CoinJoinClient
 			.Where(payment => utxoSelectionParameters.AllowedInputAmounts.Contains(payment.Value))
 			.ToList()
 			: new List<PendingPayment>();
-		AmountDecomposer amountDecomposer = new(roundParameters.MiningFeeRate, roundParameters.AllowedOutputAmounts, (int)availableVsize, await DestinationProvider.GetScriptTypeAsync(), Random.Shared);
+		AmountDecomposer amountDecomposer = new(roundParameters.MiningFeeRate, roundParameters.AllowedOutputAmounts, (int)availableVsize, await DestinationProvider.GetScriptTypeAsync(), Random.Shared, _minimumDenominationAmount);
 		var theirCoins = constructionState.Inputs.Where(x => registeredCoins.All(y => x.Outpoint != y.Outpoint));
 		
 		var registeredCoinEffectiveValues = registeredAliceClients.Select(x => x.EffectiveValue);
@@ -871,13 +875,13 @@ public class CoinJoinClient
 		{
 			outputValues = amountDecomposer.Decompose(registeredCoinEffectiveValues, theirCoinEffectiveValues);
 		}
-		var nonMixedOutputs = outputValues.Where(output => !BlockchainAnalyzer.StdDenoms.Contains(output.EffectiveAmount));
-		var mixedOutputs = outputValues.Where(output => BlockchainAnalyzer.StdDenoms.Contains(output.EffectiveAmount));
+		var nonMixedOutputs = outputValues.Where(output => !BlockchainAnalyzer.StdDenoms.Contains(output.Amount));
+		var mixedOutputs = outputValues.Where(output => BlockchainAnalyzer.StdDenoms.Contains(output.Amount));
 		
 		// Get as many destinations as outputs we need.
 		var destinations = (await DestinationProvider
-			.GetNextDestinationsAsync(mixedOutputs.Count(), true).ConfigureAwait(false)).Zip(mixedOutputs, (destination, output) => new TxOut(output.EffectiveAmount, destination));
-		var destinationsNonMixed = (await DestinationProvider.GetNextDestinationsAsync(nonMixedOutputs.Count(), false).ConfigureAwait(false)).Zip(nonMixedOutputs, (destination, output) => new TxOut(output.EffectiveAmount, destination));
+			.GetNextDestinationsAsync(mixedOutputs.Count(), true).ConfigureAwait(false)).Zip(mixedOutputs, (destination, output) => new TxOut(output.Amount, destination));
+		var destinationsNonMixed = (await DestinationProvider.GetNextDestinationsAsync(nonMixedOutputs.Count(), false).ConfigureAwait(false)).Zip(nonMixedOutputs, (destination, output) => new TxOut(output.Amount, destination));
 
 		roundState.LogDebug($"Decomposed to {outputValues.Count()} outputs");
 
