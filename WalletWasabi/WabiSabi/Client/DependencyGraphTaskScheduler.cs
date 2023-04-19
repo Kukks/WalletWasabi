@@ -179,12 +179,9 @@ public class DependencyGraphTaskScheduler
 					{
 						await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
 					}
-
-					await smartRequestNode
-						.StartOutputRegistrationAsync(bobClient, txOut.ScriptPubKey, cancellationToken)
-						.ConfigureAwait(false);
+					await smartRequestNode.StartOutputRegistrationAsync(bobClient, txOut.ScriptPubKey, cancellationToken).ConfigureAwait(false);
 				}
-				catch (WabiSabiProtocolException ex)
+				catch (WabiSabiProtocolException ex) when (ex.ErrorCode == WabiSabiProtocolErrorCode.AlreadyRegisteredScript)
 				{
 					Logger.LogDebug($"Output registration error, code:'{ex.ErrorCode}' message:'{ex.Message}'.");
 					keyChain.TrySetScriptStates(KeyState.Used, new[] { txOut.ScriptPubKey });

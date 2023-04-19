@@ -387,8 +387,8 @@ public class CoinJoinManager : BackgroundService
 
 				// When to stop mixing.
 				if (finishedCoinJoin.IsStopped  // If stop was requested by user.
-					|| stoppingToken.IsCancellationRequested    // If cancellation was requested.
-					|| (await finishedCoinJoin.Wallet.IsWalletPrivateAsync().ConfigureAwait(false) && finishedCoinJoin.StopWhenAllMixed))  // If wallet is private and the wallet needs to stop mixing when it becomes private.
+					|| stoppingToken.IsCancellationRequested)    // If cancellation was requested.
+					// || (await finishedCoinJoin.Wallet.IsWalletPrivateAsync().ConfigureAwait(false) && finishedCoinJoin.StopWhenAllMixed))  // If wallet is private and the wallet needs to stop mixing when it becomes private.
 				{
 					NotifyWalletStoppedCoinJoin(finishedCoinJoin.Wallet);
 				}
