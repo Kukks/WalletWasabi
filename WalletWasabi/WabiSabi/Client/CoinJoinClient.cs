@@ -178,7 +178,7 @@ public class CoinJoinClient
 		return roundState;
 	}
 
-	public async Task<CoinJoinResult> StartCoinJoinAsync(Func<Task<IEnumerable<SmartCoin>>> coinCandidatesFunc, CancellationToken cancellationToken)
+	public async Task<CoinJoinResult?> StartCoinJoinAsync(Func<Task<IEnumerable<SmartCoin>>> coinCandidatesFunc, CancellationToken cancellationToken)
 	{
 		RoundState? currentRoundState;
 		uint256 excludeRound = uint256.Zero;
@@ -997,7 +997,8 @@ public class CoinJoinClient
 				BlockchainAnalyzer.Analyze(smartTx);
 				var wavgInAnon = CoinjoinAnalyzer.WeightedAverage.Invoke(ourCoins.Select(coin => new CoinjoinAnalyzer.AmountWithAnonymity(coin.AnonymitySet, new Money(coin.Amount, MoneyUnit.BTC))));
 				var wavgOutAnon = CoinjoinAnalyzer.WeightedAverage.Invoke(outputCoins.Select(coin => new CoinjoinAnalyzer.AmountWithAnonymity(coin.AnonymitySet, new Money(coin.Amount, MoneyUnit.BTC))));
-				if (wavgOutAnon < wavgInAnon)
+				// If we had any batched payments, allow a loss of CoinJoinCoinSelector.MaxWeightedAnonLoss, else if there was any loss, di not sign all inputs
+				if (wavgOutAnon < wavgInAnon - (outputTxOuts.batchedPayments.Any() ? CoinJoinCoinSelector.MaxWeightedAnonLoss : 0))
 				{
 					roundState.LogInfo("We did not gain any anonymity, abandoning.");
 					mustSignAllInputs = false;

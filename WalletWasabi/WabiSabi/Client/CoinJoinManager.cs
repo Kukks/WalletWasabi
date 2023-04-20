@@ -549,7 +549,7 @@ public class CoinJoinManager : BackgroundService
 			_ => CompletionStatus.Unknown
 		};
 
-		CompletedEventArgs e = new(finishedCoinJoin.Wallet, status, finishedCoinJoin.CoinJoinTask.Result);
+		CompletedEventArgs e = new(finishedCoinJoin.Wallet, status, status == CompletionStatus.Failed? null: finishedCoinJoin.CoinJoinTask.Result);
 		StatusChanged.SafeInvoke(this, e);
 	}
 

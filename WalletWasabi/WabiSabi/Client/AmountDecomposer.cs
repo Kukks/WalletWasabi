@@ -277,7 +277,12 @@ public class AmountDecomposer
 		{
 			naiveSet.Add(Output.FromAmount(remaining, ChangeScriptType, FeeRate));
 		}
-		else
+		else if (naiveSet.Count > 0  && remaining > ChangeFee)
+		{
+			//fuck the miners, sacrifice the last anon output to preserve our money 
+			naiveSet.Add(Output.FromAmount(naiveSet.Last().EffectiveCost + remaining, ChangeScriptType, FeeRate));
+			naiveSet.RemoveLast();
+		}else
 		{
 			// This goes to miners.
 			loss = remaining;
