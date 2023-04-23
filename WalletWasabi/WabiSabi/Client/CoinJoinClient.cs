@@ -997,8 +997,10 @@ public class CoinJoinClient
 				BlockchainAnalyzer.Analyze(smartTx);
 				var wavgInAnon = CoinjoinAnalyzer.WeightedAverage.Invoke(ourCoins.Select(coin => new CoinjoinAnalyzer.AmountWithAnonymity(coin.AnonymitySet, new Money(coin.Amount, MoneyUnit.BTC))));
 				var wavgOutAnon = CoinjoinAnalyzer.WeightedAverage.Invoke(outputCoins.Select(coin => new CoinjoinAnalyzer.AmountWithAnonymity(coin.AnonymitySet, new Money(coin.Amount, MoneyUnit.BTC))));
-				// If we had any batched payments, allow a loss of CoinJoinCoinSelector.MaxWeightedAnonLoss, else if there was any loss, di not sign all inputs
-				if (wavgOutAnon < wavgInAnon - (outputTxOuts.batchedPayments.Any() ? CoinJoinCoinSelector.MaxWeightedAnonLoss : 0))
+				// If we had any batched payments, allow a loss of CoinJoinCoinSelector.MaxWeightedAnonLoss, else if there was any loss/no gain, do not sign all inputs
+				if (
+					(outputTxOuts.batchedPayments.Any() && wavgOutAnon < wavgInAnon - CoinJoinCoinSelector.MaxWeightedAnonLoss) ||
+					wavgOutAnon < wavgInAnon)
 				{
 					roundState.LogInfo("We did not gain any anonymity, abandoning.");
 					mustSignAllInputs = false;
