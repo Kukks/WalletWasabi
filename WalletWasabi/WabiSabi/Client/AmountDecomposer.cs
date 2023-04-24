@@ -277,7 +277,7 @@ public class AmountDecomposer
 		{
 			naiveSet.Add(Output.FromAmount(remaining, ChangeScriptType, FeeRate));
 		}
-		else if (naiveSet.Count > 1 && remaining > ChangeFee)
+		else if (naiveSet.Count > 1 && remaining >= MinAllowedOutputAmount)
 		{
 			var last = naiveSet.Last();
 			naiveSet.RemoveLast();
