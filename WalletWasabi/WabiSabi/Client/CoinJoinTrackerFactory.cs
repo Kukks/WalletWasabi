@@ -50,19 +50,19 @@ public class CoinJoinTrackerFactory
 			throw new NotSupportedException("Wallet has no key chain.");
 		}
 
+		var coinSelector = CoinJoinCoinSelector.FromWallet(wallet);
+		var outputProvider = new OutputProvider(wallet.DestinationProvider); 
 		var coinJoinClient = new CoinJoinClient(
 			_onCoinBan,
 			HttpClientFactory,
 			_wabiSabiApiRequestHandler,
 			wallet,
 			wallet.KeyChain,
-			wallet.DestinationProvider,
+			outputProvider,
 			RoundStatusUpdater,
 			CoordinatorIdentifier,
+			coinSelector,
 			LiquidityClueProvider,
-			wallet.AnonScoreTarget,
-			consolidationMode: wallet.ConsolidationMode,
-			redCoinIsolation: wallet.RedCoinIsolation,
 			feeRateMedianTimeFrame: wallet.FeeRateMedianTimeFrame,
 			doNotRegisterInLastMinuteTimeLimit: TimeSpan.FromMinutes(1),
 			wallet.GetCoinSelector(), wallet.BatchPayments, wallet.MinimumDenominationAmount,_coordinatorName);

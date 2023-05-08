@@ -13,7 +13,6 @@ using WalletWasabi.Exceptions;
 using WalletWasabi.Blockchain.Transactions;
 using WalletWasabi.Crypto.Randomness;
 using WalletWasabi.Extensions;
-using WalletWasabi.Helpers;
 using WalletWasabi.Logging;
 using WalletWasabi.Models;
 using WalletWasabi.Tor.Socks5.Pool.Circuits;
@@ -50,34 +49,18 @@ public class CoinJoinClient
 	// This is a maximum cap the delay can be smaller if the remaining time is less.
 	private static readonly TimeSpan MaximumRequestDelay = TimeSpan.FromSeconds(10);
 
-	/// <param name="onCoinBan"></param>
-	/// <param name="httpClientFactory"></param>
-	/// <param name="wabiSabiApiRequestHandler"></param>
-	/// <param name="keyChain"></param>
-	/// <param name="destinationProvider"></param>
-	/// <param name="roundStatusUpdater"></param>
-	/// <param name="coordinatorIdentifier"></param>
-	/// <param name="liquidityClueProvider"></param>
-	/// <param name="anonScoreTarget">Coins those have reached anonymity target, but still can be mixed if desired.</param>
-	/// <param name="consolidationMode">If true, then aggressively try to consolidate as many coins as it can.</param>
-	/// <param name="redCoinIsolation"></param>
-	/// <param name="feeRateMedianTimeFrame"></param>
-	/// <param name="doNotRegisterInLastMinuteTimeLimit"></param>
-	/// <param name="coinSelectionFunc"></param>
-	/// <param name="batchPayments"></param>
-	/// <param name="coordinatorName"></param>
-	public CoinJoinClient(Action<BannedCoinEventArgs> onCoinBan,
+	public CoinJoinClient(
+
+		Action<BannedCoinEventArgs> onCoinBan,
 		IWasabiHttpClientFactory httpClientFactory,
 		IWabiSabiApiRequestHandler wabiSabiApiRequestHandler,
 		IWallet wallet, 
 		IKeyChain keyChain,
-		IDestinationProvider destinationProvider,
+		OutputProvider outputProvider,
 		RoundStateUpdater roundStatusUpdater,
 		string coordinatorIdentifier,
+		CoinJoinCoinSelector coinJoinCoinSelector,
 		LiquidityClueProvider liquidityClueProvider,
-		int anonScoreTarget = int.MaxValue,
-		bool consolidationMode = false,
-		bool redCoinIsolation = false,
 		TimeSpan feeRateMedianTimeFrame = default,
 		TimeSpan doNotRegisterInLastMinuteTimeLimit = default,
 		IRoundCoinSelector? coinSelectionFunc = null, bool batchPayments = default,
@@ -92,13 +75,11 @@ public class CoinJoinClient
 		_coordinatorName = coordinatorName;
 		HttpClientFactory = httpClientFactory;
 		KeyChain = keyChain;
-		DestinationProvider = destinationProvider;
+		OutputProvider = outputProvider;
 		RoundStatusUpdater = roundStatusUpdater;
-		AnonScoreTarget = anonScoreTarget;
 		CoordinatorIdentifier = coordinatorIdentifier;
 		LiquidityClueProvider = liquidityClueProvider;
-		ConsolidationMode = consolidationMode;
-		SemiPrivateThreshold = redCoinIsolation ? Constants.SemiPrivateThreshold : 0;
+		CoinJoinCoinSelector = coinJoinCoinSelector;
 		FeeRateMedianTimeFrame = feeRateMedianTimeFrame;
 		SecureRandom = new SecureRandom();
 		DoNotRegisterInLastMinuteTimeLimit = doNotRegisterInLastMinuteTimeLimit;
@@ -112,16 +93,13 @@ public class CoinJoinClient
 	private SecureRandom SecureRandom { get; }
 	private IWasabiHttpClientFactory HttpClientFactory { get; }
 	private IKeyChain KeyChain { get; }
-	private IDestinationProvider DestinationProvider { get; }
+	private OutputProvider OutputProvider { get; }
 	private RoundStateUpdater RoundStatusUpdater { get; }
 	private string CoordinatorIdentifier { get; }
 	private LiquidityClueProvider LiquidityClueProvider { get; }
-	private int AnonScoreTarget { get; }
+	private CoinJoinCoinSelector CoinJoinCoinSelector { get; }
 	private TimeSpan DoNotRegisterInLastMinuteTimeLimit { get; }
 
-	private bool ConsolidationMode { get; set; }
-	private bool RedCoinIsolation { get; }
-	private int SemiPrivateThreshold { get; }
 	private TimeSpan FeeRateMedianTimeFrame { get; }
 	private TimeSpan MaxWaitingTimeForRound { get; } = TimeSpan.FromMinutes(10);
 
@@ -205,8 +183,7 @@ public class CoinJoinClient
 			}
 			else
 			{
-				coins = CoinJoinCoinSelector.SelectCoinsForRound(coinCandidates, utxoSelectionParameters,
-					ConsolidationMode, AnonScoreTarget, SemiPrivateThreshold, liquidityClue, SecureRandom);
+				coins = CoinJoinCoinSelector.SelectCoinsForRound(coinCandidates, utxoSelectionParameters, liquidityClue);
 			}
 
 			if (!roundParameters.AllowedInputTypes.Contains(ScriptType.P2WPKH) || !roundParameters.AllowedOutputTypes.Contains(ScriptType.P2WPKH))
