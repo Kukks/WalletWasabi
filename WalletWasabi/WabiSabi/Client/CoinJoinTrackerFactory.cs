@@ -51,7 +51,7 @@ public class CoinJoinTrackerFactory
 		}
 
 		var coinSelector = CoinJoinCoinSelector.FromWallet(wallet);
-		var outputProvider = new OutputProvider(wallet.DestinationProvider); 
+		var outputProvider = new OutputProvider(wallet, _coordinatorName);
 		var coinJoinClient = new CoinJoinClient(
 			_onCoinBan,
 			HttpClientFactory,
@@ -65,7 +65,8 @@ public class CoinJoinTrackerFactory
 			LiquidityClueProvider,
 			feeRateMedianTimeFrame: wallet.FeeRateMedianTimeFrame,
 			doNotRegisterInLastMinuteTimeLimit: TimeSpan.FromMinutes(1),
-			wallet.GetCoinSelector(), wallet.BatchPayments, wallet.MinimumDenominationAmount,_coordinatorName);
+			wallet.GetCoinSelector(),
+			_coordinatorName);
 
 		return new CoinJoinTracker(wallet, coinJoinClient, coinCandidatesFunc, stopWhenAllMixed, overridePlebStop, CancellationToken);
 	}
