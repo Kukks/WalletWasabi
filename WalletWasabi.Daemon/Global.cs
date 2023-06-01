@@ -118,7 +118,7 @@ public class Global
 	private IndexStore IndexStore { get; }
 
 	private HttpClientFactory BuildHttpClientFactory(Func<Uri> backendUriGetter) =>
-		new (
+		new(
 			Config.UseTor ? TorSettings.SocksEndpoint : null,
 			backendUriGetter);
 
@@ -153,6 +153,9 @@ public class Global
 				try
 				{
 					await bstoreInitTask.ConfigureAwait(false);
+
+					// Make sure that TurboSyncHeight is not higher than BestHeight
+					WalletManager.EnsureTurboSyncHeightConsistency();
 
 					// Make sure that the height of the wallets will not be better than the current height of the filters.
 					WalletManager.SetMaxBestHeight(BitcoinStore.IndexStore.SmartHeaderChain.TipHeight);

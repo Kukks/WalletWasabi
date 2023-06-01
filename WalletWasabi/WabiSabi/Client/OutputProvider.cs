@@ -35,7 +35,9 @@ public class OutputProvider
 
 		var remainingPendingPayments = _wallet.BatchPayments
 			? (await _wallet.DestinationProvider.GetPendingPaymentsAsync(utxoSelectionParameters).ConfigureAwait(false))
-			.Where(payment => utxoSelectionParameters.AllowedOutputScriptTypes.Contains(payment.Destination.ScriptPubKey.GetScriptType()))
+			.Where(payment =>
+				utxoSelectionParameters.AllowedOutputScriptTypes.Contains(
+					payment.Destination.ScriptPubKey.GetScriptType()))
 			.Where(payment => utxoSelectionParameters.AllowedInputAmounts.Contains(payment.Value))
 			.ToList()
 			: new List<PendingPayment>();
@@ -58,11 +60,13 @@ public class OutputProvider
 				var payment = potentialPayments.RandomElement();
 				var txout = payment.ToTxOut();
 				// we have to check that we fit at least one change output at the end if we batch this payment
-				if(availableVsize < txout.ScriptPubKey.EstimateOutputVsize() + amountDecomposer.ScriptType.EstimateOutputVsize())
+				if (availableVsize < txout.ScriptPubKey.EstimateOutputVsize() +
+				    amountDecomposer.ScriptType.EstimateOutputVsize())
 				{
 					potentialPayments.Remove(payment);
 					continue;
 				}
+
 				var cost = txout.EffectiveCost(utxoSelectionParameters.MiningFeeRate)
 					.ToDecimal(MoneyUnit.BTC);
 				if (!await payment.PaymentStarted.Invoke().ConfigureAwait(false))
@@ -70,6 +74,7 @@ public class OutputProvider
 					potentialPayments.Remove(payment);
 					continue;
 				}
+
 				paymentsToBatch.Add(payment);
 				pendingPaymentBatchSum += cost;
 				potentialPayments.Remove(payment);
@@ -81,7 +86,8 @@ public class OutputProvider
 			}
 
 			var remainder = effectiveValueSum - pendingPaymentBatchSum;
-			outputValues = amountDecomposer.Decompose(new []{ new Money(remainder, MoneyUnit.BTC)}, theirCoinEffectiveValues);
+			outputValues =
+				amountDecomposer.Decompose(new[] {new Money(remainder, MoneyUnit.BTC)}, theirCoinEffectiveValues);
 		}
 		else
 		{
@@ -97,15 +103,22 @@ public class OutputProvider
 		return (decomposedOut.Concat(batchedPayments.Keys), batchedPayments);
 	}
 
-	internal static async Task<IEnumerable<TxOut>> GetTxOuts(IEnumerable<Output> outputValues, IDestinationProvider destinationProvider)
+
+
+	internal static async Task<IEnumerable<TxOut>> GetTxOuts(IEnumerable<Output> outputValues,
+		IDestinationProvider destinationProvider)
 	{
+
 		var nonMixedOutputs = outputValues.Where(output => !BlockchainAnalyzer.StdDenoms.Contains(output.Amount));
 		var mixedOutputs = outputValues.Where(output => BlockchainAnalyzer.StdDenoms.Contains(output.Amount));
 
 		// Get as many destinations as outputs we need.
 		var destinations = (await destinationProvider
-			.GetNextDestinationsAsync(mixedOutputs.Count(), true).ConfigureAwait(false)).Zip(mixedOutputs, (destination, output) => new TxOut(output.Amount, destination));
-		var destinationsNonMixed = (await destinationProvider.GetNextDestinationsAsync(nonMixedOutputs.Count(), false).ConfigureAwait(false)).Zip(nonMixedOutputs, (destination, output) => new TxOut(output.Amount, destination));
+			.GetNextDestinationsAsync(mixedOutputs.Count(), true).ConfigureAwait(false)).Zip(mixedOutputs,
+			(destination, output) => new TxOut(output.Amount, destination));
+		var destinationsNonMixed =
+			(await destinationProvider.GetNextDestinationsAsync(nonMixedOutputs.Count(), false).ConfigureAwait(false))
+			.Zip(nonMixedOutputs, (destination, output) => new TxOut(output.Amount, destination));
 
 		var outputTxOuts = destinations.Concat(destinationsNonMixed);
 		return outputTxOuts;

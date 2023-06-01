@@ -11,10 +11,10 @@ public class HostedServices : IDisposable
 {
 	private volatile bool _disposedValue = false; // To detect redundant calls
 
-	private List<HostedService> Services { get; } = new List<HostedService>();
+	private List<HostedService> Services { get; } = new();
 
-	private object ServicesLock { get; } = new object();
-	public bool IsStartAllAsyncStarted { get; private set; } = false;
+	private object ServicesLock { get; } = new();
+	public bool IsStartAllAsyncStarted { get; set; } = false;
 
 	public void Register<T>(Func<IHostedService> serviceFactory, string friendlyName) where T : class, IHostedService
 	{

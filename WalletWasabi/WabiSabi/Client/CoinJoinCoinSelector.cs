@@ -38,14 +38,14 @@ public class CoinJoinCoinSelector
 	public int AnonScoreTarget { get; }
 	public int SemiPrivateThreshold { get; }
 	private WasabiRandom Rnd { get; }
-	
+
 	public static CoinJoinCoinSelector FromWallet(IWallet wallet) =>
-		new (
+		new(
 			wallet.ConsolidationMode,
 			wallet.AnonScoreTarget,
 			wallet.RedCoinIsolation ? Constants.SemiPrivateThreshold : 0,
 			SecureRandom.Instance);
-	
+
 	/// <param name="liquidityClue">Weakly prefer not to select inputs over this.</param>
 	public ImmutableList<TCoin> SelectCoinsForRound<TCoin>(IEnumerable<TCoin> coins, UtxoSelectionParameters parameters, Money liquidityClue)
 		where TCoin : class, ISmartCoin, IEquatable<TCoin>
@@ -53,7 +53,7 @@ public class CoinJoinCoinSelector
 		liquidityClue = liquidityClue > Money.Zero
 			? liquidityClue
 			: Constants.MaximumNumberOfBitcoinsMoney;
-			
+
 		var filteredCoins = coins
 			.Where(x => parameters.AllowedInputAmounts.Contains(x.Amount))
 			.Where(x => parameters.AllowedInputScriptTypes.Contains(x.ScriptType))

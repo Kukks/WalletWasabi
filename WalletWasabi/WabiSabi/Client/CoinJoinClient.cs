@@ -257,7 +257,7 @@ public class CoinJoinClient
 		var waitRoundEndedTask = Task.Run(async () =>
 		{
 			using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(waitRoundEndedTaskCts.Token, cancellationToken);
-			var rs = await RoundStatusUpdater.CreateRoundAwaiterAsync(s => s.Id == roundId && s.Phase == Phase.Ended, linkedCts.Token).ConfigureAwait(false);
+			var rs = await RoundStatusUpdater.CreateRoundAwaiterAsync(roundId, Phase.Ended, linkedCts.Token).ConfigureAwait(false);
 
 			// Indicate that the round was ended. Cancel ongoing operations those are using this CTS.
 			roundEndedCts.Cancel();
@@ -291,8 +291,17 @@ public class CoinJoinClient
 				// Do nothing - if the actual state of the round is Ended we let the execution continue.
 			}
 
+			var signedCoins = aliceClientsThatSigned.Select(a => a.SmartCoin).ToImmutableList();
 
-			roundState = await waitRoundEndedTask.ConfigureAwait(false);
+			try
+			{
+				roundState = await waitRoundEndedTask.ConfigureAwait(false);
+			}
+			catch (Exception ex)
+			{
+				roundState.Log(LogLevel.Warning, $"Waiting for the round to end failed with: '{ex}'.");
+				throw new UnknownRoundEndingException(signedCoins, outputTxOuts.Select(o => o.ScriptPubKey).ToImmutableList(), ex);
+			}
 
 			var hash = unsignedCoinJoin is { } tx ? tx.GetHash().ToString() : "Not available";
 
@@ -339,7 +348,6 @@ public class CoinJoinClient
 			};
 
 			roundState.LogInfo(msg);
-			var signedCoins = aliceClientsThatSigned.Select(a => a.SmartCoin).ToImmutableList();
 
 			return roundState.EndRoundState switch
 			{
@@ -621,7 +629,7 @@ public class CoinJoinClient
 					x => x.ScriptPubKey,
 					x => x.ScriptPubKey,
 					(coinjoinOutput, expectedOutput) => coinjoinOutput.Value - expectedOutput.Value)
-				.All(x => x >= 0L);
+				.All(x => x >= Money.Zero);
 
 		return AllExpectedScriptsArePresent() && AllOutputsHaveAtLeastTheExpectedValue();
 	}
@@ -895,7 +903,7 @@ public class CoinJoinClient
 				{
 					var index = unsignedCoinJoin.Transaction.Outputs.AsIndexedOutputs().First(@out => !matchedIndexes.Contains(@out.N) && @out.TxOut.ScriptPubKey == txOut.ScriptPubKey && @out.TxOut.Value == txOut.Value).N;
 					matchedIndexes.Add(index);
-					var coin = new SmartCoin(smartTx,  index, new HdPubKey(new Key().PubKey, new KeyPath(0,0,0,0,0,0),SmartLabel.Empty , KeyState.Clean));
+					var coin = new SmartCoin(smartTx,  index, new HdPubKey(new Key().PubKey, new KeyPath(0,0,0,0,0,0), LabelsArray.Empty, KeyState.Clean));
 					smartTx.TryAddWalletOutput(coin);
 					outputCoins.Add(coin);
 				}
