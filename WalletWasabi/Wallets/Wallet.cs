@@ -589,8 +589,8 @@ public class Wallet : BackgroundService, IWallet
 
 		KeyManager.ToFile();
 	}
-	
-    private void SetWalletHeights(Height filterHeight)
+
+	private void SetWalletHeights(Height filterHeight)
 	{
 		if (KeyManager.GetBestHeight() < filterHeight)
 		{

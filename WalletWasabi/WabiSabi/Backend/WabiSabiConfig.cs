@@ -211,7 +211,7 @@ public class WabiSabiConfig : ConfigBase
 	[JsonProperty(PropertyName = "AllowP2wpkhInputs", DefaultValueHandling = DefaultValueHandling.Populate)]
 	public bool AllowP2wpkhInputs { get; set; } = true;
 
-	[DefaultValue(false)]
+	[DefaultValue(true)]
 	[JsonProperty(PropertyName = "AllowP2trInputs", DefaultValueHandling = DefaultValueHandling.Populate)]
 	public bool AllowP2trInputs { get; set; } = true;
 

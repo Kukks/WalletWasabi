@@ -16,7 +16,7 @@ public record UtxoSelectionParameters(
 	public static UtxoSelectionParameters FromRoundParameters(RoundParameters roundParameters, string coordinatorName) =>
 		new(
 			roundParameters.AllowedInputAmounts,
-			roundParameters.AllowedOutputAmounts,
+			roundParameters.CalculateReasonableOutputAmountRange(),
 			roundParameters.CoordinationFeeRate,
 			roundParameters.MiningFeeRate,
 			roundParameters.AllowedInputTypes,

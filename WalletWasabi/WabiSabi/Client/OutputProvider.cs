@@ -29,8 +29,8 @@ public class OutputProvider
 	{
 		var utxoSelectionParameters = UtxoSelectionParameters.FromRoundParameters(roundParameters, _coordinatorName);
 
-		AmountDecomposer amountDecomposer = new(roundParameters.MiningFeeRate, roundParameters.AllowedOutputAmounts,
-			availableVsize, await _wallet.DestinationProvider.GetScriptTypeAsync().ConfigureAwait(false), null,
+		AmountDecomposer amountDecomposer = new(roundParameters.MiningFeeRate, roundParameters.AllowedOutputAmounts.Min, roundParameters.AllowedOutputAmounts.Max,
+			availableVsize, new []{await _wallet.DestinationProvider.GetScriptTypeAsync().ConfigureAwait(false)},
 			_wallet.MinimumDenominationAmount);
 
 		var remainingPendingPayments = _wallet.BatchPayments
@@ -61,7 +61,7 @@ public class OutputProvider
 				var txout = payment.ToTxOut();
 				// we have to check that we fit at least one change output at the end if we batch this payment
 				if (availableVsize < txout.ScriptPubKey.EstimateOutputVsize() +
-				    amountDecomposer.ScriptType.EstimateOutputVsize())
+				    amountDecomposer.ChangeScriptType.EstimateOutputVsize())
 				{
 					potentialPayments.Remove(payment);
 					continue;

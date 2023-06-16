@@ -211,12 +211,12 @@ public class CoinJoinManager : BackgroundService
 					throw new CoinJoinClientException(CoinjoinError.AllCoinsPrivate);
 				}
 
-				var coinCandidates = await SelectCandidateCoinsAsync(walletToStart);
+				var coinCandidates = await SelectCandidateCoinsAsync(walletToStart).ConfigureAwait(false);
 
 				// If there is no available coin candidates, then don't mix.
 				if (!coinCandidates.Any())
 				{
-					throw new CoinJoinClientException(CoinjoinError.NoCoinsToMix, "No candidate coins available to mix.");
+					throw new CoinJoinClientException(CoinjoinError.NoCoinsEligibleToMix, "No candidate coins available to mix.");
 				}
 
 				// // If coin candidates are already private and the user doesn't override the StopWhenAllMixed, then don't mix.
