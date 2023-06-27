@@ -17,24 +17,40 @@ public static class DenominationBuilder
 	{
 		var denominations = new HashSet<Output?>();
 
-		Output? CreateDenom(double sats)
+		Output? CreateDenom(double sats, out bool stop)
 		{
-			var scriptType = allowedOutputTypes.RandomElement();
-			var result =  Output.FromDenomination(Money.Satoshis((ulong)sats), scriptType, feeRate);
-			if ( (minimumDenominationAmount is not null && result.Amount.Satoshi < minimumDenominationAmount.Value) || result.Amount < minAllowedOutputAmount || result.Amount > maxAllowedOutputAmount)
+			stop = false;
+			try
+			{
+				var scriptType = allowedOutputTypes.RandomElement();
+				var result =  Output.FromDenomination(Money.Satoshis((ulong)sats), scriptType, feeRate);
+				if (result.Amount > maxAllowedOutputAmount)
+				{
+					stop = true;
+				}
+				if ( (minimumDenominationAmount is not null && result.Amount.Satoshi < minimumDenominationAmount.Value) || result.Amount < minAllowedOutputAmount || result.Amount > maxAllowedOutputAmount)
+				{
+					return null;
+				}
+				return result;
+			}
+			catch (Exception e)
 			{
 				return null;
 			}
-			return result;
 		}
 
 		// Powers of 2
 		for (int i = 0; i < int.MaxValue; i++)
 		{
-			var denom = CreateDenom(Math.Pow(2, i));
+			var denom = CreateDenom(Math.Pow(2, i), out var stop);
 
 			if (denom is null)
 			{
+				if(stop)
+				{
+					break;
+				}
 				continue;
 			}
 
@@ -44,9 +60,13 @@ public static class DenominationBuilder
 		// Powers of 3
 		for (int i = 0; i < int.MaxValue; i++)
 		{
-			var denom = CreateDenom(Math.Pow(3, i));
+			var denom = CreateDenom(Math.Pow(3, i), out var stop);
 			if (denom is null)
 			{
+				if(stop)
+				{
+					break;
+				}
 				continue;
 			}
 			denominations.Add(denom);
@@ -55,10 +75,13 @@ public static class DenominationBuilder
 		// Powers of 3 * 2
 		for (int i = 0; i < int.MaxValue; i++)
 		{
-			var denom = CreateDenom(Math.Pow(3, i) * 2);
-
+			var denom = CreateDenom(Math.Pow(3, i) * 2, out var stop);
 			if (denom is null)
 			{
+				if(stop)
+				{
+					break;
+				}
 				continue;
 			}
 			denominations.Add(denom);
@@ -67,10 +90,13 @@ public static class DenominationBuilder
 		// Powers of 10 (1-2-5 series)
 		for (int i = 0; i < int.MaxValue; i++)
 		{
-			var denom = CreateDenom(Math.Pow(10, i));
-
+			var denom = CreateDenom(Math.Pow(10, i), out var stop);
 			if (denom is null)
 			{
+				if(stop)
+				{
+					break;
+				}
 				continue;
 			}
 			denominations.Add(denom);
@@ -79,10 +105,13 @@ public static class DenominationBuilder
 		// Powers of 10 * 2 (1-2-5 series)
 		for (int i = 0; i < int.MaxValue; i++)
 		{
-			var denom = CreateDenom(Math.Pow(10, i) * 2);
-
+			var denom = CreateDenom(Math.Pow(10, i) * 2, out var stop);
 			if (denom is null)
 			{
+				if(stop)
+				{
+					break;
+				}
 				continue;
 			}
 			denominations.Add(denom);
@@ -91,10 +120,13 @@ public static class DenominationBuilder
 		// Powers of 10 * 5 (1-2-5 series)
 		for (int i = 0; i < int.MaxValue; i++)
 		{
-			var denom = CreateDenom(Math.Pow(10, i) * 5);
-
+			var denom = CreateDenom(Math.Pow(10, i) * 5, out var stop);
 			if (denom is null)
 			{
+				if(stop)
+				{
+					break;
+				}
 				continue;
 			}
 			denominations.Add(denom);
