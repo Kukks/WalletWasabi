@@ -6,6 +6,7 @@ using WalletWasabi.Blockchain.Analysis;
 using WalletWasabi.Extensions;
 using WalletWasabi.WabiSabi.Backend.Rounds;
 using WalletWasabi.Wallets;
+using WabiSabi.Crypto.Randomness;
 
 namespace WalletWasabi.WabiSabi.Client;
 
@@ -14,10 +15,14 @@ public class OutputProvider
 	private readonly IWallet _wallet;
 	private readonly string _coordinatorName;
 
-	public OutputProvider(IWallet wallet, string coordinatorName)
+	private WasabiRandom Random { get; }
+
+	public OutputProvider(IWallet wallet, string coordinatorName, WasabiRandom? random = null)
 	{
 		_wallet = wallet;
 		_coordinatorName = coordinatorName;
+
+		Random = random ?? SecureRandom.Instance;
 	}
 
 
@@ -31,7 +36,7 @@ public class OutputProvider
 
 		AmountDecomposer amountDecomposer = new(roundParameters.MiningFeeRate, roundParameters.AllowedOutputAmounts.Min, roundParameters.AllowedOutputAmounts.Max,
 			availableVsize, new []{await _wallet.DestinationProvider.GetScriptTypeAsync().ConfigureAwait(false)},
-			_wallet.MinimumDenominationAmount);
+			Random, _wallet.MinimumDenominationAmount);
 
 		var remainingPendingPayments = _wallet.BatchPayments
 			? (await _wallet.DestinationProvider.GetPendingPaymentsAsync(utxoSelectionParameters).ConfigureAwait(false))
@@ -57,7 +62,7 @@ public class OutputProvider
 
 			while (potentialPayments.Any())
 			{
-				var payment = potentialPayments.RandomElement();
+				var payment = potentialPayments.RandomElement(Random);
 				var txout = payment.ToTxOut();
 				// we have to check that we fit at least one change output at the end if we batch this payment
 				if (availableVsize < txout.ScriptPubKey.EstimateOutputVsize() +

@@ -33,7 +33,6 @@ namespace WalletWasabi.WabiSabi.Client;
 
 public class CoinJoinClient
 {
-	private readonly Action<BannedCoinEventArgs> _onCoinBan;
 	private readonly IWabiSabiApiRequestHandler _wabiSabiApiRequestHandler;
 	private readonly IWallet _wallet;
 	private readonly string _coordinatorName;
@@ -48,8 +47,6 @@ public class CoinJoinClient
 	private static readonly TimeSpan MaximumRequestDelay = TimeSpan.FromSeconds(10);
 
 	public CoinJoinClient(
-
-		Action<BannedCoinEventArgs> onCoinBan,
 		IWasabiHttpClientFactory httpClientFactory,
 		IWabiSabiApiRequestHandler wabiSabiApiRequestHandler,
 		IWallet wallet,
@@ -64,7 +61,6 @@ public class CoinJoinClient
 		IRoundCoinSelector? coinSelectionFunc = null,
 		string coordinatorName = "")
 	{
-		_onCoinBan = onCoinBan;
 		_wabiSabiApiRequestHandler = wabiSabiApiRequestHandler;
 		_wallet = wallet;
 		_coordinatorName = coordinatorName;
@@ -84,6 +80,8 @@ public class CoinJoinClient
 	public IRoundCoinSelector? CoinSelectionFunc { get; set; }
 
 	public event EventHandler<CoinJoinProgressEventArgs>? CoinJoinClientProgress;
+
+	public ImmutableList<SmartCoin> CoinsInCriticalPhase { get; private set; } = ImmutableList<SmartCoin>.Empty;
 
 	private SecureRandom SecureRandom { get; }
 	private IWasabiHttpClientFactory HttpClientFactory { get; }
@@ -399,12 +397,14 @@ public class CoinJoinClient
 			registeredAliceClientAndCircuits = await ProceedWithInputRegAndConfirmAsync(smartCoins, roundState, cancellationToken).ConfigureAwait(false);
 			if (!registeredAliceClientAndCircuits.Any())
 			{
-				throw new CoinJoinClientException(CoinjoinError.NoCoinsEligibleToMix, $"The coordinator rejected all {smartCoins.Count()} inputs.");
+				throw new CoinJoinClientException(CoinjoinError.CoinsRejected, $"The coordinator rejected all {smartCoins.Count()} inputs.");
 			}
 
 			roundState.LogInfo($"Successfully registered {registeredAliceClientAndCircuits.Length} inputs.");
 
 			var registeredAliceClients = registeredAliceClientAndCircuits.Select(x => x.AliceClient).ToImmutableArray();
+
+			CoinsInCriticalPhase = registeredAliceClients.Select(alice => alice.SmartCoin).ToImmutableList();
 
 			var outputTxOuts = await ProceedWithOutputRegistrationPhaseAsync(roundId, registeredAliceClients, cancellationToken).ConfigureAwait(false);
 
@@ -539,9 +539,9 @@ public class CoinJoinClient
 						{
 							Logger.LogError($"{nameof(InputBannedExceptionData)} is missing.");
 						}
-						var args = new  BannedCoinEventArgs(coin.Coin.Outpoint, inputBannedExData?.BannedUntil ?? DateTimeOffset.UtcNow + TimeSpan.FromDays(1));
-						_onCoinBan.Invoke(args);
-						roundState.LogInfo($"{coin.Coin.Outpoint} is banned until {args.BannedTime}.");
+						var bannedUntil = inputBannedExData?.BannedUntil ?? DateTimeOffset.UtcNow + TimeSpan.FromDays(1);
+						CoinJoinClientProgress.SafeInvoke(this, new CoinBanned(coin, bannedUntil));
+						roundState.LogInfo($"{coin.Coin.Outpoint} is banned until {bannedUntil}.");
 						break;
 
 					case WabiSabiProtocolErrorCode.InputNotWhitelisted:

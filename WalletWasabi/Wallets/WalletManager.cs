@@ -34,13 +34,14 @@ public class WalletManager : IWalletProvider
 	{
 		using IDisposable _ = BenchmarkLogger.Measure();
 
-		Network = Guard.NotNull(nameof(network), network);
+		Network = network;
 		WorkDir = Guard.NotNullOrEmptyOrWhitespace(nameof(workDir), workDir, true);
 		Directory.CreateDirectory(WorkDir);
-		WalletDirectories = Guard.NotNull(nameof(walletDirectories), walletDirectories);
+		WalletDirectories = walletDirectories;
 		BitcoinStore = bitcoinStore;
 		Synchronizer = synchronizer;
 		ServiceConfiguration = serviceConfiguration;
+		CancelAllTasksToken = CancelAllTasks.Token;
 
 		RefreshWalletList();
 	}
@@ -60,7 +61,12 @@ public class WalletManager : IWalletProvider
 	/// </summary>
 	public event EventHandler<Wallet>? WalletAdded;
 
-	private CancellationTokenSource CancelAllInitialization { get; } = new();
+	/// <summary>Cancels initialization of wallets.</summary>
+	private CancellationTokenSource CancelAllTasks { get; } = new();
+
+	/// <summary>Token from <see cref="CancelAllTasks"/>.</summary>
+	/// <remarks>Accessing the token of <see cref="CancelAllTasks"/> can lead to <see cref="ObjectDisposedException"/>. So we copy the token and no exception can be thrown.</remarks>
+	private CancellationToken CancelAllTasksToken { get; }
 
 	/// <remarks>All access must be guarded by <see cref="Lock"/> object.</remarks>
 	private HashSet<Wallet> Wallets { get; } = new();
@@ -127,8 +133,6 @@ public class WalletManager : IWalletProvider
 
 	public async Task<Wallet> StartWalletAsync(Wallet wallet)
 	{
-		Guard.NotNull(nameof(wallet), wallet);
-
 		lock (Lock)
 		{
 			if (_disposedValue)
@@ -137,7 +141,7 @@ public class WalletManager : IWalletProvider
 				throw new OperationCanceledException("Object was already disposed.");
 			}
 
-			if (CancelAllInitialization.IsCancellationRequested)
+			if (CancelAllTasks.IsCancellationRequested)
 			{
 				throw new OperationCanceledException($"Stopped loading {wallet}, because cancel was requested.");
 			}
@@ -151,7 +155,7 @@ public class WalletManager : IWalletProvider
 		// Wait for the WalletManager to be initialized.
 		while (!IsInitialized)
 		{
-			await Task.Delay(100, CancelAllInitialization.Token).ConfigureAwait(false);
+			await Task.Delay(100, CancelAllTasks.Token).ConfigureAwait(false);
 		}
 
 		if (wallet.State == WalletState.WaitingForInit)
@@ -159,16 +163,14 @@ public class WalletManager : IWalletProvider
 			wallet.RegisterServices(BitcoinStore, Synchronizer, ServiceConfiguration, FeeProvider, BlockProvider);
 		}
 
-		using (await StartStopWalletLock.LockAsync(CancelAllInitialization.Token).ConfigureAwait(false))
+		using (await StartStopWalletLock.LockAsync(CancelAllTasks.Token).ConfigureAwait(false))
 		{
 			try
 			{
-				var cancel = CancelAllInitialization.Token;
 				Logger.LogInfo($"Starting wallet '{wallet.WalletName}'...");
-				await wallet.StartAsync(cancel).ConfigureAwait(false);
+				await wallet.StartAsync(CancelAllTasksToken).ConfigureAwait(false);
 				Logger.LogInfo($"Wallet '{wallet.WalletName}' started.");
-				cancel.ThrowIfCancellationRequested();
-
+				CancelAllTasksToken.ThrowIfCancellationRequested();
 				return wallet;
 			}
 			catch
@@ -278,15 +280,7 @@ public class WalletManager : IWalletProvider
 			_disposedValue = true;
 		}
 
-		try
-		{
-			CancelAllInitialization?.Cancel();
-			CancelAllInitialization?.Dispose();
-		}
-		catch (ObjectDisposedException)
-		{
-			Logger.LogWarning($"{nameof(CancelAllInitialization)} is disposed. This can occur due to an error while processing the wallet.");
-		}
+		CancelAllTasks.Cancel();
 
 		using (await StartStopWalletLock.LockAsync(cancel).ConfigureAwait(false))
 		{
@@ -316,7 +310,8 @@ public class WalletManager : IWalletProvider
 						await wallet.StopAsync(cancel).ConfigureAwait(false);
 						Logger.LogInfo($"'{wallet.WalletName}' wallet is stopped.");
 					}
-					wallet?.Dispose();
+
+					wallet.Dispose();
 				}
 				catch (Exception ex)
 				{
@@ -324,6 +319,8 @@ public class WalletManager : IWalletProvider
 				}
 			}
 		}
+
+		CancelAllTasks.Dispose();
 	}
 
 	public void ProcessCoinJoin(SmartTransaction tx)
