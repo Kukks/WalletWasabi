@@ -88,8 +88,30 @@ public record RoundParameters
 	public FeeRate MinRelayTxFee { get; init; } = StandardTransactionPolicy.MinRelayTxFee
 												  ?? new FeeRate(Money.Satoshis(1000));
 
-	private int MaxVsizeInputOutputPair => AllowedOutputTypes.Max(x => x.EstimateInputVsize() + x.EstimateOutputVsize());
-	private ScriptType MaxVsizeInputOutputPairScriptType => AllowedOutputTypes.MaxBy(x => x.EstimateInputVsize() + x.EstimateOutputVsize());
+	private int MaxVsizeInputOutputPair => AllowedOutputTypes.Max(x =>
+	{
+		try
+		{
+			return x.EstimateInputVsize() + x.EstimateOutputVsize();
+		}
+		catch (Exception e)
+		{
+			return 0;
+		}
+
+	});
+	private ScriptType MaxVsizeInputOutputPairScriptType => AllowedOutputTypes.MaxBy(
+		x =>
+		{
+			try
+			{
+				return x.EstimateInputVsize() + x.EstimateOutputVsize();
+			}
+			catch (Exception e)
+			{
+				return 0;
+			}
+		});
 
 	public static RoundParameters Create(
 		WabiSabiConfig wabiSabiConfig,
