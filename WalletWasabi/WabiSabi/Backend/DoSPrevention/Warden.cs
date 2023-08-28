@@ -30,6 +30,7 @@ public class Warden : BackgroundService
 		Prison = DeserializePrison(PrisonFilePath, dosConfig, coinjoinIdStore, OffendersToSaveChannel.Writer);
 	}
 
+
 	public Prison Prison { get; }
 
 	public string PrisonFilePath { get; }
@@ -78,7 +79,6 @@ public class Warden : BackgroundService
 
 	public override Task StopAsync(CancellationToken cancellationToken)
 	{
-		OffendersToSaveChannel.Writer.Complete();
 		return base.StopAsync(cancellationToken);
 	}
 }
