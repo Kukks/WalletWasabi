@@ -68,6 +68,10 @@ public class WabiSabiConfig : ConfigBase
 	public double DoSPenaltyFactorForDisruptingConfirmation { get; set; } = 0.2;
 
 	[DefaultValue(1.0)]
+	[JsonProperty(PropertyName = "DoSPenaltyFactorForDisruptingSignalReadyToSign", DefaultValueHandling = DefaultValueHandling.Populate)]
+	public double DoSPenaltyFactorForDisruptingSignalReadyToSign { get; set; } = 1.0;
+
+	[DefaultValue(1.0)]
 	[JsonProperty(PropertyName = "DoSPenaltyFactorForDisruptingSigning", DefaultValueHandling = DefaultValueHandling.Populate)]
 	public double DoSPenaltyFactorForDisruptingSigning { get; set; } = 1.0;
 
@@ -243,6 +247,10 @@ public class WabiSabiConfig : ConfigBase
 	[DefaultAffiliateServers]
 	[JsonProperty(PropertyName = "AffiliateServers", DefaultValueHandling = DefaultValueHandling.Populate)]
 	public ImmutableDictionary<string, string> AffiliateServers { get; set; } = ImmutableDictionary<string, string>.Empty;
+
+	[DefaultValue(false)]
+	[JsonProperty(PropertyName = "DelayTransactionSigning", DefaultValueHandling = DefaultValueHandling.Populate)]
+	public bool DelayTransactionSigning { get; set; } = false;
 
 	public ImmutableSortedSet<ScriptType> AllowedInputTypes => GetScriptTypes(AllowP2wpkhInputs, AllowP2trInputs);
 	

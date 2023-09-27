@@ -23,6 +23,7 @@ using Xunit;
 using WalletWasabi.Logging;
 using WalletWasabi.Helpers;
 using WalletWasabi.Blockchain.Transactions;
+using WalletWasabi.Exceptions;
 
 namespace WalletWasabi.Tests.RegressionTests;
 
@@ -61,7 +62,7 @@ public class ReceiveSpeedupTests : IClassFixture<RegTestFixture>
 		node.Behaviors.Add(bitcoinStore.CreateUntrustedP2pBehavior());
 
 		// 3. Create wasabi synchronizer service.
-		await using HttpClientFactory httpClientFactory = new(torEndPoint: null, backendUriGetter: () => new Uri(RegTestFixture.BackendEndPoint));
+		await using WasabiHttpClientFactory httpClientFactory = new(torEndPoint: null, backendUriGetter: () => new Uri(RegTestFixture.BackendEndPoint));
 		WasabiSynchronizer synchronizer = new(requestInterval: TimeSpan.FromSeconds(3), 10000, bitcoinStore, httpClientFactory);
 		HybridFeeProvider feeProvider = new(synchronizer, null);
 
@@ -81,8 +82,8 @@ public class ReceiveSpeedupTests : IClassFixture<RegTestFixture>
 			new P2PBlockProvider(network, nodes, httpClientFactory.IsTorEnabled),
 			cache);
 
-		WalletManager walletManager = new(network, workDir, new WalletDirectories(network, workDir), bitcoinStore, synchronizer, serviceConfiguration);
-		walletManager.RegisterServices(feeProvider, blockProvider);
+		WalletManager walletManager = new(network, workDir, new WalletDirectories(network, workDir), bitcoinStore, synchronizer, feeProvider, blockProvider, serviceConfiguration);
+		walletManager.Initialize();
 
 		try
 		{
@@ -288,12 +289,12 @@ public class ReceiveSpeedupTests : IClassFixture<RegTestFixture>
 			// Can only speed up not too small, but not too large transaction once.
 			cpfp = wallet.SpeedUpTransaction(txJustEnoughToSpeedUp);
 			await broadcaster.SendTransactionAsync(cpfp.Transaction);
-			Assert.Throws<InvalidOperationException>(() => wallet.SpeedUpTransaction(cpfp.Transaction));
+			Assert.Throws<TransactionFeeOverpaymentException>(() => wallet.SpeedUpTransaction(cpfp.Transaction));
 
 			Assert.True(bitcoinStore.TransactionStore.TryGetTransaction(txIdTooSmallToSpeedUp, out var txTooSmallToSpeedUp));
 
 			// Can't speed too small transaction.
-			Assert.Throws<InvalidOperationException>(() => wallet.SpeedUpTransaction(txTooSmallToSpeedUp));
+			Assert.Throws<TransactionFeeOverpaymentException>(() => wallet.SpeedUpTransaction(txTooSmallToSpeedUp));
 
 			#endregion CantSpeedUpTooSmall
 		}

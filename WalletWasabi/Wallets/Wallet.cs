@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Hosting;
 using NBitcoin;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -8,7 +9,6 @@ using WalletWasabi.Backend.Models;
 using WalletWasabi.Blockchain.Analysis.Clustering;
 using WalletWasabi.Blockchain.Analysis.FeesEstimation;
 using WalletWasabi.Blockchain.Keys;
-using WalletWasabi.Blockchain.TransactionBuilding;
 using WalletWasabi.Blockchain.TransactionOutputs;
 using WalletWasabi.Blockchain.TransactionProcessing;
 using WalletWasabi.Blockchain.Transactions;
@@ -21,7 +21,6 @@ using WalletWasabi.Stores;
 using WalletWasabi.Userfacing;
 using WalletWasabi.WabiSabi.Backend.Rounds;
 using WalletWasabi.WabiSabi.Client;
-using WalletWasabi.WebClients.PayJoin;
 
 namespace WalletWasabi.Wallets;
 
@@ -29,15 +28,24 @@ public class Wallet : BackgroundService, IWallet
 {
 	private volatile WalletState _state;
 
-	public Wallet(string dataDir, Network network, string filePath) : this(dataDir, network, KeyManager.FromFile(filePath))
-	{
-	}
-
-	public Wallet(string dataDir, Network network, KeyManager keyManager)
+	public Wallet(
+		string dataDir,
+		Network network,
+		KeyManager keyManager,
+		BitcoinStore bitcoinStore,
+		WasabiSynchronizer syncer,
+		ServiceConfiguration serviceConfiguration,
+		HybridFeeProvider feeProvider,
+		IBlockProvider blockProvider)
 	{
 		Guard.NotNullOrEmptyOrWhitespace(nameof(dataDir), dataDir);
-		Network = Guard.NotNull(nameof(network), network);
-		KeyManager = Guard.NotNull(nameof(keyManager), keyManager);
+		Network = network;
+		KeyManager = keyManager;
+		BitcoinStore = bitcoinStore;
+		Synchronizer = syncer;
+		ServiceConfiguration = serviceConfiguration;
+		FeeProvider = feeProvider;
+		BlockProvider = blockProvider;
 
 		RuntimeParams.SetDataDir(dataDir);
 
@@ -47,6 +55,10 @@ public class Wallet : BackgroundService, IWallet
 		}
 
 		DestinationProvider = new InternalDestinationProvider(KeyManager);
+
+		TransactionProcessor = new TransactionProcessor(BitcoinStore.TransactionStore, BitcoinStore.MempoolService, KeyManager, ServiceConfiguration.DustThreshold);
+		Coins = TransactionProcessor.Coins;
+		WalletFilterProcessor = new WalletFilterProcessor(KeyManager, BitcoinStore, TransactionProcessor, BlockProvider);
 	}
 
 	public event EventHandler<ProcessedResult>? WalletRelevantTransactionProcessed;
@@ -75,8 +87,7 @@ public class Wallet : BackgroundService, IWallet
 	public ServiceConfiguration ServiceConfiguration { get; private set; }
 	public string WalletName => KeyManager.WalletName;
 
-	/// <summary>Unspent Transaction Outputs</summary>
-	public ICoinsView Coins { get; private set; }
+	public CoinsRegistry Coins { get; private set; }
 
 	public bool RedCoinIsolation => KeyManager.RedCoinIsolation;
 	public bool BatchPayments { get; } = false;
@@ -86,7 +97,7 @@ public class Wallet : BackgroundService, IWallet
 	public TransactionProcessor TransactionProcessor { get; private set; }
 
 	public HybridFeeProvider FeeProvider { get; private set; }
-	
+
 	public WalletFilterProcessor WalletFilterProcessor { get; private set; }
 	public FilterModel? LastProcessedFilter => WalletFilterProcessor?.LastProcessedFilter;
 	public IBlockProvider BlockProvider { get; private set; }
@@ -111,11 +122,11 @@ public class Wallet : BackgroundService, IWallet
 
 	public bool IsUnderPlebStop => Coins.TotalAmount() <= KeyManager.PlebStopThreshold;
 
-	public ICoinsView GetAllCoins() => ((CoinsRegistry)Coins).AsAllCoinsView();
+	public ICoinsView GetAllCoins() => Coins.AsAllCoinsView();
 
 	public Task<bool> IsWalletPrivateAsync() => Task.FromResult(IsWalletPrivate());
 
-	public bool IsWalletPrivate() => GetPrivacyPercentage(new CoinsView(Coins), AnonScoreTarget) >= 1;
+	public bool IsWalletPrivate() => GetPrivacyPercentage() >= 100;
 
 	public Task<IEnumerable<SmartCoin>> GetCoinjoinCoinCandidatesAsync(string coordinatorname) => Task.FromResult(GetCoinjoinCoinCandidates());
 
@@ -129,9 +140,13 @@ public class Wallet : BackgroundService, IWallet
 
 	public IEnumerable<SmartCoin> GetCoinjoinCoinCandidates() => Coins;
 
+	/// <summary>
+	/// Get all the transactions associated to the wallet ordered by blockchain.
+	/// </summary>
 	public IEnumerable<SmartTransaction> GetTransactions()
 	{
-		var walletTransactions = new List<SmartTransaction>();
+		var walletTransactions = new HashSet<SmartTransaction>();
+
 		foreach (SmartCoin coin in GetAllCoins())
 		{
 			walletTransactions.Add(coin.Transaction);
@@ -140,7 +155,32 @@ public class Wallet : BackgroundService, IWallet
 				walletTransactions.Add(coin.SpenderTransaction);
 			}
 		}
+
 		return walletTransactions.OrderByBlockchain().ToList();
+	}
+
+	/// <summary>
+	/// Gets the wallet transaction with the given txid, if the transaction exists.
+	/// </summary>
+	public bool TryGetTransaction(uint256 txid, [NotNullWhen(true)] out SmartTransaction? smartTransaction)
+	{
+		foreach (SmartCoin coin in GetAllCoins())
+		{
+			if (coin.TransactionId == txid)
+			{
+				smartTransaction = coin.Transaction;
+				return true;
+			}
+
+			if (coin.SpenderTransaction is not null && coin.SpenderTransaction.GetHash() == txid)
+			{
+				smartTransaction = coin.SpenderTransaction;
+				return true;
+			}
+		}
+
+		smartTransaction = null;
+		return false;
 	}
 
 	public HdPubKey GetNextReceiveAddress(IEnumerable<string> destinationLabels)
@@ -148,16 +188,12 @@ public class Wallet : BackgroundService, IWallet
 		return KeyManager.GetNextReceiveKey(new LabelsArray(destinationLabels));
 	}
 
-	private double GetPrivacyPercentage(CoinsView coins, int privateThreshold)
+	public int GetPrivacyPercentage()
 	{
-		var privateAmount = coins.FilterBy(x => x.IsPrivate(privateThreshold)).TotalAmount();
-		var normalAmount = coins.FilterBy(x => !x.IsPrivate(privateThreshold)).TotalAmount();
+		var currentPrivacyScore = Coins.Sum(x => x.Amount.Satoshi * Math.Min(x.HdPubKey.AnonymitySet - 1, x.IsPrivate(AnonScoreTarget) ? AnonScoreTarget - 1 : AnonScoreTarget - 2));
+		var maxPrivacyScore = Coins.TotalAmount().Satoshi * (AnonScoreTarget - 1);
+		int pcPrivate = maxPrivacyScore == 0M ? 100 : (int)(currentPrivacyScore * 100 / maxPrivacyScore);
 
-		var privateDecimalAmount = privateAmount.ToDecimal(MoneyUnit.BTC);
-		var normalDecimalAmount = normalAmount.ToDecimal(MoneyUnit.BTC);
-		var totalDecimalAmount = privateDecimalAmount + normalDecimalAmount;
-
-		var pcPrivate = totalDecimalAmount == 0M ? 1d : (double)(privateDecimalAmount / totalDecimalAmount);
 		return pcPrivate;
 	}
 
@@ -185,12 +221,7 @@ public class Wallet : BackgroundService, IWallet
 		IsLoggedIn = false;
 	}
 
-	public void RegisterServices(
-		BitcoinStore bitcoinStore,
-		WasabiSynchronizer syncer,
-		ServiceConfiguration serviceConfiguration,
-		HybridFeeProvider feeProvider,
-		IBlockProvider blockProvider)
+	public void Initialize()
 	{
 		if (State > WalletState.WaitingForInit)
 		{
@@ -199,23 +230,10 @@ public class Wallet : BackgroundService, IWallet
 
 		try
 		{
-			BitcoinStore = Guard.NotNull(nameof(bitcoinStore), bitcoinStore);
-			Synchronizer = Guard.NotNull(nameof(syncer), syncer);
-			ServiceConfiguration = Guard.NotNull(nameof(serviceConfiguration), serviceConfiguration);
-			FeeProvider = Guard.NotNull(nameof(feeProvider), feeProvider);
-
-			TransactionProcessor = new TransactionProcessor(BitcoinStore.TransactionStore, BitcoinStore.MempoolService, KeyManager, ServiceConfiguration.DustThreshold);
-			Coins = TransactionProcessor.Coins;
-
 			TransactionProcessor.WalletRelevantTransactionProcessed += TransactionProcessor_WalletRelevantTransactionProcessed;
 			BitcoinStore.MempoolService.TransactionReceived += Mempool_TransactionReceived;
-
-			BlockProvider = blockProvider;
-
-			WalletFilterProcessor = new WalletFilterProcessor(KeyManager, BitcoinStore, TransactionProcessor, BlockProvider);
-			
 			BitcoinStore.IndexStore.NewFilters += IndexDownloader_NewFiltersAsync;
-			
+
 			State = WalletState.Initialized;
 		}
 		catch
@@ -352,7 +370,7 @@ public class Wallet : BackgroundService, IWallet
 	private async void IndexDownloader_NewFiltersAsync(object? sender, IEnumerable<FilterModel> filters)
 	{
 		try
-		{ 
+		{
 			var filterModels = filters as FilterModel[] ?? filters.ToArray();
 
 			if (KeyManager.UseTurboSync)
@@ -399,7 +417,7 @@ public class Wallet : BackgroundService, IWallet
 	{
 		BitcoinStore.IndexStore.NewFilters -= IndexDownloader_NewFiltersAsync;
 	}
-	
+
 	private async Task LoadWalletStateAsync(CancellationToken cancel)
 	{
 		KeyManager.AssertNetworkOrClearBlockState(Network);
@@ -414,6 +432,21 @@ public class Wallet : BackgroundService, IWallet
 			TransactionProcessor.Process(BitcoinStore.TransactionStore.ConfirmedStore.GetTransactions().TakeWhile(x => x.Height <= bestKeyManagerHeight));
 		}
 
+		// Each time a new batch of filters is downloaded, request a synchronization.
+		var lastHashesLeft = BitcoinStore.SmartHeaderChain.HashesLeft;
+		while (BitcoinStore.SmartHeaderChain.HashesLeft > 0)
+		{
+			cancel.ThrowIfCancellationRequested();
+			if (lastHashesLeft == BitcoinStore.SmartHeaderChain.HashesLeft)
+			{
+				await Task.Delay(100, cancel).ConfigureAwait(false);
+				continue;
+			}
+			lastHashesLeft = BitcoinStore.SmartHeaderChain.HashesLeft;
+			await PerformSynchronizationAsync(KeyManager.UseTurboSync ? SyncType.Turbo : SyncType.Complete, cancel).ConfigureAwait(false);
+		}
+
+		// Request a synchronization once all filters were downloaded.
 		await PerformSynchronizationAsync(KeyManager.UseTurboSync ? SyncType.Turbo : SyncType.Complete, cancel).ConfigureAwait(false);
 	}
 
@@ -481,8 +514,8 @@ public class Wallet : BackgroundService, IWallet
 
 	public static Wallet CreateAndRegisterServices(Network network, BitcoinStore bitcoinStore, KeyManager keyManager, WasabiSynchronizer synchronizer, string dataDir, ServiceConfiguration serviceConfiguration, HybridFeeProvider feeProvider, IBlockProvider blockProvider)
 	{
-		var wallet = new Wallet(dataDir, network, keyManager);
-		wallet.RegisterServices(bitcoinStore, synchronizer, serviceConfiguration, feeProvider, blockProvider);
+		var wallet = new Wallet(dataDir, network, keyManager, bitcoinStore, synchronizer, serviceConfiguration, feeProvider, blockProvider);
+		wallet.Initialize();
 		return wallet;
 	}
 

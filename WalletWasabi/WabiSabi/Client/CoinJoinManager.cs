@@ -26,6 +26,9 @@ namespace WalletWasabi.WabiSabi.Client;
 public class CoinJoinManager : BackgroundService
 {
 	private readonly IWabiSabiApiRequestHandler _wabiSabiApiRequestHandler;
+	private ConcurrentDictionary<string, CoinJoinTracker> _trackedCoinJoins;
+	private IReadOnlyDictionary<string, CoinJoinTracker> TrackedCoinJoins => _trackedCoinJoins;
+
 
 	public CoinJoinManager(string coordinatorName, IWalletProvider walletProvider, RoundStateUpdater roundStatusUpdater,
 		IWabiSabiApiRequestHandler wabiSabiApiRequestHandler, IWasabiHttpClientFactory backendHttpClientFactory,
@@ -139,7 +142,7 @@ public class CoinJoinManager : BackgroundService
 	{
 		// This is a shared resource and that's why it is concurrent. Alternatives are locking structures,
 		// using a single lock around its access or use a channel.
-		var trackedCoinJoins = new ConcurrentDictionary<string, CoinJoinTracker>();
+		_trackedCoinJoins = new ConcurrentDictionary<string, CoinJoinTracker>();
 		var trackedAutoStarts = new ConcurrentDictionary<IWallet, TrackedAutoStart>();
 
 		var commandsHandlingTask = Task.Run(() => HandleCoinJoinCommandsAsync(trackedCoinJoins, trackedAutoStarts, stoppingToken), stoppingToken);

@@ -4,8 +4,8 @@ namespace WalletWasabi.Rpc;
 
 public class PaymentInfo
 {
-	public BitcoinAddress Sendto { get; set; }
-	public Money Amount { get; set; }
-	public string Label { get; set; }
-	public bool SubtractFee { get; set; }
+	public BitcoinAddress Sendto { get; init; }
+	public Money Amount { get; init; }
+	public string Label { get; init; }
+	public bool SubtractFee { get; init; }
 }

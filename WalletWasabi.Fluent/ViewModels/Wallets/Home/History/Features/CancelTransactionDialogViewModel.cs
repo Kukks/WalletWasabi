@@ -8,6 +8,7 @@ using WalletWasabi.Blockchain.TransactionBuilding;
 using WalletWasabi.Blockchain.Transactions;
 using WalletWasabi.Fluent.Extensions;
 using WalletWasabi.Fluent.Models;
+using WalletWasabi.Fluent.Models.Wallets;
 using WalletWasabi.Fluent.ViewModels.Navigation;
 using WalletWasabi.Logging;
 using WalletWasabi.Wallets;
@@ -50,7 +51,11 @@ public partial class CancelTransactionDialogViewModel : RoutableViewModel
 	protected override void OnNavigatedTo(bool isInHistory, CompositeDisposable disposables)
 	{
 		_triggers.TransactionsUpdateTrigger
-			.Select(_ => _wallet.GetTransactions().FirstOrDefault(s => s.GetHash() == _transactionToCancel.GetHash()))
+			.Select(x =>
+			{
+				_ = _wallet.TryGetTransaction(_transactionToCancel.GetHash(), out SmartTransaction? tx);
+				return tx;
+			})
 			.WhereNotNull()
 			.Where(s => s.Confirmed)
 			.Do(_ => Navigate().Back())
@@ -91,7 +96,7 @@ public partial class CancelTransactionDialogViewModel : RoutableViewModel
 	{
 		if (!string.IsNullOrEmpty(_wallet.Kitchen.SaltSoup()))
 		{
-			var result = UiContext.Navigate().To().PasswordAuthDialog(_wallet);
+			var result = UiContext.Navigate().To().PasswordAuthDialog(new WalletModel(_wallet));
 			var dialogResult = await result.GetResultAsync();
 			return dialogResult;
 		}
