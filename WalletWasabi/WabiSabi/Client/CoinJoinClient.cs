@@ -82,12 +82,13 @@ public class CoinJoinClient
 	public event EventHandler<CoinJoinProgressEventArgs>? CoinJoinClientProgress;
 
 	public ImmutableList<SmartCoin> CoinsInCriticalPhase { get; private set; } = ImmutableList<SmartCoin>.Empty;
+	public ImmutableList<SmartCoin> CoinsToRegister { get; private set; } = ImmutableList<SmartCoin>.Empty;
 
 	private SecureRandom SecureRandom { get; }
 	private IWasabiHttpClientFactory HttpClientFactory { get; }
 	private IKeyChain KeyChain { get; }
 	private OutputProvider OutputProvider { get; }
-	private RoundStateUpdater RoundStatusUpdater { get; }
+	public  RoundStateUpdater RoundStatusUpdater { get; }
 	private string CoordinatorIdentifier { get; }
 	private LiquidityClueProvider LiquidityClueProvider { get; }
 	private CoinJoinCoinSelector CoinJoinCoinSelector { get; }
@@ -149,110 +150,136 @@ public class CoinJoinClient
 		return roundState;
 	}
 
-	public  RoundState? CurrentRoundState { get; private set; }
+	public  uint256? CurrentRoundId { get; private set; }
 	SemaphoreSlim currentRoundStateLock = new(1, 1);
+
+	public (IEnumerable<TxOut> outputTxOuts, Dictionary<TxOut, PendingPayment> batchedPayments)? OutputTxOuts
+	{
+		get;
+		private set;
+	}
+
 	public async Task<CoinJoinResult?> StartCoinJoinAsync(Func<Task<IEnumerable<SmartCoin>>> coinCandidatesFunc, CancellationToken cancellationToken)
 	{
 		await currentRoundStateLock.WaitAsync(cancellationToken).ConfigureAwait(false);
 		try
 		{
 
-		uint256 excludeRound = uint256.Zero;
-		ImmutableList<SmartCoin> coins;
-		IEnumerable<SmartCoin> coinCandidates;
+			uint256 excludeRound = uint256.Zero;
+			// ImmutableList<SmartCoin> coins;
+			IEnumerable<SmartCoin> coinCandidates;
 
-		do
-		{
-			// Sanity check if we would get coins at all otherwise this will throw.
-			var _ = await coinCandidatesFunc().ConfigureAwait(false);
-
-			CurrentRoundState = await WaitForRoundAsync(excludeRound, cancellationToken).ConfigureAwait(false);
-			RoundParameters roundParameters = CurrentRoundState.CoinjoinState.Parameters;
-
-			coinCandidates = await coinCandidatesFunc().ConfigureAwait(false);
-
-			var liquidityClue = LiquidityClueProvider.GetLiquidityClue(roundParameters.MaxSuggestedAmount);
-			var utxoSelectionParameters = UtxoSelectionParameters.FromRoundParameters(roundParameters, _coordinatorName);
-
-			if (CoinSelectionFunc is not null)
+			RoundState? currentRoundState = null;
+			do
 			{
-				coins = await CoinSelectionFunc.SelectCoinsAsync(coinCandidates, utxoSelectionParameters, liquidityClue,
-					SecureRandom).ConfigureAwait(false);
-			}
-			else
+				// Sanity check if we would get coins at all otherwise this will throw.
+				var _ = await coinCandidatesFunc().ConfigureAwait(false);
+
+				currentRoundState = await WaitForRoundAsync(excludeRound, cancellationToken).ConfigureAwait(false);
+				CurrentRoundId = currentRoundState.Id;
+				RoundParameters roundParameters = currentRoundState.CoinjoinState.Parameters;
+
+				coinCandidates = await coinCandidatesFunc().ConfigureAwait(false);
+
+				var liquidityClue = LiquidityClueProvider.GetLiquidityClue(roundParameters.MaxSuggestedAmount);
+				var utxoSelectionParameters =
+					UtxoSelectionParameters.FromRoundParameters(roundParameters, _coordinatorName);
+
+				if (CoinSelectionFunc is not null)
+				{
+					CoinsToRegister = await CoinSelectionFunc.SelectCoinsAsync(coinCandidates, utxoSelectionParameters,
+						liquidityClue,
+						SecureRandom).ConfigureAwait(false);
+				}
+				else
+				{
+					CoinsToRegister =
+						CoinJoinCoinSelector.SelectCoinsForRound(coinCandidates, utxoSelectionParameters,
+							liquidityClue);
+				}
+
+				if (!roundParameters.AllowedInputTypes.Contains(ScriptType.P2WPKH) ||
+				    !roundParameters.AllowedOutputTypes.Contains(ScriptType.P2WPKH))
+				{
+					excludeRound = currentRoundState.Id;
+					CurrentRoundId = null;
+					_wallet.LogInfo($"Skipping the round since it doesn't support P2WPKH inputs and outputs.");
+
+					continue;
+				}
+
+				if (roundParameters.MaxSuggestedAmount != default &&
+				    CoinsToRegister.Any(c => c.Amount > roundParameters.MaxSuggestedAmount))
+				{
+					excludeRound = currentRoundState.Id;
+					CurrentRoundId = null;
+					_wallet.LogInfo(
+						$"Skipping the round for more optimal mixing. Max suggested amount is '{roundParameters.MaxSuggestedAmount}' BTC, biggest coin amount is: '{CoinsToRegister.Select(c => c.Amount).Max()}' BTC.");
+
+					continue;
+				}
+
+				break;
+			} while (!cancellationToken.IsCancellationRequested);
+
+			if (CoinsToRegister.IsEmpty)
 			{
-				coins = CoinJoinCoinSelector.SelectCoinsForRound(coinCandidates, utxoSelectionParameters, liquidityClue);
+				throw new CoinJoinClientException(CoinjoinError.NoCoinsEligibleToMix,
+					$"No coin was selected from '{coinCandidates.Count()}' number of coins. Probably it was not economical, total amount of coins were: {Money.Satoshis(coinCandidates.Sum(c => c.Amount))} BTC.");
 			}
 
-			if (!roundParameters.AllowedInputTypes.Contains(ScriptType.P2WPKH) || !roundParameters.AllowedOutputTypes.Contains(ScriptType.P2WPKH))
+			// Keep going to blame round until there's none, so CJs won't be DDoS-ed.
+			while (true)
 			{
-				excludeRound = CurrentRoundState.Id;
-				CurrentRoundState.LogInfo($"Skipping the round since it doesn't support P2WPKH inputs and outputs.");
+				using CancellationTokenSource coinJoinRoundTimeoutCts = new(
+					currentRoundState.InputRegistrationTimeout +
+					currentRoundState.CoinjoinState.Parameters.ConnectionConfirmationTimeout +
+					currentRoundState.CoinjoinState.Parameters.OutputRegistrationTimeout +
+					currentRoundState.CoinjoinState.Parameters.TransactionSigningTimeout +
+					ExtraRoundTimeoutMargin);
+				using CancellationTokenSource linkedCts =
+					CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, coinJoinRoundTimeoutCts.Token);
 
-				continue;
+				var result = await StartRoundAsync(CoinsToRegister, currentRoundState, linkedCts.Token)
+					.ConfigureAwait(false);
+
+				switch (result)
+				{
+					case DisruptedCoinJoinResult info:
+						if (info.abandonAndAllSubsequentBlames)
+						{
+							throw new InvalidOperationException(
+								"Skipping blame rounds as we were the only ones in the round.");
+						}
+
+						// Only use successfully registered coins in the blame round.
+						CoinsToRegister = info.SignedCoins;
+
+						currentRoundState.LogInfo("Waiting for the blame round.");
+						currentRoundState = await WaitForBlameRoundAsync(currentRoundState.Id, cancellationToken)
+							.ConfigureAwait(false);
+						CurrentRoundId = currentRoundState.Id;
+						break;
+
+					case SuccessfulCoinJoinResult success:
+						return success;
+
+					case FailedCoinJoinResult failure:
+						return failure;
+
+					default:
+						throw new InvalidOperationException("The coinjoin result type was not handled.");
+				}
 			}
 
-			if (roundParameters.MaxSuggestedAmount != default && coins.Any(c => c.Amount > roundParameters.MaxSuggestedAmount))
-			{
-				excludeRound = CurrentRoundState.Id;
-				CurrentRoundState.LogInfo($"Skipping the round for more optimal mixing. Max suggested amount is '{roundParameters.MaxSuggestedAmount}' BTC, biggest coin amount is: '{coins.Select(c => c.Amount).Max()}' BTC.");
-
-				continue;
-			}
-
-			break;
-		}
-		while (!cancellationToken.IsCancellationRequested);
-
-		if (coins.IsEmpty)
-		{
-			throw new CoinJoinClientException(CoinjoinError.NoCoinsEligibleToMix, $"No coin was selected from '{coinCandidates.Count()}' number of coins. Probably it was not economical, total amount of coins were: {Money.Satoshis(coinCandidates.Sum(c => c.Amount))} BTC.");
-		}
-
-		// Keep going to blame round until there's none, so CJs won't be DDoS-ed.
-		while (true)
-		{
-			using CancellationTokenSource coinJoinRoundTimeoutCts = new(
-				CurrentRoundState.InputRegistrationTimeout +
-				CurrentRoundState.CoinjoinState.Parameters.ConnectionConfirmationTimeout +
-				CurrentRoundState.CoinjoinState.Parameters.OutputRegistrationTimeout +
-				CurrentRoundState.CoinjoinState.Parameters.TransactionSigningTimeout +
-				ExtraRoundTimeoutMargin);
-			using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, coinJoinRoundTimeoutCts.Token);
-
-			var result = await StartRoundAsync(coins, CurrentRoundState, linkedCts.Token).ConfigureAwait(false);
-
-			switch (result)
-			{
-				case DisruptedCoinJoinResult info:
-					if (info.abandonAndAllSubsequentBlames)
-					{
-						throw new InvalidOperationException("Skipping blame rounds as we were the only ones in the round.");
-					}
-					// Only use successfully registered coins in the blame round.
-					coins = info.SignedCoins;
-
-					CurrentRoundState.LogInfo("Waiting for the blame round.");
-					CurrentRoundState = await WaitForBlameRoundAsync(CurrentRoundState.Id, cancellationToken).ConfigureAwait(false);
-					break;
-
-				case SuccessfulCoinJoinResult success:
-					return success;
-
-				case FailedCoinJoinResult failure:
-					return failure;
-
-				default:
-					throw new InvalidOperationException("The coinjoin result type was not handled.");
-			}
-		}
-
-		throw new InvalidOperationException("Blame rounds were not successful.");
+			throw new InvalidOperationException("Blame rounds were not successful.");
 
 		}
 		finally
 		{
-			CurrentRoundState = null;
+			CurrentRoundId = null;
+			OutputTxOuts = null;
+			CoinsToRegister = ImmutableList<SmartCoin>.Empty;
 			currentRoundStateLock.Release();
 		}
 	}
@@ -418,13 +445,13 @@ public class CoinJoinClient
 
 			CoinsInCriticalPhase = registeredAliceClients.Select(alice => alice.SmartCoin).ToImmutableList();
 
-			var outputTxOuts = await ProceedWithOutputRegistrationPhaseAsync(roundId, registeredAliceClients, cancellationToken).ConfigureAwait(false);
+			OutputTxOuts = await ProceedWithOutputRegistrationPhaseAsync(roundId, registeredAliceClients, cancellationToken).ConfigureAwait(false);
 
-			var (unsignedCoinJoin, aliceClientsThatSigned, abandonAndAllSubsequentBlames) = await ProceedWithSigningStateAsync(roundId, registeredAliceClients, outputTxOuts, cancellationToken).ConfigureAwait(false);
-			LogCoinJoinSummary(registeredAliceClients, outputTxOuts, unsignedCoinJoin, roundState);
+			var (unsignedCoinJoin, aliceClientsThatSigned, abandonAndAllSubsequentBlames) = await ProceedWithSigningStateAsync(roundId, registeredAliceClients, OutputTxOuts.Value, cancellationToken).ConfigureAwait(false);
+			LogCoinJoinSummary(registeredAliceClients, OutputTxOuts.Value, unsignedCoinJoin, roundState);
 
-			LiquidityClueProvider.UpdateLiquidityClue(roundState.CoinjoinState.Parameters.MaxSuggestedAmount, unsignedCoinJoin, outputTxOuts.outputTxOuts);
-			return new(aliceClientsThatSigned, outputTxOuts.outputTxOuts, unsignedCoinJoin,outputTxOuts.batchedPayments.ToImmutableDictionary(), abandonAndAllSubsequentBlames);
+			LiquidityClueProvider.UpdateLiquidityClue(roundState.CoinjoinState.Parameters.MaxSuggestedAmount, unsignedCoinJoin, OutputTxOuts.Value.outputTxOuts);
+			return new(aliceClientsThatSigned, OutputTxOuts.Value.outputTxOuts, unsignedCoinJoin,OutputTxOuts.Value.batchedPayments.ToImmutableDictionary(), abandonAndAllSubsequentBlames);
 		}
 		finally
 		{

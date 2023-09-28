@@ -27,7 +27,7 @@ public class CoinJoinManager : BackgroundService
 {
 	private readonly IWabiSabiApiRequestHandler _wabiSabiApiRequestHandler;
 	private ConcurrentDictionary<string, CoinJoinTracker> _trackedCoinJoins;
-	private IReadOnlyDictionary<string, CoinJoinTracker> TrackedCoinJoins => _trackedCoinJoins;
+	public  IReadOnlyDictionary<string, CoinJoinTracker> TrackedCoinJoins => _trackedCoinJoins;
 
 
 	public CoinJoinManager(string coordinatorName, IWalletProvider walletProvider, RoundStateUpdater roundStatusUpdater,
@@ -145,8 +145,8 @@ public class CoinJoinManager : BackgroundService
 		_trackedCoinJoins = new ConcurrentDictionary<string, CoinJoinTracker>();
 		var trackedAutoStarts = new ConcurrentDictionary<IWallet, TrackedAutoStart>();
 
-		var commandsHandlingTask = Task.Run(() => HandleCoinJoinCommandsAsync(trackedCoinJoins, trackedAutoStarts, stoppingToken), stoppingToken);
-		var monitorCoinJoinTask = Task.Run(() => MonitorAndHandlingCoinJoinFinalizationAsync(trackedCoinJoins, trackedAutoStarts, stoppingToken), stoppingToken);
+		var commandsHandlingTask = Task.Run(() => HandleCoinJoinCommandsAsync(_trackedCoinJoins, trackedAutoStarts, stoppingToken), stoppingToken);
+		var monitorCoinJoinTask = Task.Run(() => MonitorAndHandlingCoinJoinFinalizationAsync(_trackedCoinJoins, trackedAutoStarts, stoppingToken), stoppingToken);
 
 		await Task.WhenAny(commandsHandlingTask, monitorCoinJoinTask).ConfigureAwait(false);
 
