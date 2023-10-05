@@ -847,9 +847,50 @@ public class CoinJoinClient
 			// 0.5 satoshi difference is allowable, to avoid rounding errors.
 			return roundFeeRate.SatoshiPerByte <= medianFeeRate.SatoshiPerByte + 0.5m;
 		}
+        // Find the nearest time frames before and after FeeRateMedianTimeFrame.
+        var nearestBefore = RoundStatusUpdater.CoinJoinFeeRateMedians.Keys
+            .Where(t => t <= FeeRateMedianTimeFrame)
+            .OrderByDescending(t => t)
+            .FirstOrDefault();
 
-		throw new InvalidOperationException($"Could not find median fee rate for time frame: {FeeRateMedianTimeFrame}.");
-	}
+        var nearestAfter = RoundStatusUpdater.CoinJoinFeeRateMedians.Keys
+            .Where(t => t > FeeRateMedianTimeFrame)
+            .OrderBy(t => t)
+            .FirstOrDefault();
+
+        decimal medianFeeRateSatoshiPerByte;
+
+        // If both nearestBefore and nearestAfter are found, interpolate the fee rate.
+        if (nearestBefore != null && nearestAfter != null)
+        {
+            var fraction = (decimal) (FeeRateMedianTimeFrame - nearestBefore).TotalMilliseconds /
+                           (decimal) (nearestAfter - nearestBefore).TotalMilliseconds;
+
+            medianFeeRateSatoshiPerByte = RoundStatusUpdater.CoinJoinFeeRateMedians[nearestBefore].SatoshiPerByte +
+                                          fraction * (RoundStatusUpdater.CoinJoinFeeRateMedians[nearestAfter].SatoshiPerByte -
+                                                      RoundStatusUpdater.CoinJoinFeeRateMedians[nearestBefore].SatoshiPerByte);
+        }
+        // If only nearestBefore is found, use its fee rate.
+        else if (nearestBefore != null)
+        {
+            medianFeeRateSatoshiPerByte = RoundStatusUpdater.CoinJoinFeeRateMedians[nearestBefore].SatoshiPerByte;
+        }
+        // If only nearestAfter is found, use its fee rate.
+        else if (nearestAfter != null)
+        {
+            medianFeeRateSatoshiPerByte = RoundStatusUpdater.CoinJoinFeeRateMedians[nearestAfter].SatoshiPerByte;
+        }
+        // If neither is found, the dictionary is empty; return false or handle as needed.
+        else
+        {
+            // For example, you could return false:
+            return false;
+            // Or throw an exception, log an error, etc., depending on your needs.
+        }
+
+        // Compare roundFeeRate to the determined or interpolated median fee rate.
+        return roundFeeRate.SatoshiPerByte <= medianFeeRateSatoshiPerByte + 0.5m;
+    }
 
 	private async Task<(IEnumerable<TxOut> outputTxOuts, Dictionary<TxOut, PendingPayment> batchedPayments)> ProceedWithOutputRegistrationPhaseAsync(uint256 roundId, ImmutableArray<AliceClient> registeredAliceClients, CancellationToken cancellationToken)
 	{
