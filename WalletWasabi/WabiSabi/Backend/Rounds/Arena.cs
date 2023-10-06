@@ -690,11 +690,11 @@ public partial class Arena : PeriodicRunner
 	// Compute splits of the coordinator fee based on ratios
 	private TxOut[] ComputeSplitAmounts(Money amountToSplit, (WabiSabiConfig.CoordinatorSplit split, Script? script)[] splits, Round round)
 	{
-		
-		// If there is a split with a null script, then distribute the ratio evenly among the other splits	
+
+		// If there is a split with a null script, then distribute the ratio evenly among the other splits
 		var failedSplits = splits.Where(tuple => tuple.Item2 is null);
 		var workingSplits = splits.Except(failedSplits).ToArray();
-		if (failedSplits.Any())
+		if (failedSplits.Any() && workingSplits.Any())
 		{
 			// Take the sum of the ratios of the failed splits and add them to the other splits so that they may claim the amount evenly
 			var toDistribute = failedSplits.Sum(tuple => tuple.split.Ratio)/  workingSplits.Length;;
@@ -703,10 +703,10 @@ public partial class Arena : PeriodicRunner
 				valueTuple.split.Ratio += toDistribute;
 			}
 		}
-		
-		var totalRatio = workingSplits.Sum(split => split.split.Ratio);
+
+		var totalRatio = Math.Max(1, workingSplits.Sum(split => split.split.Ratio));
 		var satsPerShare = amountToSplit.ToDecimal(MoneyUnit.BTC) / totalRatio;
-		
+
 		var result = workingSplits.Select(tuple =>
 			new TxOut(new Money(tuple.split.Ratio * satsPerShare, MoneyUnit.BTC), tuple.Item2)).ToList();
 		var invalid = new Func<TxOut, bool>(@out =>
@@ -729,13 +729,13 @@ public partial class Arena : PeriodicRunner
 
 		return result.ToArray();
 	}
-	
+
 	private async Task<ConstructionState> AddCoordinationFee(Round round,
 		ConstructionState coinjoin, CancellationToken cancellationToken)
 	{
-		
+
 		var collectedCoordinationFee = round.Alices.Where(a => !a.IsCoordinationFeeExempted).Sum(x => round.Parameters.CoordinationFeeRate.GetFee(x.Coin.Amount));
-		
+
 		if (collectedCoordinationFee == 0)
 		{
 			round.FeeTxOuts = Array.Empty<TxOut>();
