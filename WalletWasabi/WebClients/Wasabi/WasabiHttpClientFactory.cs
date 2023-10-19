@@ -5,6 +5,8 @@ using System.Threading.Tasks;
 using WalletWasabi.Tor.Http;
 using WalletWasabi.Tor.Socks5.Pool;
 using WalletWasabi.Tor.Socks5.Pool.Circuits;
+using WalletWasabi.WabiSabi.Backend.PostRequests;
+using WalletWasabi.WabiSabi.Client;
 
 namespace WalletWasabi.WebClients.Wasabi;
 
@@ -133,5 +135,10 @@ public class WasabiHttpClientFactory : IWasabiHttpClientFactory, IAsyncDisposabl
 		{
 			await TorHttpPool.DisposeAsync().ConfigureAwait(false);
 		}
+	}
+
+	public IWabiSabiApiRequestHandler NewWabiSabiApiRequestHandler(Mode mode, ICircuit? circuit = null)
+	{
+		return new WabiSabiHttpApiClient(NewHttpClient(mode, circuit));
 	}
 }

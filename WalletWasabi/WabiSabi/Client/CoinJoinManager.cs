@@ -25,16 +25,13 @@ using WalletWasabi.WebClients.Wasabi;
 namespace WalletWasabi.WabiSabi.Client;
 public class CoinJoinManager : BackgroundService
 {
-	private readonly IWabiSabiApiRequestHandler _wabiSabiApiRequestHandler;
 	private ConcurrentDictionary<string, CoinJoinTracker> _trackedCoinJoins;
 	public  IReadOnlyDictionary<string, CoinJoinTracker> TrackedCoinJoins => _trackedCoinJoins;
 
 
 	public CoinJoinManager(string coordinatorName, IWalletProvider walletProvider, RoundStateUpdater roundStatusUpdater,
-		IWabiSabiApiRequestHandler wabiSabiApiRequestHandler, IWasabiHttpClientFactory backendHttpClientFactory,
-		IWasabiBackendStatusProvider wasabiBackendStatusProvider, string coordinatorIdentifier, CoinPrison coinPrison)
+		IWasabiHttpClientFactory backendHttpClientFactory, IWasabiBackendStatusProvider wasabiBackendStatusProvider, string coordinatorIdentifier, CoinPrison coinPrison)
 	{
-		_wabiSabiApiRequestHandler = wabiSabiApiRequestHandler;
 		CoordinatorName = coordinatorName;
 		WasabiBackendStatusProvide = wasabiBackendStatusProvider;
 		WalletProvider = walletProvider;
@@ -156,7 +153,7 @@ public class CoinJoinManager : BackgroundService
 
 	private async Task HandleCoinJoinCommandsAsync(ConcurrentDictionary<string, CoinJoinTracker> trackedCoinJoins, ConcurrentDictionary<IWallet, TrackedAutoStart> trackedAutoStarts, CancellationToken stoppingToken)
 	{
-		var coinJoinTrackerFactory = new CoinJoinTrackerFactory(HttpClientFactory, _wabiSabiApiRequestHandler,
+		var coinJoinTrackerFactory = new CoinJoinTrackerFactory(HttpClientFactory,
 			RoundStatusUpdater, CoordinatorIdentifier, stoppingToken, CoordinatorName);
 
 		async void StartCoinJoinCommand(StartCoinJoinCommand startCommand)

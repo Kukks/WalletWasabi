@@ -12,7 +12,7 @@ using WalletWasabi.Helpers;
 using WalletWasabi.Logging;
 using WalletWasabi.Models;
 using WalletWasabi.Stores;
-using WalletWasabi.Tor.Http;
+using WalletWasabi.Tor.Socks5.Pool.Circuits;
 using WalletWasabi.Wallets;
 using WalletWasabi.WebClients.Wasabi;
 
@@ -92,10 +92,14 @@ public class TransactionBroadcaster
 	private async Task BroadcastTransactionToBackendAsync(SmartTransaction transaction)
 	{
 		Logger.LogInfo("Broadcasting with backend...");
-		IHttpClient httpClient = HttpClientFactory.NewHttpClientWithCircuitPerRequest();
+		WasabiClient client;
+		if (HttpClientFactory is  not WasabiHttpClientFactory httpClientFactory)
+		{
+			return;
+		}
 
-		WasabiClient client = new(httpClient);
 
+		client = new(httpClientFactory.NewHttpClient(Mode.NewCircuitPerRequest));
 		try
 		{
 			await client.BroadcastAsync(transaction).ConfigureAwait(false);

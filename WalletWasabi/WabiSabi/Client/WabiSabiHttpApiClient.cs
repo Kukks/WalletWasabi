@@ -1,6 +1,7 @@
 using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Threading;
@@ -171,4 +172,20 @@ public class WabiSabiHttpApiClient : IWabiSabiApiRequestHandler
 			RemoteAction.ReadyToSign => "ready-to-sign",
 			_ => throw new NotSupportedException($"Action '{action}' is unknown and has no endpoint associated.")
 		};
+
+	public async Task<string> GetLegalDocumentsAsync(CancellationToken cancel)
+	{
+		using HttpResponseMessage response = await _client.SendAsync(HttpMethod.Get,
+			$"api/v{ushort.Parse(Helpers.Constants.BackendMajorVersion)}/wasabi/legaldocuments?id=ww2", cancellationToken: cancel).ConfigureAwait(false);
+
+		if (response.StatusCode != HttpStatusCode.OK)
+		{
+			await response.ThrowRequestExceptionFromContentAsync(cancel).ConfigureAwait(false);
+		}
+
+		using HttpContent content = response.Content;
+		var result = await content.ReadAsStringAsync(cancel).ConfigureAwait(false);
+
+		return result;
+	}
 }

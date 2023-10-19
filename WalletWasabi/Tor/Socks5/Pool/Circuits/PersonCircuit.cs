@@ -37,7 +37,10 @@ public class PersonCircuit : INamedCircuit, IDisposable
 	public void IncrementIsolationId()
 	{
 		Interlocked.Increment(ref _isolationId);
+		IsolationIdChanged?.Invoke(this, EventArgs.Empty);
 	}
+
+	public event EventHandler<EventArgs>? IsolationIdChanged;
 
 	/// <inheritdoc/>
 	public override string ToString()

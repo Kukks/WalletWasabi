@@ -33,7 +33,6 @@ namespace WalletWasabi.WabiSabi.Client;
 
 public class CoinJoinClient
 {
-	private readonly IWabiSabiApiRequestHandler _wabiSabiApiRequestHandler;
 	private readonly IWallet _wallet;
 	private readonly string _coordinatorName;
 
@@ -48,7 +47,6 @@ public class CoinJoinClient
 
 	public CoinJoinClient(
 		IWasabiHttpClientFactory httpClientFactory,
-		IWabiSabiApiRequestHandler wabiSabiApiRequestHandler,
 		IWallet wallet,
 		IKeyChain keyChain,
 		OutputProvider outputProvider,
@@ -61,7 +59,6 @@ public class CoinJoinClient
 		IRoundCoinSelector? coinSelectionFunc = null,
 		string coordinatorName = "")
 	{
-		_wabiSabiApiRequestHandler = wabiSabiApiRequestHandler;
 		_wallet = wallet;
 		_coordinatorName = coordinatorName;
 		HttpClientFactory = httpClientFactory;
@@ -493,21 +490,15 @@ public class CoinJoinClient
 			bool disposeCircuit = true;
 			try
 			{
-				IWabiSabiApiRequestHandler arenaRequestHandler;
-				if (_wabiSabiApiRequestHandler is not null)
-				{
-					arenaRequestHandler = _wabiSabiApiRequestHandler;
-				}
-				else
-				{
+
+
 
 					var (newPersonCircuit, httpClient) = HttpClientFactory.NewHttpClientWithPersonCircuit();
 					personCircuit = newPersonCircuit;
 
 					// Alice client requests are inherently linkable to each other, so the circuit can be reused
-					arenaRequestHandler = new WabiSabiHttpApiClient(httpClient);
+					IWabiSabiApiRequestHandler arenaRequestHandler = httpClient;
 
-				}
 				var aliceArenaClient = new ArenaClient(
 					roundState.CreateAmountCredentialClient(SecureRandom),
 					roundState.CreateVsizeCredentialClient(SecureRandom),
@@ -661,7 +652,7 @@ public class CoinJoinClient
 
 		var successfulAlices = aliceClients
 			.Select(x => x.Result)
-			.Where(r => r.AliceClient is not null && (_wabiSabiApiRequestHandler is not null || r.PersonCircuit is not null))
+			.Where(r => r.AliceClient is not null &&  r.PersonCircuit is not null)
 			.Select(r => (r.AliceClient!, r.PersonCircuit!))
 			.ToImmutableArray();
 
@@ -677,15 +668,7 @@ public class CoinJoinClient
 	private BobClient CreateBobClient(RoundState roundState)
 	{
 		IWabiSabiApiRequestHandler arenaRequestHandler;
-		if (HttpClientFactory is null)
-		{
-			arenaRequestHandler = _wabiSabiApiRequestHandler;
-		}
-		else
-		{
-			arenaRequestHandler = new WabiSabiHttpApiClient(HttpClientFactory.NewHttpClientWithCircuitPerRequest());
-		}
-
+		arenaRequestHandler = HttpClientFactory.NewHttpClientWithCircuitPerRequest();
 		return new BobClient(
 			roundState.Id,
 			new(

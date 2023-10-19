@@ -35,6 +35,8 @@ public class OneOffCircuit : INamedCircuit, IDisposable
 		// Do nothing as OneOffCircuit does not support incrementing isolation ID as it can be used only once.
 	}
 
+	public event EventHandler<EventArgs>? IsolationIdChanged;
+
 	/// <inheritdoc/>
 	public override string ToString()
 	{

@@ -13,17 +13,14 @@ namespace WalletWasabi.WabiSabi.Client;
 
 public class CoinJoinTrackerFactory
 {
-	private readonly IWabiSabiApiRequestHandler _wabiSabiApiRequestHandler;
 	private readonly string _coordinatorName;
 
 	public CoinJoinTrackerFactory(IWasabiHttpClientFactory httpClientFactory,
-		IWabiSabiApiRequestHandler wabiSabiApiRequestHandler,
 		RoundStateUpdater roundStatusUpdater,
 		string coordinatorIdentifier,
 		CancellationToken cancellationToken,
 		string coordinatorName)
 	{
-		_wabiSabiApiRequestHandler = wabiSabiApiRequestHandler;
 		HttpClientFactory = httpClientFactory;
 		_coordinatorName = coordinatorName;
 		RoundStatusUpdater = roundStatusUpdater;
@@ -51,7 +48,6 @@ public class CoinJoinTrackerFactory
 		var outputProvider = new OutputProvider(wallet, _coordinatorName, InsecureRandom.Instance);
 		var coinJoinClient = new CoinJoinClient(
 			HttpClientFactory,
-			_wabiSabiApiRequestHandler,
 			wallet,
 			wallet.KeyChain,
 			outputProvider,

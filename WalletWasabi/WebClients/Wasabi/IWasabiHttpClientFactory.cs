@@ -1,27 +1,29 @@
 using WalletWasabi.Tor.Http;
 using WalletWasabi.Tor.Socks5.Pool.Circuits;
+using WalletWasabi.WabiSabi.Backend.PostRequests;
 
 namespace WalletWasabi.WebClients.Wasabi;
 
 public interface IWasabiHttpClientFactory
 {
-	(PersonCircuit, IHttpClient) NewHttpClientWithPersonCircuit()
+
+	(PersonCircuit, IWabiSabiApiRequestHandler) NewHttpClientWithPersonCircuit()
 	{
 		PersonCircuit personCircuit = new();
-		var httpClient = NewHttpClient(Mode.SingleCircuitPerLifetime, personCircuit);
+		var httpClient = NewWabiSabiApiRequestHandler(Mode.SingleCircuitPerLifetime, personCircuit);
 		return (personCircuit, httpClient);
 	}
 
-	IHttpClient NewHttpClientWithDefaultCircuit()
+	IWabiSabiApiRequestHandler NewHttpClientWithDefaultCircuit()
 	{
-		return NewHttpClient(Mode.DefaultCircuit);
+		return NewWabiSabiApiRequestHandler(Mode.DefaultCircuit);
 	}
 
-	IHttpClient NewHttpClientWithCircuitPerRequest()
+	IWabiSabiApiRequestHandler NewHttpClientWithCircuitPerRequest()
 	{
-		return NewHttpClient(Mode.NewCircuitPerRequest);
+		return NewWabiSabiApiRequestHandler(Mode.NewCircuitPerRequest);
 	}
 
 	/// <remarks>This is a low-level method. Unless necessary, use a preceding convenience method.</remarks>
-	IHttpClient NewHttpClient(Mode mode, ICircuit? circuit = null);
+	IWabiSabiApiRequestHandler NewWabiSabiApiRequestHandler(Mode mode, ICircuit? circuit = null);
 }

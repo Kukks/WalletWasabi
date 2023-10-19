@@ -41,4 +41,6 @@ public interface INamedCircuit : ICircuit
 	/// Mechanism to require a new Tor circuit after we detect HTTP requests' timeouts on the particular Tor circuit or other Tor instabilities of the current Tor circuit.
 	/// </summary>
 	void IncrementIsolationId();
+
+	event EventHandler<EventArgs> IsolationIdChanged;
 }
