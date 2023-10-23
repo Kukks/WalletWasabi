@@ -844,7 +844,7 @@ public class CoinJoinClient
         decimal medianFeeRateSatoshiPerByte;
 
         // If both nearestBefore and nearestAfter are found, interpolate the fee rate.
-        if (nearestBefore != null && nearestAfter != null)
+        if (nearestBefore != default && nearestAfter != default)
         {
             var fraction = (decimal) (FeeRateMedianTimeFrame - nearestBefore).TotalMilliseconds /
                            (decimal) (nearestAfter - nearestBefore).TotalMilliseconds;
@@ -854,12 +854,12 @@ public class CoinJoinClient
                                                       RoundStatusUpdater.CoinJoinFeeRateMedians[nearestBefore].SatoshiPerByte);
         }
         // If only nearestBefore is found, use its fee rate.
-        else if (nearestBefore != null)
+        else if (nearestBefore != default)
         {
             medianFeeRateSatoshiPerByte = RoundStatusUpdater.CoinJoinFeeRateMedians[nearestBefore].SatoshiPerByte;
         }
         // If only nearestAfter is found, use its fee rate.
-        else if (nearestAfter != null)
+        else if (nearestAfter != default)
         {
             medianFeeRateSatoshiPerByte = RoundStatusUpdater.CoinJoinFeeRateMedians[nearestAfter].SatoshiPerByte;
         }
