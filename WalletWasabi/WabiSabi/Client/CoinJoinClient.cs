@@ -490,10 +490,7 @@ public class CoinJoinClient
 			bool disposeCircuit = true;
 			try
 			{
-
-
-
-					var (newPersonCircuit, httpClient) = HttpClientFactory.NewHttpClientWithPersonCircuit();
+				var (newPersonCircuit, httpClient) = HttpClientFactory.NewHttpClientWithPersonCircuit();
 					personCircuit = newPersonCircuit;
 
 					// Alice client requests are inherently linkable to each other, so the circuit can be reused

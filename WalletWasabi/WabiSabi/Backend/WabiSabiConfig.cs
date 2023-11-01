@@ -29,7 +29,7 @@ public class DefaultCoordinatorSplits : DefaultValueAttribute
 
 	public DefaultCoordinatorSplits(string? value) : base(value)
 	{
-		
+
 	}
 };
 
@@ -146,8 +146,8 @@ public class WabiSabiConfig : ConfigBase
 	[JsonProperty(PropertyName = "CoordinationFeeRate", DefaultValueHandling = DefaultValueHandling.Populate)]
 	public CoordinationFeeRate CoordinationFeeRate { get; set; } = new CoordinationFeeRate(0.003m, Money.Coins(0.01m));
 
-	
-	
+
+
 	public class CoordinatorSplit
 	{
 		public decimal Ratio { get; set; }
@@ -155,21 +155,21 @@ public class WabiSabiConfig : ConfigBase
 		[JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
 		public string Value { get; set; }
 	}
-	
+
 	public static List<CoordinatorSplit> DefaultCoordinatorSplits =new()
 	{
 		new CoordinatorSplit()
 		{
 			Ratio = 1,
 			Type = "hrf"
-			
+
 		},
 		new CoordinatorSplit()
 		{
 			Ratio = 1,
 			Type = "opensats",
 			Value = "btcpayserver"
-			
+
 		}
 	};
 
@@ -253,15 +253,9 @@ public class WabiSabiConfig : ConfigBase
 	public bool DelayTransactionSigning { get; set; } = false;
 
 	public ImmutableSortedSet<ScriptType> AllowedInputTypes => GetScriptTypes(AllowP2wpkhInputs, AllowP2trInputs);
-	
+
 	[JsonProperty(PropertyName = "AllowedOutputTypes", ItemConverterType = typeof(StringEnumConverter))]
-	public ImmutableSortedSet<ScriptType> AllowedOutputTypes { get; set; } = ImmutableSortedSet.Create(
-		ScriptType.P2PKH,
-		ScriptType.P2SH,
-		ScriptType.P2WPKH,
-		ScriptType.P2WSH,
-		ScriptType.Taproot
-	);
+	public ImmutableSortedSet<ScriptType> AllowedOutputTypes { get; set; } = ImmutableSortedSet.Create(ScriptType.P2WPKH, ScriptType.Taproot);
 
 	public async Task<(CoordinatorSplit split, Script? script)[]> GetNextCleanCoordinatorScripts( IHttpClientFactory httpClient, Round round, CancellationToken cancellationToken)
 	{
@@ -278,7 +272,7 @@ public class WabiSabiConfig : ConfigBase
 			try
 			{
 				return (split, await  ResolveScript(split.Type, split.Value, httpClient, round.Parameters.Network, cancellationToken).ConfigureAwait(false));
-				
+
 			}
 			catch (Exception e)
 			{
@@ -286,9 +280,9 @@ public class WabiSabiConfig : ConfigBase
 			}
 		});
 		return await Task.WhenAll(splitsTasks).ConfigureAwait(false);
-		
+
 	}
-	
+
 	private static async Task<string> GetRedirectedUrl(HttpClient client, string url,
 		CancellationToken cancellationToken)
 	{
@@ -310,7 +304,7 @@ public class WabiSabiConfig : ConfigBase
 
 	public async Task<Script?> ResolveScript(string type, string value, IHttpClientFactory httpClientFactory, Network network, CancellationToken cancellationToken)
 	{
-		
+
 		using var  httpClient = httpClientFactory.CreateClient("wabisabi-coordinator-scripts-no-redirect.onion");
 		string? invoiceUrl = null;
 		switch (type)
