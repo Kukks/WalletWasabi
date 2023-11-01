@@ -1,12 +1,14 @@
 using NBitcoin;
 using System.Linq;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Threading.Tasks;
 using WalletWasabi.Blockchain.Analysis;
 using WalletWasabi.Extensions;
 using WalletWasabi.WabiSabi.Backend.Rounds;
 using WalletWasabi.Wallets;
 using WabiSabi.Crypto.Randomness;
+using WalletWasabi.Helpers;
 
 namespace WalletWasabi.WabiSabi.Client;
 
@@ -28,10 +30,11 @@ public class OutputProvider
 
 	public virtual async Task<(IEnumerable<TxOut>, Dictionary<TxOut, PendingPayment> batchedPayments)> GetOutputs(
 		RoundParameters roundParameters,
-		IEnumerable<Money> registeredCoinEffectiveValues,
+		ImmutableArray<AliceClient> registeredCoins,
 		IEnumerable<Money> theirCoinEffectiveValues,
 		int availableVsize)
 	{
+		var registeredCoinEffectiveValues = registeredCoins.Select(client => client.EffectiveValue);
 		var utxoSelectionParameters = UtxoSelectionParameters.FromRoundParameters(roundParameters, _coordinatorName);
 
 		AmountDecomposer amountDecomposer = new(roundParameters.MiningFeeRate, roundParameters.AllowedOutputAmounts.Min, roundParameters.AllowedOutputAmounts.Max,
@@ -99,11 +102,11 @@ public class OutputProvider
 			outputValues = amountDecomposer.Decompose(registeredCoinEffectiveValues, theirCoinEffectiveValues);
 		}
 
-
+		var privateEnough = registeredCoins.All(client => client.SmartCoin.AnonymitySet >= _wallet.AnonScoreTarget );
 		Dictionary<TxOut, PendingPayment> batchedPayments =
 			paymentsToBatch.ToDictionary(payment => new TxOut(payment.Value, payment.Destination.ScriptPubKey));
 
-		var decomposedOut = await GetTxOuts(outputValues, _wallet.DestinationProvider).ConfigureAwait(false);
+		var decomposedOut = await GetTxOuts(outputValues, _wallet.DestinationProvider, privateEnough).ConfigureAwait(false);
 
 		return (decomposedOut.Concat(batchedPayments.Keys), batchedPayments);
 	}
@@ -111,18 +114,19 @@ public class OutputProvider
 
 
 	internal static async Task<IEnumerable<TxOut>> GetTxOuts(IEnumerable<Output> outputValues,
-		IDestinationProvider destinationProvider)
+		IDestinationProvider destinationProvider, bool privateEnough)
 	{
 
 		var nonMixedOutputs = outputValues.Where(output => !BlockchainAnalyzer.StdDenoms.Contains(output.Amount));
 		var mixedOutputs = outputValues.Where(output => BlockchainAnalyzer.StdDenoms.Contains(output.Amount));
 
+
 		// Get as many destinations as outputs we need.
 		var destinations = (await destinationProvider
-			.GetNextDestinationsAsync(mixedOutputs.Count(), true).ConfigureAwait(false)).Zip(mixedOutputs,
+			.GetNextDestinationsAsync(mixedOutputs.Count(), true, privateEnough).ConfigureAwait(false)).Zip(mixedOutputs,
 			(destination, output) => new TxOut(output.Amount, destination));
 		var destinationsNonMixed =
-			(await destinationProvider.GetNextDestinationsAsync(nonMixedOutputs.Count(), false).ConfigureAwait(false))
+			(await destinationProvider.GetNextDestinationsAsync(nonMixedOutputs.Count(), false, privateEnough).ConfigureAwait(false))
 			.Zip(nonMixedOutputs, (destination, output) => new TxOut(output.Amount, destination));
 
 		var outputTxOuts = destinations.Concat(destinationsNonMixed);

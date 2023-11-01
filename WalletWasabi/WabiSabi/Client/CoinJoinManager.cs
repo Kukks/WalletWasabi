@@ -553,6 +553,7 @@ public class CoinJoinManager : BackgroundService
 			}
 		}
 
+		await wallet.CompletedCoinjoin(finishedCoinJoin).ConfigureAwait(false);
 		NotifyCoinJoinCompletion(finishedCoinJoin);
 
 		// When to stop mixing:

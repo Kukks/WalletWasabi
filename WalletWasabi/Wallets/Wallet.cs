@@ -136,6 +136,11 @@ public class Wallet : BackgroundService, IWallet
 		return true;
 	}
 
+	public async Task CompletedCoinjoin(CoinJoinTracker finishedCoinJoin)
+	{
+
+	}
+
 	public Task<IEnumerable<SmartCoin>> GetCoinjoinCoinCandidatesAsync() => Task.FromResult(GetCoinjoinCoinCandidates());
 
 	public IEnumerable<SmartCoin> GetCoinjoinCoinCandidates() => Coins;

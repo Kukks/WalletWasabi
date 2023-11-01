@@ -34,7 +34,7 @@ namespace WalletWasabi.WabiSabi.Client;
 public class CoinJoinClient
 {
 	private readonly IWallet _wallet;
-	private readonly string _coordinatorName;
+	public  readonly string CoordinatorName;
 
 	private static readonly Money MinimumOutputAmountSanity = Money.Coins(0.0001m); // ignore rounds with too big minimum denominations
 	private static readonly TimeSpan ExtraPhaseTimeoutMargin = TimeSpan.FromMinutes(2);
@@ -60,7 +60,7 @@ public class CoinJoinClient
 		string coordinatorName = "")
 	{
 		_wallet = wallet;
-		_coordinatorName = coordinatorName;
+		CoordinatorName = coordinatorName;
 		HttpClientFactory = httpClientFactory;
 		KeyChain = keyChain;
 		OutputProvider = outputProvider;
@@ -108,7 +108,7 @@ public class CoinJoinClient
 					&& roundState.CoinjoinState.Parameters.AllowedOutputAmounts.Min < MinimumOutputAmountSanity
 					&& roundState.Phase == Phase.InputRegistration
 					&& roundState.BlameOf == uint256.Zero
-					&& _wallet.IsRoundOk(roundState.CoinjoinState.Parameters, _coordinatorName)
+					&& _wallet.IsRoundOk(roundState.CoinjoinState.Parameters, CoordinatorName)
 					&& IsRoundEconomic(roundState.CoinjoinState.Parameters.MiningFeeRate)
 					&& roundState.Id != excludeRound,
 				linkedCts.Token)
@@ -180,7 +180,7 @@ public class CoinJoinClient
 
 				var liquidityClue = LiquidityClueProvider.GetLiquidityClue(roundParameters.MaxSuggestedAmount);
 				var utxoSelectionParameters =
-					UtxoSelectionParameters.FromRoundParameters(roundParameters, _coordinatorName);
+					UtxoSelectionParameters.FromRoundParameters(roundParameters, CoordinatorName);
 
 				if (CoinSelectionFunc is not null)
 				{
@@ -901,8 +901,7 @@ public class CoinJoinClient
 		var theirCoins = constructionState.Inputs.Where(x => !registeredCoins.Any(y => x.Outpoint == y.Outpoint));
 		var registeredCoinEffectiveValues = registeredAliceClients.Select(x => x.EffectiveValue);
 		var theirCoinEffectiveValues = theirCoins.Select(x => x.EffectiveValue(roundParameters.MiningFeeRate, roundParameters.CoordinationFeeRate));
-
-		var outputTxOuts = await OutputProvider.GetOutputs(roundParameters, registeredCoinEffectiveValues,
+		var outputTxOuts = await OutputProvider.GetOutputs(roundParameters, registeredAliceClients,
 			theirCoinEffectiveValues, (int) availableVsize).ConfigureAwait(false);
 
 		DependencyGraph dependencyGraph = DependencyGraph.ResolveCredentialDependencies(inputEffectiveValuesAndSizes, outputTxOuts.Item1, roundParameters.MiningFeeRate, roundParameters.MaxVsizeAllocationPerAlice);
@@ -999,7 +998,7 @@ public class CoinJoinClient
 				var smartTx = new SmartTransaction(unsignedCoinJoin.Transaction, new Height(HeightType.Unknown));
 				foreach (var smartCoin in ourCoins)
 				{
-					smartTx.TryAddWalletInput(smartCoin);
+					smartTx.TryAddWalletInput(SmartCoin.Clone(smartCoin));
 				}
 
 				var outputCoins = new List<SmartCoin>();

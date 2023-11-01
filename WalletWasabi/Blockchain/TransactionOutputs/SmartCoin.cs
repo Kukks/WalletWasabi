@@ -1,7 +1,10 @@
 using NBitcoin;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
+using Newtonsoft.Json;
 using WalletWasabi.Bases;
+using WalletWasabi.Blockchain.Analysis.Clustering;
 using WalletWasabi.Blockchain.Keys;
 using WalletWasabi.Blockchain.Transactions;
 using WalletWasabi.Extensions;
@@ -49,6 +52,12 @@ public class SmartCoin : NotifyPropertyChangedBase, IEquatable<SmartCoin>, IDest
 		HdPubKey = pubKey;
 
 		Transaction.TryAddWalletOutput(this);
+	}
+	public static SmartCoin Clone(SmartCoin smartCoin)
+	{
+var coin =  new SmartCoin(smartCoin.Transaction, smartCoin.Index,  new HdPubKey(smartCoin.HdPubKey.PubKey, smartCoin.HdPubKey.FullKeyPath, new LabelsArray(smartCoin.HdPubKey.Labels.ToArray()), smartCoin.HdPubKey.KeyState) );
+coin.HdPubKey.SetAnonymitySet(smartCoin.AnonymitySet);
+return coin;
 	}
 
 	public SmartTransaction Transaction { get; }

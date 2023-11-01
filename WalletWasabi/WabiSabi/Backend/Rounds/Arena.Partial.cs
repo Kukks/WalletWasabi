@@ -76,9 +76,9 @@ public partial class Arena : IWabiSabiApiRequestHandler
 			if (!comingFromCoinJoin)
 			{
 				// If the coin comes from a tx that all of the tx inputs are coming from a CJ (1 hop - no pay).
-				Transaction tx = await Rpc.GetRawTransactionAsync(coin.Outpoint.Hash, true, cancellationToken).ConfigureAwait(false);
+				Transaction tx = await Rpc.GetRawTransactionAsync(coin.Outpoint.Hash, false, cancellationToken).ConfigureAwait(false);
 
-				if (tx.Inputs.All(input => CoinJoinIdStore.Contains(input.PrevOut.Hash)))
+				if (tx?.Inputs.All(input => CoinJoinIdStore.Contains(input.PrevOut.Hash)) is true)
 				{
 					oneHop = true;
 				}

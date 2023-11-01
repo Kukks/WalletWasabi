@@ -42,6 +42,7 @@ public interface IWallet
 	}
 
 	bool IsRoundOk(RoundParameters coinjoinStateParameters, string coordinatorName);
+	Task CompletedCoinjoin(CoinJoinTracker finishedCoinJoin);
 }
 
 

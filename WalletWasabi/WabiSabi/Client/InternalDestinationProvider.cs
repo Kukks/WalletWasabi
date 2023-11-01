@@ -16,7 +16,7 @@ public class InternalDestinationProvider : IDestinationProvider
 
 	private KeyManager KeyManager { get; }
 
-	public Task<IEnumerable<IDestination>> GetNextDestinationsAsync(int count, bool mixedOutputs)
+	public Task<IEnumerable<IDestination>> GetNextDestinationsAsync(int count, bool mixedOutputs, bool privateEnough)
 	{
 		// Get all locked internal keys we have and assert we have enough.
 		KeyManager.AssertLockedInternalKeysIndexedAndPersist(count, false);
