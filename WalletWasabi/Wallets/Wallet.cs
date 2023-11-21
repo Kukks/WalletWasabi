@@ -89,6 +89,7 @@ public class Wallet : BackgroundService, IWallet
 
 	public CoinsRegistry Coins { get; private set; }
 
+	public int LowFeeTarget { get; }
 	public bool RedCoinIsolation => KeyManager.RedCoinIsolation;
 	public bool BatchPayments { get; } = false;
 	public long? MinimumDenominationAmount { get; }
@@ -111,7 +112,7 @@ public class Wallet : BackgroundService, IWallet
 	public IDestinationProvider DestinationProvider { get; }
 
 	public int AnonScoreTarget => KeyManager.AnonScoreTarget;
-	public bool ConsolidationMode => false;
+	public ConsolidationModeType ConsolidationMode => ConsolidationModeType.Never;
 
 	public bool IsMixable =>
 		State == WalletState.Started // Only running wallets
@@ -119,6 +120,7 @@ public class Wallet : BackgroundService, IWallet
 		&& Kitchen.HasIngredients;
 
 	public TimeSpan FeeRateMedianTimeFrame => TimeSpan.FromHours(KeyManager.FeeRateMedianTimeFrameHours);
+	public int ExplicitHighestFeeTarget { get; }
 
 	public bool IsUnderPlebStop => Coins.TotalAmount() <= KeyManager.PlebStopThreshold;
 

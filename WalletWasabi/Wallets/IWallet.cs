@@ -11,6 +11,14 @@ using WalletWasabi.WabiSabi.Client;
 
 namespace WalletWasabi.Wallets;
 
+public enum ConsolidationModeType
+{
+	Always,
+	Never,
+	WhenLowFee,
+	WhenLowFeeAndManyUTXO
+}
+
 public interface IWallet
 {
 	string WalletName { get; }
@@ -24,8 +32,11 @@ public interface IWallet
 
 	IDestinationProvider DestinationProvider { get; }
 	int AnonScoreTarget { get; }
-	bool ConsolidationMode { get; }
+	ConsolidationModeType ConsolidationMode { get; }
 	TimeSpan FeeRateMedianTimeFrame { get; }
+	int ExplicitHighestFeeTarget { get; }
+	int LowFeeTarget { get; }
+
 	bool RedCoinIsolation { get; }
 	bool BatchPayments { get; }
 	long? MinimumDenominationAmount { get; }

@@ -817,59 +817,63 @@ public class CoinJoinClient
 
 	public bool IsRoundEconomic(FeeRate roundFeeRate)
 	{
-		if (FeeRateMedianTimeFrame == default)
-		{
-			return true;
-		}
+		 if(_wallet.ExplicitHighestFeeTarget < roundFeeRate.SatoshiPerByte)
+		 {
+			 return false;
+		 }
+		 if (FeeRateMedianTimeFrame == default)
+		 {
+			 return true;
+		 }
 
-		if (RoundStatusUpdater.CoinJoinFeeRateMedians.TryGetValue(FeeRateMedianTimeFrame, out var medianFeeRate))
-		{
-			// 0.5 satoshi difference is allowable, to avoid rounding errors.
-			return roundFeeRate.SatoshiPerByte <= medianFeeRate.SatoshiPerByte + 0.5m;
-		}
-        // Find the nearest time frames before and after FeeRateMedianTimeFrame.
-        var nearestBefore = RoundStatusUpdater.CoinJoinFeeRateMedians.Keys
-            .Where(t => t <= FeeRateMedianTimeFrame)
-            .OrderByDescending(t => t)
-            .FirstOrDefault();
+		 if (RoundStatusUpdater.CoinJoinFeeRateMedians.TryGetValue(FeeRateMedianTimeFrame, out var medianFeeRate))
+		 {
+			 // 0.5 satoshi difference is allowable, to avoid rounding errors.
+			 return roundFeeRate.SatoshiPerByte <= medianFeeRate.SatoshiPerByte + 0.5m;
+		 }
+		 // Find the nearest time frames before and after FeeRateMedianTimeFrame.
+		 var nearestBefore = RoundStatusUpdater.CoinJoinFeeRateMedians.Keys
+			 .Where(t => t <= FeeRateMedianTimeFrame)
+			 .OrderByDescending(t => t)
+			 .FirstOrDefault();
 
-        var nearestAfter = RoundStatusUpdater.CoinJoinFeeRateMedians.Keys
-            .Where(t => t > FeeRateMedianTimeFrame)
-            .OrderBy(t => t)
-            .FirstOrDefault();
+		 var nearestAfter = RoundStatusUpdater.CoinJoinFeeRateMedians.Keys
+			 .Where(t => t > FeeRateMedianTimeFrame)
+			 .OrderBy(t => t)
+			 .FirstOrDefault();
 
-        decimal medianFeeRateSatoshiPerByte;
+		 decimal medianFeeRateSatoshiPerByte;
 
-        // If both nearestBefore and nearestAfter are found, interpolate the fee rate.
-        if (nearestBefore != default && nearestAfter != default)
-        {
-            var fraction = (decimal) (FeeRateMedianTimeFrame - nearestBefore).TotalMilliseconds /
-                           (decimal) (nearestAfter - nearestBefore).TotalMilliseconds;
+		 // If both nearestBefore and nearestAfter are found, interpolate the fee rate.
+		 if (nearestBefore != default && nearestAfter != default)
+		 {
+			 var fraction = (decimal) (FeeRateMedianTimeFrame - nearestBefore).TotalMilliseconds /
+			                (decimal) (nearestAfter - nearestBefore).TotalMilliseconds;
 
-            medianFeeRateSatoshiPerByte = RoundStatusUpdater.CoinJoinFeeRateMedians[nearestBefore].SatoshiPerByte +
-                                          fraction * (RoundStatusUpdater.CoinJoinFeeRateMedians[nearestAfter].SatoshiPerByte -
-                                                      RoundStatusUpdater.CoinJoinFeeRateMedians[nearestBefore].SatoshiPerByte);
-        }
-        // If only nearestBefore is found, use its fee rate.
-        else if (nearestBefore != default)
-        {
-            medianFeeRateSatoshiPerByte = RoundStatusUpdater.CoinJoinFeeRateMedians[nearestBefore].SatoshiPerByte;
-        }
-        // If only nearestAfter is found, use its fee rate.
-        else if (nearestAfter != default)
-        {
-            medianFeeRateSatoshiPerByte = RoundStatusUpdater.CoinJoinFeeRateMedians[nearestAfter].SatoshiPerByte;
-        }
-        // If neither is found, the dictionary is empty; return false or handle as needed.
-        else
-        {
-            // For example, you could return false:
-            return false;
-            // Or throw an exception, log an error, etc., depending on your needs.
-        }
+			 medianFeeRateSatoshiPerByte = RoundStatusUpdater.CoinJoinFeeRateMedians[nearestBefore].SatoshiPerByte +
+			                               fraction * (RoundStatusUpdater.CoinJoinFeeRateMedians[nearestAfter].SatoshiPerByte -
+			                                           RoundStatusUpdater.CoinJoinFeeRateMedians[nearestBefore].SatoshiPerByte);
+		 }
+		 // If only nearestBefore is found, use its fee rate.
+		 else if (nearestBefore != default)
+		 {
+			 medianFeeRateSatoshiPerByte = RoundStatusUpdater.CoinJoinFeeRateMedians[nearestBefore].SatoshiPerByte;
+		 }
+		 // If only nearestAfter is found, use its fee rate.
+		 else if (nearestAfter != default)
+		 {
+			 medianFeeRateSatoshiPerByte = RoundStatusUpdater.CoinJoinFeeRateMedians[nearestAfter].SatoshiPerByte;
+		 }
+		 // If neither is found, the dictionary is empty; return false or handle as needed.
+		 else
+		 {
+			 // For example, you could return false:
+			 return false;
+			 // Or throw an exception, log an error, etc., depending on your needs.
+		 }
 
-        // Compare roundFeeRate to the determined or interpolated median fee rate.
-        return roundFeeRate.SatoshiPerByte <= medianFeeRateSatoshiPerByte + 0.5m;
+		 // Compare roundFeeRate to the determined or interpolated median fee rate.
+		 return roundFeeRate.SatoshiPerByte <= medianFeeRateSatoshiPerByte + 0.5m;
     }
 
 	private async Task<(IEnumerable<TxOut> outputTxOuts, Dictionary<TxOut, PendingPayment> batchedPayments)> ProceedWithOutputRegistrationPhaseAsync(uint256 roundId, ImmutableArray<AliceClient> registeredAliceClients, CancellationToken cancellationToken)

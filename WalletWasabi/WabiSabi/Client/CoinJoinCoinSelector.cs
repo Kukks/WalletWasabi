@@ -43,7 +43,7 @@ public class CoinJoinCoinSelector
 
 	public static CoinJoinCoinSelector FromWallet(IWallet wallet) =>
 		new(
-			wallet.ConsolidationMode,
+			wallet.ConsolidationMode != ConsolidationModeType.Always,
 			wallet.AnonScoreTarget,
 			wallet.RedCoinIsolation ? Constants.SemiPrivateThreshold : 0);
 
