@@ -462,7 +462,7 @@ public class Wallet : BackgroundService, IWallet
 			lastHashesLeft = BitcoinStore.SmartHeaderChain.HashesLeft;
 			await PerformSynchronizationAsync(KeyManager.UseTurboSync ? SyncType.Turbo : SyncType.Complete, cancel).ConfigureAwait(false);
 		}
-
+		
 		// Request a synchronization once all filters were downloaded.
 		await PerformSynchronizationAsync(KeyManager.UseTurboSync ? SyncType.Turbo : SyncType.Complete, cancel).ConfigureAwait(false);
 	}
