@@ -22,7 +22,9 @@ namespace WalletWasabi.WabiSabi;
 
 public class WabiSabiCoordinator : BackgroundService
 {
-	public WabiSabiCoordinator(CoordinatorParameters parameters, IRPCClient rpc, ICoinJoinIdStore coinJoinIdStore, CoinJoinScriptStore coinJoinScriptStore, IHttpClientFactory httpClientFactory, CoinVerifier? coinVerifier = null)
+	public WabiSabiCoordinator(CoordinatorParameters parameters, IRPCClient rpc, ICoinJoinIdStore coinJoinIdStore,
+		CoinJoinScriptStore coinJoinScriptStore, IHttpClientFactory httpClientFactory,
+		WabiSabiConfig.CoordinatorScriptResolver coordinatorScriptResolver, CoinVerifier? coinVerifier = null)
 	{
 		Parameters = parameters;
 
@@ -47,6 +49,7 @@ public class WabiSabiCoordinator : BackgroundService
 			coinJoinIdStore,
 			roundParameterFactory,
 			httpClientFactory,
+			 coordinatorScriptResolver  ,
 			transactionArchiver,
 			coinJoinScriptStore,
 			coinVerifier);

@@ -53,6 +53,14 @@ public class AmountDecomposer
 			.Select(x => x.Key)
 			.ToArray();
 
+		if(preFilteredDenoms.Length == 0)
+		{
+			preFilteredDenoms = histogram
+				.OrderByDescending(x => x.Key.EffectiveCost)
+				.Select(x => x.Key)
+				.ToArray();
+		}
+
 		// Filter out denominations very close to each other.
 		// Heavy filtering on the top, little to no filtering on the bottom,
 		// because in smaller denom levels larger users are expected to participate,

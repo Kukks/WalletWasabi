@@ -85,6 +85,16 @@ public class Wallet : BackgroundService, IWallet
 	public KeyManager KeyManager { get; }
 	public WasabiSynchronizer Synchronizer { get; private set; }
 	public ServiceConfiguration ServiceConfiguration { get; private set; }
+
+
+
+	public void Log(LogLevel logLevel, string logMessage, string callerFilePath = "", string callerMemberName = "",
+		int callerLineNumber = -1)
+	{
+
+		Logger.Log(logLevel, $"Wallet ({WalletName}): {logMessage}", callerFilePath: callerFilePath, callerMemberName: callerMemberName, callerLineNumber: callerLineNumber);
+	}
+
 	public string WalletName => KeyManager.WalletName;
 
 	public CoinsRegistry Coins { get; private set; }

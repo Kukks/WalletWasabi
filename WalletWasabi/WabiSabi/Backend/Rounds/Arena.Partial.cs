@@ -264,11 +264,12 @@ public partial class Arena : IWabiSabiApiRequestHandler
 
 			var credentialAmount = -request.AmountCredentialRequests.Delta;
 
-			if (CoinJoinScriptStore?.Contains(request.Script) is true)
-			{
-				Logger.LogWarning($"Round ({request.RoundId}): Already registered script in previous coinjoins.");
-				throw new WabiSabiProtocolException(WabiSabiProtocolErrorCode.AlreadyRegisteredScript, $"Round ({request.RoundId}): Already registered script.");
-			}
+			//Since we have payments, we must allow the same script to be registered multiple times.
+			// if (CoinJoinScriptStore?.Contains(request.Script) is true)
+			// {
+			// 	Logger.LogWarning($"Round ({request.RoundId}): Already registered script in previous coinjoins.");
+			// 	throw new WabiSabiProtocolException(WabiSabiProtocolErrorCode.AlreadyRegisteredScript, $"Round ({request.RoundId}): Already registered script.");
+			// }
 
 			var outputScripts = Rounds
 				.Where(r => r.Id != round.Id && r.Phase != Phase.Ended)

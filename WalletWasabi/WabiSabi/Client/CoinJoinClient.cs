@@ -252,7 +252,7 @@ public class CoinJoinClient
 						// Only use successfully registered coins in the blame round.
 						CoinsToRegister = info.SignedCoins;
 
-						currentRoundState.LogInfo("Waiting for the blame round.");
+						currentRoundState.LogInfo(null, "Waiting for the blame round.");
 						currentRoundState = await WaitForBlameRoundAsync(currentRoundState.Id, cancellationToken)
 							.ConfigureAwait(false);
 						CurrentRoundId = currentRoundState.Id;
@@ -333,7 +333,7 @@ public class CoinJoinClient
 			}
 			catch (Exception ex)
 			{
-				roundState.Log(LogLevel.Warning, $"Waiting for the round to end failed with: '{ex}'.");
+				roundState.Log(null, LogLevel.Warning, $"Waiting for the round to end failed with: '{ex}'.");
 				throw new UnknownRoundEndingException(signedCoins, outputTxOuts.Select(o => o.ScriptPubKey).ToImmutableList(), ex);
 			}
 
@@ -381,7 +381,7 @@ public class CoinJoinClient
 				_ => throw new ArgumentOutOfRangeException(nameof(roundState))
 			};
 
-			roundState.LogInfo(msg);
+			roundState.LogInfo(null, msg);
 
 			// Coinjoin succeeded but wallet had no input in it.
 			if (signedCoins.IsEmpty && roundState.EndRoundState == EndRoundState.TransactionBroadcasted)
@@ -412,7 +412,7 @@ public class CoinJoinClient
 			catch (Exception ex)
 			{
 				// Make sure that to not generate UnobservedTaskException.
-				roundState.LogDebug(ex.Message);
+				roundState.LogDebug(null, ex.Message);
 			}
 
 			CoinJoinClientProgress.SafeInvoke(this, new LeavingCriticalPhase());
@@ -436,7 +436,7 @@ public class CoinJoinClient
 				throw new CoinJoinClientException(CoinjoinError.CoinsRejected, $"The coordinator rejected all {smartCoins.Count()} inputs.");
 			}
 
-			roundState.LogInfo($"Successfully registered {registeredAliceClientAndCircuits.Length} inputs.");
+			roundState.LogInfo(null, $"Successfully registered {registeredAliceClientAndCircuits.Length} inputs.");
 
 			var registeredAliceClients = registeredAliceClientAndCircuits.Select(x => x.AliceClient).ToImmutableArray();
 
@@ -520,7 +520,7 @@ public class CoinJoinClient
 				{
 					case WabiSabiProtocolErrorCode.RoundNotFound:
 						// if the round does not exist then it ended/aborted.
-						roundState.LogInfo($"{coin.Coin.Outpoint} arrived too late because the round doesn't exist anymore. Aborting input registrations: '{WabiSabiProtocolErrorCode.RoundNotFound}'.");
+						roundState.LogInfo(_wallet, $"{coin.Coin.Outpoint} arrived too late because the round doesn't exist anymore. Aborting input registrations: '{WabiSabiProtocolErrorCode.RoundNotFound}'.");
 						registrationsCts.Cancel();
 						confirmationsCts.Cancel();
 						break;
@@ -528,7 +528,7 @@ public class CoinJoinClient
 					case WabiSabiProtocolErrorCode.WrongPhase:
 						if (wpe.ExceptionData is WrongPhaseExceptionData wrongPhaseExceptionData)
 						{
-							roundState.LogInfo($"{coin.Coin.Outpoint} arrived too late. Aborting input registrations: '{WabiSabiProtocolErrorCode.WrongPhase}'.");
+							roundState.LogInfo(_wallet, $"{coin.Coin.Outpoint} arrived too late. Aborting input registrations: '{WabiSabiProtocolErrorCode.WrongPhase}'.");
 							if (wrongPhaseExceptionData.CurrentPhase != Phase.InputRegistration)
 							{
 								// Cancel all remaining pending input registrations because they will arrive late too.
@@ -549,36 +549,36 @@ public class CoinJoinClient
 						break;
 
 					case WabiSabiProtocolErrorCode.AliceAlreadyRegistered:
-						roundState.LogInfo($"{coin.Coin.Outpoint} was already registered.");
+						roundState.LogInfo(_wallet, $"{coin.Coin.Outpoint} was already registered.");
 						break;
 
 					case WabiSabiProtocolErrorCode.AliceAlreadyConfirmedConnection:
-						roundState.LogInfo($"{coin.Coin.Outpoint} already confirmed connection.");
+						roundState.LogInfo(_wallet, $"{coin.Coin.Outpoint} already confirmed connection.");
 						break;
 
 					case WabiSabiProtocolErrorCode.InputSpent:
 						coin.SpentAccordingToBackend = true;
-						roundState.LogInfo($"{coin.Coin.Outpoint} is spent according to the backend. The wallet is not fully synchronized or corrupted.");
+						roundState.LogInfo(_wallet, $"{coin.Coin.Outpoint} is spent according to the backend. The wallet is not fully synchronized or corrupted.");
 						break;
 
 					case WabiSabiProtocolErrorCode.InputBanned or WabiSabiProtocolErrorCode.InputLongBanned:
 						var inputBannedExData = wpe.ExceptionData as InputBannedExceptionData;
 						if (inputBannedExData is null)
 						{
-							Logger.LogError($"{nameof(InputBannedExceptionData)} is missing.");
+							_wallet.LogError($"{nameof(InputBannedExceptionData)} is missing.");
 						}
 						var bannedUntil = inputBannedExData?.BannedUntil ?? DateTimeOffset.UtcNow + TimeSpan.FromDays(1);
 						CoinJoinClientProgress.SafeInvoke(this, new CoinBanned(coin, bannedUntil));
-						roundState.LogInfo($"{coin.Coin.Outpoint} is banned until {bannedUntil}.");
+						roundState.LogInfo(_wallet, $"{coin.Coin.Outpoint} is banned until {bannedUntil}.");
 						break;
 
 					case WabiSabiProtocolErrorCode.InputNotWhitelisted:
 						coin.SpentAccordingToBackend = false;
-						Logger.LogWarning($"{coin.Coin.Outpoint} cannot be registered in the blame round.");
+						_wallet.LogWarning($"{coin.Coin.Outpoint} cannot be registered in the blame round.");
 						break;
 
 					default:
-						roundState.LogInfo($"{coin.Coin.Outpoint} cannot be registered: '{wpe.ErrorCode}'.");
+						roundState.LogInfo(_wallet, $"{coin.Coin.Outpoint} cannot be registered: '{wpe.ErrorCode}'.");
 						break;
 				}
 			}
@@ -625,7 +625,7 @@ public class CoinJoinClient
 		// Gets the list of scheduled dates/time in the remaining available time frame when each alice has to be registered.
 		var remainingTimeForRegistration = roundState.InputRegistrationEnd - DateTimeOffset.UtcNow;
 
-		roundState.LogDebug($"Inputs({smartCoins.Count()}) registration started - it will end in: {remainingTimeForRegistration:hh\\:mm\\:ss}.");
+		roundState.LogDebug(_wallet, $"Inputs({smartCoins.Count()}) registration started - it will end in: {remainingTimeForRegistration:hh\\:mm\\:ss}.");
 
 		// Decrease the available time, so the clients hurry up.
 		var safetyBuffer = TimeSpan.FromMinutes(1);
@@ -812,7 +812,7 @@ public class CoinJoinClient
 			$"\tTotal fee  : {totalNetworkFee.ToString(true, false)}"
 		};
 
-		roundState.LogDebug(string.Join(Environment.NewLine, summary));
+		roundState.LogDebug(_wallet,string.Join(Environment.NewLine, summary));
 	}
 
 	public bool IsRoundEconomic(FeeRate roundFeeRate)
@@ -916,15 +916,15 @@ public class CoinJoinClient
 		{
 			// Re-issuances.
 			var bobClient = CreateBobClient(roundState);
-			roundState.LogInfo("Starting reissuances.");
+			roundState.LogInfo(_wallet, "Starting reissuances.");
 			await scheduler.StartReissuancesAsync(registeredAliceClients, bobClient, combinedToken).ConfigureAwait(false);
 
 			// Output registration.
-			roundState.LogDebug($"Output registration started - it will end in: {outputRegistrationEndTime - DateTimeOffset.UtcNow:hh\\:mm\\:ss}.");
+			roundState.LogDebug(_wallet, $"Output registration started - it will end in: {outputRegistrationEndTime - DateTimeOffset.UtcNow:hh\\:mm\\:ss}.");
 
 			var outputRegistrationScheduledDates = GetScheduledDates(outputTxOuts.Item1.Count(),DateTimeOffset.UtcNow, outputRegistrationEndTime, MaximumRequestDelay);
 			var failedOutputs = await scheduler.StartOutputRegistrationsAsync(outputTxOuts.Item1, bobClient, KeyChain, outputRegistrationScheduledDates, combinedToken).ConfigureAwait(false);
-			roundState.LogInfo($"Outputs({failedOutputs.Count(pair => pair.Value is not null)}/{failedOutputs.Count}) were registered.");
+			roundState.LogInfo(_wallet, $"Outputs({failedOutputs.Count(pair => pair.Value is not null)}/{failedOutputs.Count}) were registered.");
 			if (failedOutputs.Any())
 			{
 				foreach (var pendingPayment in outputTxOuts.batchedPayments.Values)
@@ -935,14 +935,14 @@ public class CoinJoinClient
 		}
 		catch (Exception e)
 		{
-			roundState.LogInfo($"Failed to register outputs with message {e.Message}. Ignoring...");
-			roundState.LogDebug(e.ToString());
+			roundState.LogInfo(_wallet, $"Failed to register outputs with message {e.Message}. Ignoring...");
+			roundState.LogDebug(_wallet, e.ToString());
 		}
 
 		// ReadyToSign.
-		roundState.LogDebug($"ReadyToSign phase started - it will end in: {readyToSignEndTime - DateTimeOffset.UtcNow:hh\\:mm\\:ss}.");
+		roundState.LogDebug(_wallet, $"ReadyToSign phase started - it will end in: {readyToSignEndTime - DateTimeOffset.UtcNow:hh\\:mm\\:ss}.");
 		await ReadyToSignAsync(registeredAliceClients, readyToSignEndTime, combinedToken).ConfigureAwait(false);
-		roundState.LogDebug($"Alices({registeredAliceClients.Length}) are ready to sign.");
+		roundState.LogDebug(_wallet, $"Alices({registeredAliceClients.Length}) are ready to sign.");
 		return outputTxOuts;
 	}
 
@@ -962,7 +962,7 @@ public class CoinJoinClient
 		using CancellationTokenSource phaseTimeoutCts = new(remainingTime + ExtraPhaseTimeoutMargin);
 		using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, phaseTimeoutCts.Token);
 
-		roundState.LogDebug($"Transaction signing phase started - it will end in: {signingStateEndTime - DateTimeOffset.UtcNow:hh\\:mm\\:ss}.");
+		roundState.LogDebug(_wallet, $"Transaction signing phase started - it will end in: {signingStateEndTime - DateTimeOffset.UtcNow:hh\\:mm\\:ss}.");
 
 		var signingState = roundState.Assert<SigningState>();
 		var unsignedCoinJoin = signingState.CreateUnsignedTransactionWithPrecomputedData();
@@ -972,7 +972,7 @@ public class CoinJoinClient
 		if (unsignedCoinJoin.Transaction.Inputs.Count <= registeredAliceClients.Length)
 		{
 			//we're the only one in the coinjoin, fuck that.
-			roundState.LogInfo("We are the only ones in this coinjoin.");
+			roundState.LogInfo(_wallet, "We are the only ones in this coinjoin.");
 			abandonAndAllSubsequentBlames = true;
 		}else
 		{
@@ -986,7 +986,7 @@ public class CoinJoinClient
 				mustSignAllInputs = false;
 
 
-				roundState.LogInfo($"There are missing outputs. A subset of inputs will be signed.");
+				roundState.LogInfo(_wallet, $"There are missing outputs. A subset of inputs will be signed.");
 
 			}
 
@@ -1024,7 +1024,7 @@ public class CoinJoinClient
 					(outputTxOuts.batchedPayments.Any() && wavgOutAnon < wavgInAnon - CoinJoinCoinSelector.MaxWeightedAnonLoss) ||
 					wavgOutAnon < wavgInAnon)
 				{
-					roundState.LogInfo("We did not gain any anonymity, abandoning.");
+					roundState.LogInfo(_wallet, "We did not gain any anonymity, abandoning.");
 					mustSignAllInputs = false;
 				}
 			}
@@ -1040,7 +1040,7 @@ public class CoinJoinClient
 		var delayBeforeSigning = TimeSpan.FromSeconds(roundState.CoinjoinState.Parameters.DelayTransactionSigning ? 50 : 0);
 		var signingStateStartTime = DateTimeOffset.UtcNow + delayBeforeSigning;
 		await SignTransactionAsync(alicesToSign, unsignedCoinJoin, signingStateStartTime, signingStateEndTime, combinedToken).ConfigureAwait(false);
-		roundState.LogInfo($"{alicesToSign.Length} out of {registeredAliceClients.Length} Alices have signed the coinjoin tx.");
+		roundState.LogInfo(_wallet, $"{alicesToSign.Length} out of {registeredAliceClients.Length} Alices have signed the coinjoin tx.");
 
 		return (unsignedCoinJoin.Transaction, alicesToSign, abandonAndAllSubsequentBlames);
 	}

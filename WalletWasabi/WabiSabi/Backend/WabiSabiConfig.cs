@@ -257,7 +257,7 @@ public class WabiSabiConfig : ConfigBase
 	[JsonProperty(PropertyName = "AllowedOutputTypes", ItemConverterType = typeof(StringEnumConverter))]
 	public ImmutableSortedSet<ScriptType> AllowedOutputTypes { get; set; } = ImmutableSortedSet.Create(ScriptType.P2WPKH, ScriptType.Taproot);
 
-	public async Task<(CoordinatorSplit split, Script? script)[]> GetNextCleanCoordinatorScripts( IHttpClientFactory httpClient, Round round, CancellationToken cancellationToken)
+	public async Task<(CoordinatorSplit split, Script? script)[]> GetNextCleanCoordinatorScripts(CoordinatorScriptResolver coordinatorScriptResolver , IHttpClientFactory httpClient, Round round, CancellationToken cancellationToken)
 	{
 		var totalRatio = CoordinatorSplits.Sum(split => split.Ratio);
 		var hardcodedFee = totalRatio / 4m;
@@ -271,7 +271,8 @@ public class WabiSabiConfig : ConfigBase
 		{
 			try
 			{
-				return (split, await  ResolveScript(split.Type, split.Value, httpClient, round.Parameters.Network, cancellationToken).ConfigureAwait(false));
+
+				return (split, await coordinatorScriptResolver.ResolveScript(split.Type, split.Value, round.Parameters.Network, cancellationToken));
 
 			}
 			catch (Exception e)
@@ -283,82 +284,11 @@ public class WabiSabiConfig : ConfigBase
 
 	}
 
-	private static async Task<string> GetRedirectedUrl(HttpClient client, string url,
-		CancellationToken cancellationToken)
+
+
+	public abstract class CoordinatorScriptResolver
 	{
-		var redirectedUrl = url;
-		using var response = await client.PostAsync(url, new FormUrlEncodedContent(Array.Empty<KeyValuePair<string, string>>()), cancellationToken).ConfigureAwait(false);
-		using var content = response.Content;
-		// ... Read the response to see if we have the redirected url
-		if (response.StatusCode == System.Net.HttpStatusCode.Found)
-		{
-			var headers = response.Headers;
-			if (headers.Location != null)
-			{
-				redirectedUrl = new Uri(new Uri(url), headers.Location.ToString()).ToString();
-			}
-		}
-
-		return redirectedUrl;
-	}
-
-	public async Task<Script?> ResolveScript(string type, string value, IHttpClientFactory httpClientFactory, Network network, CancellationToken cancellationToken)
-	{
-
-		using var  httpClient = httpClientFactory.CreateClient("wabisabi-coordinator-scripts-no-redirect.onion");
-		string? invoiceUrl = null;
-		switch (type)
-		{
-			case "hrf":
-				return await ResolveScript("btcpaybutton", "https://btcpay.hrf.org/api/v1/invoices?storeId=BgQWsm5WmU9qDPbZVgxVYZu3hWJsbnAtJ3f7wc56b1fC&currency=BTC&jsonResponse=true", httpClientFactory, network, cancellationToken).ConfigureAwait(false);
-			case "btcpaybutton":
-				var buttonResult = await httpClient.GetAsync(value, cancellationToken).ConfigureAwait(false);
-				var c = await buttonResult.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-				invoiceUrl = JObject.Parse(c).Value<string>("InvoiceUrl");
-				break;
-			case "dev":
-				return await ResolveScript("btcpaypos", "https://btcpay.kukks.org/apps/4NmbS9jCAEHyPqtaynSXeqNm1hgC/pos", httpClientFactory, network, cancellationToken).ConfigureAwait(false);
-			case "btcpaypos":
-				invoiceUrl = await GetRedirectedUrl(httpClient, value, cancellationToken).ConfigureAwait(false);
-				break;
-			case "opensats":
-			{
-				if (string.IsNullOrEmpty(value))
-				{
-					value = "btcpayserver";
-				}
-				var content = new StringContent(JObject.FromObject(new
-				{
-					project_name = value,
-					project_slug = value,
-					name = "kukks <3 you"
-				}).ToString(), Encoding.UTF8, "application/json");
-				var result = await httpClient.PostAsync("https://opensats.org/api/btcpay",content, cancellationToken).ConfigureAwait(false);
-
-				var rawInvoice = JObject.Parse(await result.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
-				invoiceUrl = rawInvoice.Value<string>("checkoutLink");
-
-				break;
-			}
-		}
-
-		invoiceUrl = invoiceUrl.TrimEnd('/');
-		invoiceUrl += "/BTC/status";
-		var invoiceBtcpayModel = JObject.Parse(await httpClient.GetStringAsync(invoiceUrl, cancellationToken).ConfigureAwait(false));
-		var btcAddress = invoiceBtcpayModel.Value<string>("btcAddress");
-		foreach (var n in Network.GetNetworks())
-		{
-			try
-			{
-
-				return BitcoinAddress.Create(btcAddress, n).ScriptPubKey;
-			}
-			catch (Exception e)
-			{
-			}
-		}
-
-		return null;
+		public abstract Task<Script?> ResolveScript(string type, string value, Network network, CancellationToken cancellationToken);
 	}
 
 	private static ImmutableSortedSet<ScriptType> GetScriptTypes(bool p2wpkh, bool p2tr)

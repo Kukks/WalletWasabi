@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NBitcoin;
 using WalletWasabi.Blockchain.TransactionOutputs;
@@ -8,6 +10,7 @@ using WalletWasabi.Blockchain.Transactions;
 using WalletWasabi.Crypto.Randomness;
 using WalletWasabi.WabiSabi.Backend.Rounds;
 using WalletWasabi.WabiSabi.Client;
+using LogLevel = WalletWasabi.Logging.LogLevel;
 
 namespace WalletWasabi.Wallets;
 
@@ -21,6 +24,8 @@ public enum ConsolidationModeType
 
 public interface IWallet
 {
+	void Log(LogLevel logLevel, string logMessage, [CallerFilePath] string callerFilePath = "",
+		[CallerMemberName] string callerMemberName = "", [CallerLineNumber] int callerLineNumber = -1);
 	string WalletName { get; }
 	bool IsUnderPlebStop { get; }
 	bool IsMixable(string coordinator);
