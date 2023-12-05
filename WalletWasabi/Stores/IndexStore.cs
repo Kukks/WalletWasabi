@@ -43,12 +43,12 @@ public class IndexStore : IAsyncDisposable
 		{
 			IndexStorage = BlockFilterSqliteStorage.FromFile(dataSource: NewIndexFilePath, startingFilter: StartingFilters.GetStartingFilter(network));
 		}
-		catch (SqliteException ex) when (ex.SqliteExtendedErrorCode == 11) // 11 ~ SQLITE_CORRUPT error code
+		catch (SqliteException ex) when (ex.SqliteErrorCode == 11) // 11 ~ SQLITE_CORRUPT error code
 		{
 			Logger.LogError($"Failed to open SQLite storage file because it's corrupted. Deleting the storage file '{NewIndexFilePath}'.");
 
 			// The database file can still be in use, clear all pools to unlock the filter database file.
-			SqliteConnection.ClearAllPools();
+			// SqliteConnection.ClearAllPools();
 			File.Delete(NewIndexFilePath);
 			throw;
 		}
@@ -187,14 +187,14 @@ public class IndexStore : IAsyncDisposable
 		}
 		catch (OperationCanceledException)
 		{
-			SqliteConnection.ClearAllPools();
+			// SqliteConnection.ClearAllPools();
 			throw;
 		}
 		catch (Exception ex)
 		{
 			Logger.LogError(ex);
 
-			SqliteConnection.ClearAllPools();
+			// SqliteConnection.ClearAllPools();
 
 			// Do not run migration code again if it fails.
 			File.Delete(NewIndexFilePath);
