@@ -918,13 +918,11 @@ public class CoinJoinClient
 			var bobClient = CreateBobClient(roundState);
 			roundState.LogInfo(_wallet, "Starting reissuances.");
 			await scheduler.StartReissuancesAsync(registeredAliceClients, bobClient, combinedToken).ConfigureAwait(false);
-
 			// Output registration.
 			roundState.LogDebug(_wallet, $"Output registration started - it will end in: {outputRegistrationEndTime - DateTimeOffset.UtcNow:hh\\:mm\\:ss}.");
-
 			var outputRegistrationScheduledDates = GetScheduledDates(outputTxOuts.Item1.Count(),DateTimeOffset.UtcNow, outputRegistrationEndTime, MaximumRequestDelay);
 			var failedOutputs = await scheduler.StartOutputRegistrationsAsync(outputTxOuts.Item1, bobClient, KeyChain, outputRegistrationScheduledDates, combinedToken).ConfigureAwait(false);
-			roundState.LogInfo(_wallet, $"Outputs({failedOutputs.Count(pair => pair.Value is not null)}/{failedOutputs.Count}) were registered.");
+		roundState.LogInfo(_wallet, $"Outputs({outputTxOuts.Item1.Count()- failedOutputs?.Count??0}/ {outputTxOuts.Item1.Count()}) registered.");
 			if (failedOutputs.Any())
 			{
 				foreach (var pendingPayment in outputTxOuts.batchedPayments.Values)
