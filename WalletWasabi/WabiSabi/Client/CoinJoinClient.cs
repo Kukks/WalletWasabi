@@ -156,7 +156,7 @@ public class CoinJoinClient
 		private set;
 	}
 
-	public async Task<CoinJoinResult?> StartCoinJoinAsync(Func<Task<IEnumerable<SmartCoin>>> coinCandidatesFunc, CancellationToken cancellationToken)
+	public async Task<CoinJoinResult?> StartCoinJoinAsync(Func<Task<(IEnumerable<SmartCoin> Candidates, IEnumerable<SmartCoin> Ineligible)>> coinCandidatesFunc, CancellationToken cancellationToken)
 	{
 		await currentRoundStateLock.WaitAsync(cancellationToken).ConfigureAwait(false);
 		try
@@ -164,7 +164,7 @@ public class CoinJoinClient
 
 			uint256 excludeRound = uint256.Zero;
 			// ImmutableList<SmartCoin> coins;
-			IEnumerable<SmartCoin> coinCandidates;
+			(IEnumerable<SmartCoin> Candidates, IEnumerable<SmartCoin> Ineligible) coinCandidates;
 
 			RoundState? currentRoundState = null;
 			do
@@ -191,7 +191,7 @@ public class CoinJoinClient
 				else
 				{
 					CoinsToRegister =
-						CoinJoinCoinSelector.SelectCoinsForRound(coinCandidates, utxoSelectionParameters,
+						CoinJoinCoinSelector.SelectCoinsForRound(coinCandidates.Candidates, utxoSelectionParameters,
 							liquidityClue);
 				}
 
@@ -222,7 +222,7 @@ public class CoinJoinClient
 			if (CoinsToRegister.IsEmpty)
 			{
 				throw new CoinJoinClientException(CoinjoinError.NoCoinsEligibleToMix,
-					$"No coin was selected from '{coinCandidates.Count()}' number of coins. Probably it was not economical, total amount of coins were: {Money.Satoshis(coinCandidates.Sum(c => c.Amount))} BTC.");
+					$"No coin was selected from '{coinCandidates.Candidates}' number of eligible coins. Probably it was not economical, total amount of coins were: {Money.Satoshis(coinCandidates.Candidates.Sum(c => c.Amount))} BTC.");
 			}
 
 			// Keep going to blame round until there's none, so CJs won't be DDoS-ed.

@@ -178,7 +178,7 @@ public class CoinJoinManager : BackgroundService
 				return;
 			}
 
-			async Task<IEnumerable<SmartCoin>> SanityChecksAndGetCoinCandidatesFunc()
+			async Task<(IEnumerable<SmartCoin> Candidates, IEnumerable<SmartCoin> Ineligible)> SanityChecksAndGetCoinCandidatesFunc()
 			{
 				if (WalletsBlockedByUi.ContainsKey(walletToStart.WalletName))
 				{
@@ -208,7 +208,7 @@ public class CoinJoinManager : BackgroundService
 				var coinCandidates = await SelectCandidateCoinsAsync(walletToStart).ConfigureAwait(false);
 
 				// If there is no available coin candidates, then don't mix.
-				if (!coinCandidates.Any())
+				if (!coinCandidates.Candidates.Any())
 				{
 					throw new CoinJoinClientException(CoinjoinError.NoCoinsEligibleToMix, "No candidate coins available to mix.");
 				}
@@ -292,25 +292,25 @@ public class CoinJoinManager : BackgroundService
 
 		await WaitAndHandleResultOfTasksAsync(nameof(trackedAutoStarts), trackedAutoStarts.Values.Select(x => x.Task).ToArray()).ConfigureAwait(false);
 	}
-	private async Task<IEnumerable<SmartCoin>> SelectCandidateCoinsAsync(IWallet walletToStart)
+	private async Task<(IEnumerable<SmartCoin> Candidates, IEnumerable<SmartCoin> Ineligible)> SelectCandidateCoinsAsync(IWallet walletToStart)
 	{
-		var coinCandidates = new CoinsView(await walletToStart.GetCoinjoinCoinCandidatesAsync(CoordinatorName).ConfigureAwait(false))
+
+		var rawCcinCandidates = new CoinsView(await walletToStart.GetCoinjoinCoinCandidatesAsync(CoordinatorName).ConfigureAwait(false))
 			.Available()
-			.Confirmed()
 			.Where(x => !CoinRefrigerator.IsFrozen(x))
 			.ToArray();
 
 		// If there is no available coin candidates, then don't mix.
-		if (!coinCandidates.Any())
+		if (!rawCcinCandidates.Any())
 		{
 			throw new CoinJoinClientException(CoinjoinError.NoCoinsEligibleToMix, "No candidate coins available to mix.");
 		}
 
-		var bannedCoins = coinCandidates.Where(x => CoinPrison.TryGetOrRemoveBannedCoin(x, out _)).ToArray();
-		var unconfirmedCoins = coinCandidates.Where(x => !x.Confirmed).ToArray();
-		var excludedCoins = coinCandidates.Where(x => x.IsExcludedFromCoinJoin).ToArray();
+		var bannedCoins = rawCcinCandidates.Where(x => CoinPrison.TryGetOrRemoveBannedCoin(x, out _)).ToArray();
+		var unconfirmedCoins = rawCcinCandidates.Where(x => !x.Confirmed).ToArray();
+		var excludedCoins = rawCcinCandidates.Where(x => x.IsExcludedFromCoinJoin).ToArray();
 
-		coinCandidates = coinCandidates
+		var coinCandidates = rawCcinCandidates
 			.Except(bannedCoins)
 			.Except(unconfirmedCoins)
 			.Except(excludedCoins)
@@ -340,7 +340,7 @@ public class CoinJoinManager : BackgroundService
 			}
 		}
 
-		return coinCandidates;
+		return (coinCandidates, rawCcinCandidates.Except(coinCandidates));
 	}
 
 	private bool TryRemoveTrackedAutoStart(ConcurrentDictionary<IWallet, TrackedAutoStart> trackedAutoStarts, IWallet wallet)

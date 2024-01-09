@@ -64,6 +64,7 @@ public interface IWallet
 
 public interface IRoundCoinSelector
 {
-	Task<ImmutableList<SmartCoin>> SelectCoinsAsync(IEnumerable<SmartCoin> coinCandidates,
+	Task<ImmutableList<SmartCoin>> SelectCoinsAsync(
+		(IEnumerable<SmartCoin> Candidates, IEnumerable<SmartCoin> Ineligible) candidates,
 		UtxoSelectionParameters utxoSelectionParameters, Money liquidityClue, SecureRandom secureRandom);
 }
