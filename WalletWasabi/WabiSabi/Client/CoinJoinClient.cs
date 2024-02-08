@@ -184,9 +184,11 @@ public class CoinJoinClient
 
 				if (CoinSelectionFunc is not null)
 				{
-					CoinsToRegister = await CoinSelectionFunc.SelectCoinsAsync(coinCandidates, utxoSelectionParameters,
+					var x = await CoinSelectionFunc.SelectCoinsAsync(coinCandidates, utxoSelectionParameters,
 						liquidityClue,
 						SecureRandom).ConfigureAwait(false);
+					CoinsToRegister = x.selected;
+					Acceptor = x.acceptableSigned;
 				}
 				else
 				{
@@ -280,6 +282,8 @@ public class CoinJoinClient
 			currentRoundStateLock.Release();
 		}
 	}
+
+	public Func<IEnumerable<SmartCoin>, Task<bool>>? Acceptor { get; set; }
 
 	public async Task<CoinJoinResult> StartRoundAsync(IEnumerable<SmartCoin> smartCoins, RoundState roundState, CancellationToken cancellationToken)
 	{
@@ -433,7 +437,35 @@ public class CoinJoinClient
 			registeredAliceClientAndCircuits = await ProceedWithInputRegAndConfirmAsync(smartCoins, roundState, cancellationToken).ConfigureAwait(false);
 			if (!registeredAliceClientAndCircuits.Any())
 			{
-				throw new CoinJoinClientException(CoinjoinError.CoinsRejected, $"The coordinator rejected all {smartCoins.Count()} inputs.");
+				throw new CoinJoinClientException(CoinjoinError.CoinsRejected,
+					$"The coordinator rejected all {smartCoins.Count()} inputs.");
+			}
+			if(Acceptor is not null)
+			{
+				var accepted = await Acceptor(registeredAliceClientAndCircuits.Select(x => x.AliceClient.SmartCoin)).ConfigureAwait(false);
+				if (!accepted)
+				{
+					var safetyBuffer = TimeSpan.FromSeconds(10);
+					var scheduledDates = GetScheduledDates(smartCoins.Count(), roundState.InputRegistrationEnd - safetyBuffer);
+;
+
+					await Task.WhenAll(registeredAliceClientAndCircuits.Zip(
+							scheduledDates,
+							async (alice, date) =>
+							{
+								var delay = date - DateTimeOffset.UtcNow;
+								if (delay > TimeSpan.Zero)
+								{
+									await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+								}
+								await alice.AliceClient.TryToUnregisterAlicesAsync(cancellationToken).ConfigureAwait(false);
+							})
+						.ToImmutableArray()).ConfigureAwait(false);
+
+
+					throw new CoinJoinClientException(CoinjoinError.CoinsRejected,
+						$"The coordinator rejected too many inputs to make this round suitable");
+				}
 			}
 
 			roundState.LogInfo(null, $"Successfully registered {registeredAliceClientAndCircuits.Length} inputs.");
