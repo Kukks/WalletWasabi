@@ -140,6 +140,12 @@ public class Wallet : BackgroundService, IWallet
 
 	public bool IsWalletPrivate() => GetPrivacyPercentage() >= 100;
 
+	public async Task<IWallet.MixingReason[]> ShouldMix(string coordinatorName, bool? isLowFee = null,
+		bool? anyPayments = false)
+	{
+		return new[] { IWallet.MixingReason.PreliminaryMixConclusion };
+	}
+
 	public Task<IEnumerable<SmartCoin>> GetCoinjoinCoinCandidatesAsync(string coordinatorname) => Task.FromResult(GetCoinjoinCoinCandidates());
 
 	public Task<IEnumerable<SmartTransaction>> GetTransactionsAsync() => Task.FromResult(GetTransactions());

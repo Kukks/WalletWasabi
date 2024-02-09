@@ -198,9 +198,9 @@ public class CoinJoinManager : BackgroundService
 				}
 
 				// If all coins are already private, then don't mix.
-				if (await walletToStart.IsWalletPrivateAsync().ConfigureAwait(false))
+				if (!(await walletToStart.ShouldMix(CoordinatorName).ConfigureAwait(false)).Any())
 				{
-					walletToStart.LogTrace("All mixed!");
+					walletToStart.LogTrace("Instru");
 
 					throw new CoinJoinClientException(CoinjoinError.AllCoinsPrivate);
 				}

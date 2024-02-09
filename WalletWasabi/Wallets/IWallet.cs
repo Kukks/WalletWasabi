@@ -46,7 +46,17 @@ public interface IWallet
 	bool BatchPayments { get; }
 	long? MinimumDenominationAmount { get; }
 
-	Task<bool> IsWalletPrivateAsync();
+	public enum MixingReason
+	{
+		PreliminaryMixConclusion,
+		NotPrivate,
+		Payment,
+		ExtraJoin,
+		WalletForward,
+		Consolidation,
+	}
+
+	Task<MixingReason[]> ShouldMix(string coordinatorName, bool? isLowFee = null, bool? anyPayments = null);
 
 	Task<IEnumerable<SmartCoin>> GetCoinjoinCoinCandidatesAsync(string coordinatorname);
 
