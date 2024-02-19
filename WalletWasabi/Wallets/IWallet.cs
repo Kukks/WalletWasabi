@@ -10,6 +10,8 @@ using WalletWasabi.Blockchain.Transactions;
 using WalletWasabi.Crypto.Randomness;
 using WalletWasabi.WabiSabi.Backend.Rounds;
 using WalletWasabi.WabiSabi.Client;
+using WalletWasabi.WabiSabi.Models;
+using WalletWasabi.WabiSabi.Models.MultipartyTransaction;
 using LogLevel = WalletWasabi.Logging.LogLevel;
 
 namespace WalletWasabi.Wallets;
@@ -71,10 +73,9 @@ public interface IWallet
 	Task CompletedCoinjoin(CoinJoinTracker finishedCoinJoin);
 }
 
-
 public interface IRoundCoinSelector
 {
-	Task<(ImmutableList<SmartCoin> selected, Func<IEnumerable<SmartCoin>, Task<bool>> acceptableSigned)>
+	Task<(ImmutableList<SmartCoin> selected, Func<IEnumerable<AliceClient>, Task<bool>> acceptableRegistered, Func<ImmutableArray<AliceClient>, (IEnumerable<TxOut> outputTxOuts, Dictionary<TxOut, PendingPayment> batchedPayments), TransactionWithPrecomputedData, RoundState, Task<bool>> acceptableOutputs)>
 		SelectCoinsAsync((IEnumerable<SmartCoin> Candidates, IEnumerable<SmartCoin> Ineligible) candidates,
 			UtxoSelectionParameters utxoSelectionParameters, Money liquidityClue, SecureRandom secureRandom);
 }

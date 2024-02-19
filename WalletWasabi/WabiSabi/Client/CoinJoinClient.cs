@@ -188,7 +188,8 @@ public class CoinJoinClient
 						liquidityClue,
 						SecureRandom).ConfigureAwait(false);
 					CoinsToRegister = x.selected;
-					Acceptor = x.acceptableSigned;
+					Acceptor = x.acceptableRegistered;
+					OutputAcceptor = x.acceptableOutputs;
 				}
 				else
 				{
@@ -283,7 +284,9 @@ public class CoinJoinClient
 		}
 	}
 
-	public Func<IEnumerable<SmartCoin>, Task<bool>>? Acceptor { get; set; }
+	public Func<IEnumerable<AliceClient>, Task<bool>> Acceptor { get; set; }
+	public Func<ImmutableArray<AliceClient>, (IEnumerable<TxOut> outputTxOuts, Dictionary<TxOut, PendingPayment> batchedPayments), TransactionWithPrecomputedData, RoundState, Task<bool>>? OutputAcceptor;
+
 
 	public async Task<CoinJoinResult> StartRoundAsync(IEnumerable<SmartCoin> smartCoins, RoundState roundState, CancellationToken cancellationToken)
 	{
@@ -442,7 +445,7 @@ public class CoinJoinClient
 			}
 			if(Acceptor is not null)
 			{
-				var accepted = await Acceptor(registeredAliceClientAndCircuits.Select(x => x.AliceClient.SmartCoin)).ConfigureAwait(false);
+				var accepted = await Acceptor(registeredAliceClientAndCircuits.Select(x => x.AliceClient)).ConfigureAwait(false);
 				if (!accepted)
 				{
 					var safetyBuffer = TimeSpan.FromSeconds(10);
@@ -1015,51 +1018,14 @@ public class CoinJoinClient
 			{
 				mustSignAllInputs = false;
 
-
 				roundState.LogInfo(_wallet, $"There are missing outputs. A subset of inputs will be signed.");
 
 			}
-
-			else
+			else if(OutputAcceptor is not null)
 			{
-
-				var ourCoins = registeredAliceClients.Select(client => client.SmartCoin);
-				var ourOutputsThatAreNotPayments = outputTxOuts.outputTxOuts.ToList();
-				foreach (var batchedPayment in outputTxOuts.batchedPayments)
-				{
-					ourOutputsThatAreNotPayments.Remove(ourOutputsThatAreNotPayments.First(@out => @out.ScriptPubKey == batchedPayment.Key.ScriptPubKey && @out.Value == batchedPayment.Key.Value));
-				}
-				var smartTx = new SmartTransaction(unsignedCoinJoin.Transaction, new Height(HeightType.Unknown));
-				foreach (var smartCoin in ourCoins)
-				{
-					smartTx.TryAddWalletInput(SmartCoin.Clone(smartCoin));
-				}
-
-				var outputCoins = new List<SmartCoin>();
-				var matchedIndexes = new List<uint>();
-				foreach (var txOut in ourOutputsThatAreNotPayments)
-				{
-					var index = unsignedCoinJoin.Transaction.Outputs.AsIndexedOutputs().First(@out => !matchedIndexes.Contains(@out.N) && @out.TxOut.ScriptPubKey == txOut.ScriptPubKey && @out.TxOut.Value == txOut.Value).N;
-					matchedIndexes.Add(index);
-					var coin = new SmartCoin(smartTx,  index, new HdPubKey(new Key().PubKey, new KeyPath(0,0,0,0,0,0), LabelsArray.Empty, KeyState.Clean));
-					smartTx.TryAddWalletOutput(coin);
-					outputCoins.Add(coin);
-				}
-
-				BlockchainAnalyzer.Analyze(smartTx);
-				var wavgInAnon = CoinjoinAnalyzer.WeightedAverage.Invoke(ourCoins.Select(coin => new CoinjoinAnalyzer.AmountWithAnonymity(coin.AnonymitySet, new Money(coin.Amount, MoneyUnit.BTC))));
-				var wavgOutAnon = CoinjoinAnalyzer.WeightedAverage.Invoke(outputCoins.Select(coin => new CoinjoinAnalyzer.AmountWithAnonymity(coin.AnonymitySet, new Money(coin.Amount, MoneyUnit.BTC))));
-				// If we had any batched payments, allow a loss of CoinJoinCoinSelector.MaxWeightedAnonLoss, else if there was any loss/no gain, do not sign all inputs
-				if (
-					(outputTxOuts.batchedPayments.Any() && wavgOutAnon < wavgInAnon - CoinJoinCoinSelector.MaxWeightedAnonLoss) ||
-					wavgOutAnon < wavgInAnon)
-				{
-					roundState.LogInfo(_wallet, "We did not gain any anonymity, abandoning.");
-					mustSignAllInputs = false;
-				}
+				mustSignAllInputs = await OutputAcceptor.Invoke(registeredAliceClients, outputTxOuts, unsignedCoinJoin, roundState).ConfigureAwait(false);
 			}
 		}
-
 
 		// Send signature.
 		var combinedToken = linkedCts.Token;
@@ -1074,7 +1040,6 @@ public class CoinJoinClient
 
 		return (unsignedCoinJoin.Transaction, alicesToSign, abandonAndAllSubsequentBlames);
 	}
-	private static BlockchainAnalyzer BlockchainAnalyzer { get; } = new();
 
 	private async Task<ImmutableArray<(AliceClient, PersonCircuit)>> ProceedWithInputRegAndConfirmAsync(IEnumerable<SmartCoin> smartCoins, RoundState roundState, CancellationToken cancellationToken)
 	{
