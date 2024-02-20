@@ -318,9 +318,9 @@ public class CoinJoinManager : BackgroundService
 
 		if (!coinCandidates.Any())
 		{
-			var anyNonPrivateUnconfirmed = unconfirmedCoins.Any(x => !x.IsPrivate(walletToStart.AnonScoreTarget));
-			var anyNonPrivateBanned = bannedCoins.Any(x => !x.IsPrivate(walletToStart.AnonScoreTarget));
-			var anyNonPrivateExcluded = excludedCoins.Any(x => !x.IsPrivate(walletToStart.AnonScoreTarget));
+			var anyNonPrivateUnconfirmed = unconfirmedCoins.Any(x => !x.IsPrivate(walletToStart));
+			var anyNonPrivateBanned = bannedCoins.Any(x => !x.IsPrivate(walletToStart));
+			var anyNonPrivateExcluded = excludedCoins.Any(x => !x.IsPrivate(walletToStart));
 
 			var errorMessage = $"Coin candidates are empty! {nameof(anyNonPrivateUnconfirmed)}:{anyNonPrivateUnconfirmed} {nameof(anyNonPrivateBanned)}:{anyNonPrivateBanned} {nameof(anyNonPrivateExcluded)}:{anyNonPrivateExcluded}";
 

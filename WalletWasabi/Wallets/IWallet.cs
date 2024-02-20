@@ -43,7 +43,7 @@ public interface IWallet
 	TimeSpan FeeRateMedianTimeFrame { get; }
 	int ExplicitHighestFeeTarget { get; }
 	int LowFeeTarget { get; }
-
+bool ConsiderEntryProximity { get; }
 	bool RedCoinIsolation { get; }
 	bool BatchPayments { get; }
 	long? MinimumDenominationAmount { get; }

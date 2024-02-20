@@ -69,10 +69,10 @@ public class CoinJoinCoinSelector
 		}
 
 		var privateCoins = filteredCoins
-			.Where(x => x.IsPrivate(AnonScoreTarget))
+			.Where(x => x.IsPrivate(null))
 			.ToArray();
 		var semiPrivateCoins = filteredCoins
-			.Where(x => x.IsSemiPrivate(AnonScoreTarget, SemiPrivateThreshold))
+			.Where(x => x.IsSemiPrivate(null, SemiPrivateThreshold))
 			.ToArray();
 
 		// redCoins will only fill up if redCoinIsolation is turned on. Otherwise the coin will be in semiPrivateCoins.

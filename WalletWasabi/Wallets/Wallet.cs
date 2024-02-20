@@ -100,6 +100,9 @@ public class Wallet : BackgroundService, IWallet
 	public CoinsRegistry Coins { get; private set; }
 
 	public int LowFeeTarget { get; }
+
+	public bool ConsiderEntryProximity => true;
+
 	public bool RedCoinIsolation => KeyManager.RedCoinIsolation;
 	public bool BatchPayments { get; } = false;
 	public long? MinimumDenominationAmount { get; }
@@ -213,7 +216,7 @@ public class Wallet : BackgroundService, IWallet
 
 	public int GetPrivacyPercentage()
 	{
-		var currentPrivacyScore = Coins.Sum(x => x.Amount.Satoshi * Math.Min(x.HdPubKey.AnonymitySet - 1, x.IsPrivate(AnonScoreTarget) ? AnonScoreTarget - 1 : AnonScoreTarget - 2));
+		var currentPrivacyScore = Coins.Sum(x => x.Amount.Satoshi * Math.Min(x.HdPubKey.AnonymitySet - 1, x.IsPrivate(this) ? AnonScoreTarget - 1 : AnonScoreTarget - 2));
 		var maxPrivacyScore = Coins.TotalAmount().Satoshi * (AnonScoreTarget - 1);
 		int pcPrivate = maxPrivacyScore == 0M ? 100 : (int)(currentPrivacyScore * 100 / maxPrivacyScore);
 
@@ -468,7 +471,7 @@ public class Wallet : BackgroundService, IWallet
 			lastHashesLeft = BitcoinStore.SmartHeaderChain.HashesLeft;
 			await PerformSynchronizationAsync(KeyManager.UseTurboSync ? SyncType.Turbo : SyncType.Complete, cancel).ConfigureAwait(false);
 		}
-		
+
 		// Request a synchronization once all filters were downloaded.
 		await PerformSynchronizationAsync(KeyManager.UseTurboSync ? SyncType.Turbo : SyncType.Complete, cancel).ConfigureAwait(false);
 	}
