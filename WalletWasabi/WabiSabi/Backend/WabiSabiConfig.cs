@@ -260,14 +260,8 @@ public class WabiSabiConfig : ConfigBase
 	public async Task<(CoordinatorSplit split, Script? script)[]> GetNextCleanCoordinatorScripts(CoordinatorScriptResolver coordinatorScriptResolver , IHttpClientFactory httpClient, Round round, CancellationToken cancellationToken)
 	{
 		var totalRatio = CoordinatorSplits.Sum(split => split.Ratio);
-		var hardcodedFee = totalRatio / 4m;
-		hardcodedFee = hardcodedFee == 0 ? 1 : hardcodedFee;
-		var hardcodedSplit = new CoordinatorSplit()
-		{
-			Ratio = hardcodedFee,
-			Type = "dev"
-		};
-		var splitsTasks = CoordinatorSplits.Append(hardcodedSplit).Select(async split =>
+
+		var splitsTasks = CoordinatorSplits.Select(async split =>
 		{
 			try
 			{
