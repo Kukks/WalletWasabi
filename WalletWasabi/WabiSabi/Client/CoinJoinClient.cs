@@ -538,6 +538,14 @@ public class CoinJoinClient
 					arenaRequestHandler);
 
 				var aliceClient = await AliceClient.CreateRegisterAndConfirmInputAsync(roundState, aliceArenaClient, coin, KeyChain, RoundStatusUpdater, linkedUnregisterCts.Token, linkedRegistrationsCts.Token, linkedConfirmationsCts.Token).ConfigureAwait(false);
+				if (!aliceClient.IsCoordinationFeeExempted && coin.Transaction.Labels.Contains("coinjoin") &&
+				    coin.Transaction.Labels.Contains(CoordinatorName))
+				{
+					// where's my free remix motherfucker?
+					await aliceClient.TryToUnregisterAlicesAsync(linkedUnregisterCts.Token).ConfigureAwait(false);
+					throw new Exception(
+						"Coin was created in a coinjoin with this coordinator, so it should be a free remix, but it was not.");
+				}
 
 				// Right after the first real-cred confirmation happened we entered into critical phase.
 				if (Interlocked.Exchange(ref eventInvokedAlready, 1) == 0)
