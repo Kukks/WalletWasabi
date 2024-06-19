@@ -623,7 +623,8 @@ public partial class Arena : PeriodicRunner
 		var now = DateTimeOffset.UtcNow;
 		foreach (var round in Rounds.Where(x => !x.IsInputRegistrationEnded(x.Parameters.MaxInputCountByRound)).ToArray())
 		{
-			var alicesToRemove = round.Alices.Where(x => x.Deadline < now && !x.ConfirmedConnection).ToArray();
+
+		var alicesToRemove = round.Alices.Where(x => x.Deadline < now && !x.ConfirmedConnection).ToArray();
 			foreach (var alice in alicesToRemove)
 			{
 				round.Alices.Remove(alice);
@@ -720,7 +721,7 @@ public partial class Arena : PeriodicRunner
 		{
 			if (result.Count == 1)
 			{
-				return Array.Empty<TxOut>();
+				return [];
 			}
 			result.RemoveAll(@out => invalid(@out));
 			satsPerShare = left / totalRatio;
@@ -739,10 +740,10 @@ public partial class Arena : PeriodicRunner
 
 		if (collectedCoordinationFee == 0)
 		{
-			round.FeeTxOuts = Array.Empty<TxOut>();
+			round.FeeTxOuts = [];
 			round.LogInfo(null,$"Coordination fee wasn't taken, because it was free for everyone. Hurray!");
 		}
-		else
+		if(Config.CoordinatorSplits.Any())
 		{
 			var splits = await Config.GetNextCleanCoordinatorScripts(_coordinatorScriptResolver,_httpClientFactory, round, cancellationToken).ConfigureAwait(false);
 			var splitsVSize = splits.Sum(tuple =>
@@ -750,11 +751,20 @@ public partial class Arena : PeriodicRunner
 					? 0
 					: new TxOut(Money.Zero, tuple.Item2).GetSerializedSize());
 			var coinjoinVSize = coinjoin.EstimatedVsize + splitsVSize;
-			var expectedCost = coinjoin.Parameters.MiningFeeRate.GetFee(coinjoinVSize- coinjoin.UnpaidSharedOverhead)!;
+			var expectedCost = coinjoin.Parameters.MiningFeeRate.GetFee(coinjoinVSize)!;
 			var coordinationFee = coinjoin.Balance - expectedCost;
-			var txOuts = ComputeSplitAmounts(coordinationFee, splits, round);
-			coinjoin = txOuts.Aggregate(coinjoin, (current, txOut) => current.AddOutput(txOut));
-			round.FeeTxOuts = txOuts;
+			if (coordinationFee > 0)
+			{
+				round.LogInfo(null,$"Coordination fee was originally {Money.Satoshis(collectedCoordinationFee).ToDecimal(MoneyUnit.BTC)}, " +
+				                   $"but we're now at {coordinationFee.ToDecimal(MoneyUnit.BTC)} after computing advertised feerate and splitting it among the coordinator scripts.");
+				var txOuts = ComputeSplitAmounts(coordinationFee, splits, round);
+				coinjoin = txOuts.Aggregate(coinjoin, (current, txOut) => current.AddOutput(txOut)).AsPayingForSharedOverhead();
+				round.FeeTxOuts = txOuts;
+			}
+			if(coinjoin.EffectiveFeeRate > coinjoin.Parameters.MiningFeeRate)
+			{
+				round.LogWarning(null,$"Effective fee rate is higher than the advertised fee rate. Effective: {coinjoin.EffectiveFeeRate.SatoshiPerByte}, Advertised: {coinjoin.Parameters.MiningFeeRate.SatoshiPerByte}");
+			}
 		}
 
 		return coinjoin;
