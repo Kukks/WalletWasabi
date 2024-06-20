@@ -566,7 +566,7 @@ public partial class Arena : PeriodicRunner
 
 			var r = new Round(parameters, SecureRandom.Instance);
 			AddRound(r);
-			r.LogInfo(null,$"Created round with parameters: {nameof(r.Parameters.MaxSuggestedAmount)}:'{r.Parameters.MaxSuggestedAmount}' BTC.");
+			r.LogInfo(null,$"Created round with parameters: {r.Parameters.MiningFeeRate} mining fee, {r.Parameters.MinInputCountByRound} min inputs, {r.Parameters.CalculateMinReasonableOutputAmount()}BTC min output amount.");
 		}
 	}
 
