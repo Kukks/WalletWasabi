@@ -3,75 +3,88 @@ using System.Collections.ObjectModel;
 using System.Reactive.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
-using Avalonia;
-using NBitcoin;
 using ReactiveUI;
-using WalletWasabi.Blockchain.Analysis.Clustering;
-using WalletWasabi.Blockchain.Transactions;
 using WalletWasabi.Fluent.Extensions;
-using WalletWasabi.Fluent.Helpers;
+using WalletWasabi.Fluent.Models.UI;
+using WalletWasabi.Fluent.Models.Wallets;
+using WalletWasabi.Fluent.TreeDataGrid;
 
 namespace WalletWasabi.Fluent.ViewModels.Wallets.Home.History.HistoryItems;
 
-public abstract partial class HistoryItemViewModelBase : ViewModelBase
+public abstract partial class HistoryItemViewModelBase : ViewModelBase, ITreeDataGridExpanderItem
 {
 	[AutoNotify] private bool _isFlashing;
-	[AutoNotify] private int _orderIndex;
-	[AutoNotify] private DateTimeOffset _date;
-	[AutoNotify] private string _dateString = "";
-	[AutoNotify] private bool _isConfirmed;
 	[AutoNotify] private bool _isExpanded;
-	[AutoNotify] private string _confirmedToolTip;
-	private ObservableCollection<HistoryItemViewModelBase>? _children;
+	[AutoNotify] private bool _isPointerOver;
+	[AutoNotify] private bool _isParentPointerOver;
+	[AutoNotify] private bool _isSelected;
+	[AutoNotify] private bool _isParentSelected;
 
-	protected HistoryItemViewModelBase(int orderIndex, TransactionSummary transactionSummary)
+	protected HistoryItemViewModelBase(TransactionModel transaction)
 	{
-		OrderIndex = orderIndex;
-		TransactionSummary = transactionSummary;
-		Id = transactionSummary.GetHash();
-
-		_confirmedToolTip = GetConfirmedToolTip(transactionSummary.GetConfirmations());
-
-		_isConfirmed = transactionSummary.IsConfirmed();
-
-		ClipboardCopyCommand = ReactiveCommand.CreateFromTask<string>(CopyToClipboardAsync);
+		Transaction = transaction;
+		IsChild = transaction.IsChild;
+		ClipboardCopyCommand = ReactiveCommand.CreateFromTask<string>(text => UiContext.Clipboard.SetTextAsync(text));
 
 		this.WhenAnyValue(x => x.IsFlashing)
 			.Where(x => x)
 			.SubscribeAsync(async _ =>
 			{
-				await Task.Delay(1260);
+				await Task.Delay(1800);
 				IsFlashing = false;
 			});
 
-		IsCancellation = false;
-		IsSpeedUp = false;
+		this.WhenAnyValue(x => x.IsPointerOver)
+			.Do(x =>
+			{
+				foreach (var child in Children)
+				{
+					child.IsParentPointerOver = x;
+				}
+			})
+			.Subscribe();
+
+		this.WhenAnyValue(x => x.IsSelected)
+			.Do(x =>
+			{
+				foreach (var child in Children)
+				{
+					child.IsParentSelected = x;
+				}
+			})
+			.Subscribe();
 	}
 
-	protected string GetConfirmedToolTip(int confirmations)
+	protected HistoryItemViewModelBase(UiContext uiContext, TransactionModel transaction) : this(transaction)
 	{
-		return $"Confirmed ({confirmations} confirmation{TextHelpers.AddSIfPlural(confirmations)})";
+		UiContext = uiContext;
 	}
 
-	public uint256 Id { get; }
+	/// <summary>
+	/// Proxy property to prevent stack overflow due to internal bug in Avalonia where the OneWayToSource Binding
+	/// is replaced by a TwoWay one.when
+	/// </summary>
+	public bool IsPointerOverProxy
+	{
+		get => IsPointerOver;
+		set => IsPointerOver = value;
+	}
 
-	public LabelsArray Labels { get; init; }
+	public bool IsSelectedProxy
+	{
+		get => IsSelected;
+		set => IsSelected = value;
+	}
 
-	public bool IsCoinJoin { get; protected set; }
+	public TransactionModel Transaction { get; }
 
-	public bool IsCoinJoinGroup { get; protected set; }
-
-	public IReadOnlyList<HistoryItemViewModelBase> Children => _children ??= LoadChildren();
-
-	public Money? Balance { get; protected set; }
-
-	public Money? OutgoingAmount { get; protected set; }
-
-	public Money? IncomingAmount { get; protected set; }
-
-	public ICommand? ShowDetailsCommand { get; protected set; }
+	public ObservableCollection<HistoryItemViewModelBase> Children { get; } = new();
 
 	public bool IsChild { get; set; }
+
+	public bool IsLastChild { get; set; }
+
+	public ICommand? ShowDetailsCommand { get; protected set; }
 
 	public ICommand? ClipboardCopyCommand { get; protected set; }
 
@@ -79,65 +92,7 @@ public abstract partial class HistoryItemViewModelBase : ViewModelBase
 
 	public ICommand? CancelTransactionCommand { get; protected set; }
 
-	public bool IsCancellation { get; set; }
-
-	public bool IsSpeedUp { get; set; }
-
-	public bool IsCPFP { get; set; }
-
-	public bool IsCPFPd { get; set; }
-
-	public bool IsIncomingTransactionDisplayed => !IsCPFP && IncomingAmount is { } amount && amount > Money.Zero && !IsCoinJoin;
-
-	public bool IsOutgoingTransactionDisplayed => !IsCPFP && OutgoingAmount is { } amount && amount > Money.Zero && !IsCoinJoin;
-
-	public bool IsSelfTransferTransaction => OutgoingAmount == Money.Zero;
-
-	public bool IsConfirmedDisplayed => IsConfirmed;
-
-	public bool IsPendingDisplayed => !IsConfirmed && !IsSpeedUp;
-
-	public bool IsCoinjoinDisplayed => IsCoinJoin && !IsCoinJoinGroup;
-
-	public bool IsCoinjoinGroupDisplayed => IsCoinJoin && IsCoinJoinGroup;
-
-	public bool IsCancellationDisplayed => IsCancellation;
-
-	/// <remarks>
-	/// CPFPd transactions are not SpeedUp transactions, but they are sped up as well.
-	/// </remarks>
-	public bool IsSpeedUpDisplayed => !IsConfirmed && (IsSpeedUp || IsCPFPd);
-
-	public bool IsCPFPDisplayed => IsCPFP;
-
-	public TransactionSummary TransactionSummary { get; }
-
-	private async Task CopyToClipboardAsync(string text)
-	{
-		if (Application.Current is { Clipboard: { } clipboard })
-		{
-			await clipboard.SetTextAsync(text);
-		}
-	}
-
-	protected virtual ObservableCollection<HistoryItemViewModelBase> LoadChildren()
-	{
-		throw new NotSupportedException();
-	}
-
-	protected void SetAmount(Money amount, Money? fee)
-	{
-		if (amount < Money.Zero)
-		{
-			OutgoingAmount = -amount - (fee ?? Money.Zero);
-		}
-		else
-		{
-			IncomingAmount = amount;
-		}
-	}
-
-	public virtual bool HasChildren() => false;
+	public bool HasChildren() => Children.Count > 0;
 
 	public static Comparison<HistoryItemViewModelBase?> SortAscending<T>(Func<HistoryItemViewModelBase, T> selector, IComparer<T>? comparer = null)
 	{
@@ -171,7 +126,7 @@ public abstract partial class HistoryItemViewModelBase : ViewModelBase
 			}
 
 			// Confirmation comparison must be the same for both sort directions..
-			var result = x.IsConfirmed.CompareTo(y.IsConfirmed);
+			var result = x.Transaction.IsConfirmed.CompareTo(y.Transaction.IsConfirmed);
 			if (result == 0)
 			{
 				var xValue = selector(x);

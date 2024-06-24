@@ -9,44 +9,51 @@ using WalletWasabi.WabiSabi.Backend.Rounds;
 using WalletWasabi.Wallets;
 using WabiSabi.Crypto.Randomness;
 using WalletWasabi.Helpers;
+using WalletWasabi.WabiSabi.Client.Batching;
+using WalletWasabi.WabiSabi.Client.CoinJoin.Client;
+using WalletWasabi.WabiSabi.Client.CoinJoin.Client.Decomposer;
 
 namespace WalletWasabi.WabiSabi.Client;
 
 public class OutputProvider
 {
 	private readonly IWallet _wallet;
-	private readonly string _coordinatorName;
 
 	private WasabiRandom Random { get; }
 
-	public OutputProvider(IWallet wallet, string coordinatorName, WasabiRandom? random = null)
+	public OutputProvider(IWallet wallet,  WasabiRandom? random = null)
 	{
 		_wallet = wallet;
-		_coordinatorName = coordinatorName;
 
 		Random = random ?? SecureRandom.Instance;
 	}
 
 
 	public virtual async Task<(IEnumerable<TxOut>, Dictionary<TxOut, PendingPayment> batchedPayments)> GetOutputs(
+		uint256 roundId,
 		RoundParameters roundParameters,
 		ImmutableArray<AliceClient> registeredCoins,
 		IEnumerable<Money> theirCoinEffectiveValues,
 		int availableVsize)
 	{
-		var registeredCoinEffectiveValues = registeredCoins.Select(client => client.EffectiveValue);
-		var utxoSelectionParameters = UtxoSelectionParameters.FromRoundParameters(roundParameters, _coordinatorName);
-
-		AmountDecomposer amountDecomposer = new(roundParameters.MiningFeeRate, roundParameters.AllowedOutputAmounts.Min, roundParameters.AllowedOutputAmounts.Max,
-			availableVsize, new []{await _wallet.DestinationProvider.GetScriptTypeAsync().ConfigureAwait(false)},
+		var scrriptTypes = await _wallet.DestinationProvider.GetScriptTypeAsync().ConfigureAwait(false);
+		AmountDecomposer amountDecomposer = new(
+			roundParameters.MiningFeeRate,
+			roundParameters.CalculateMinReasonableOutputAmount(scrriptTypes),
+			roundParameters.AllowedOutputAmounts.Max,
+			availableVsize,
+			scrriptTypes,
 			Random, _wallet.MinimumDenominationAmount);
 
+		var registeredCoinEffectiveValues = registeredCoins.Select(client => client.EffectiveValue);
+
+
 		var remainingPendingPayments = _wallet.BatchPayments
-			? (await _wallet.DestinationProvider.GetPendingPaymentsAsync(utxoSelectionParameters).ConfigureAwait(false))
+			? (await _wallet.DestinationProvider.GetPendingPaymentsAsync(roundParameters).ConfigureAwait(false))
 			.Where(payment =>
-				utxoSelectionParameters.AllowedOutputScriptTypes.Contains(
+				roundParameters.AllowedOutputTypes.Contains(
 					payment.Destination.ScriptPubKey.GetScriptType()))
-			.Where(payment => utxoSelectionParameters.AllowedInputAmounts.Contains(payment.Value))
+			.Where(payment => roundParameters.AllowedOutputAmounts.Contains(payment.Value))
 			.ToList()
 			: new List<PendingPayment>();
 
@@ -60,7 +67,7 @@ public class OutputProvider
 			// Loop through the pending payments and handle each payment by subtracting the payment amount from the total value of the selected coins
 			var potentialPayments = remainingPendingPayments
 				.Where(payment =>
-					payment.ToTxOut().EffectiveCost(utxoSelectionParameters.MiningFeeRate).ToDecimal(MoneyUnit.BTC) <=
+					payment.ToTxOut().EffectiveCost(roundParameters.MiningFeeRate).ToDecimal(MoneyUnit.BTC) <=
 					(effectiveValueSum - pendingPaymentBatchSum)).ToList();
 
 			while (potentialPayments.Any())
@@ -75,7 +82,7 @@ public class OutputProvider
 					continue;
 				}
 
-				var cost = txout.EffectiveCost(utxoSelectionParameters.MiningFeeRate)
+				var cost = txout.EffectiveCost(roundParameters.MiningFeeRate)
 					.ToDecimal(MoneyUnit.BTC);
 				if (!await payment.PaymentStarted.Invoke().ConfigureAwait(false))
 				{
@@ -88,7 +95,7 @@ public class OutputProvider
 				potentialPayments.Remove(payment);
 				potentialPayments = potentialPayments
 					.Where(payment =>
-						payment.ToTxOut().EffectiveCost(utxoSelectionParameters.MiningFeeRate)
+						payment.ToTxOut().EffectiveCost(roundParameters.MiningFeeRate)
 							.ToDecimal(MoneyUnit.BTC) <= (effectiveValueSum - pendingPaymentBatchSum)).ToList();
 
 			}

@@ -109,6 +109,11 @@ public class JsonRpcRequestHandler<TService>
 					var parameter = methodParameters[i];
 					if (!jObj.ContainsKey(parameter.name))
 					{
+						if (parameter.isOptional)
+						{
+							parameters.Add(parameter.defaultValue);
+							continue;
+						}
 						return Error(
 							JsonRpcErrorCodes.InvalidParams,
 							$"A value for the '{parameter.name}' is missing.",
@@ -157,7 +162,7 @@ public class JsonRpcRequestHandler<TService>
 				if (!procedureMetadata.MethodInfo.ReturnType.IsGenericType)
 				{
 					await ((Task)result).ConfigureAwait(false);
-					response = JsonRpcResponse.CreateResultResponse(jsonRpcRequest.Id, null);
+					response = JsonRpcResponse.CreateResultResponse(jsonRpcRequest.Id);
 				}
 				else
 				{

@@ -1,10 +1,10 @@
-using System.Linq;
+using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Windows.Input;
-using DynamicData;
+using DynamicData.Binding;
+using DynamicData.Aggregation;
 using ReactiveUI;
 using WalletWasabi.Fluent.Extensions;
-using WalletWasabi.Fluent.Models.UI;
 using WalletWasabi.Fluent.Models.Wallets;
 using WalletWasabi.Fluent.ViewModels.Navigation;
 using WalletWasabi.Fluent.ViewModels.Wallets.Labels;
@@ -19,10 +19,12 @@ namespace WalletWasabi.Fluent.ViewModels.Wallets.Receive;
 	Category = "Wallet",
 	Keywords = new[] { "Wallet", "Receive", "Action", },
 	NavBarPosition = NavBarPosition.None,
-	NavigationTarget = NavigationTarget.DialogScreen)]
-public partial class ReceiveViewModel : RoutableViewModel
+	NavigationTarget = NavigationTarget.DialogScreen,
+	Searchable = false)]
+public partial class ReceiveViewModel : RoutableViewModel, IDisposable
 {
 	private readonly IWalletModel _wallet;
+	private readonly CompositeDisposable _disposables = new();
 
 	private ReceiveViewModel(IWalletModel wallet)
 	{
@@ -43,24 +45,27 @@ public partial class ReceiveViewModel : RoutableViewModel
 
 		ShowExistingAddressesCommand = ReactiveCommand.Create(OnShowExistingAddresses);
 
-		HasUnusedAddresses =
-			_wallet
-				.UnusedAddresses()
-				.ToCollection()
-				.Select(x => x.Any())
-				.StartWith(false);
+		AddressesModel = wallet.Addresses;
 	}
+
+	public IAddressesModel AddressesModel { get; }
 
 	public SuggestionLabelsViewModel SuggestionLabels { get; }
 
 	public ICommand ShowExistingAddressesCommand { get; }
 
-	public IObservable<bool> HasUnusedAddresses { get; }
+	public IObservable<bool> HasUnusedAddresses => _wallet.Addresses.Unused.ToObservableChangeSet().Count().Select(i => i > 0);
+
+	protected override void OnNavigatedTo(bool isInHistory, CompositeDisposable disposables)
+	{
+		base.OnNavigatedTo(isInHistory, disposables);
+		SuggestionLabels.Activate(disposables);
+	}
 
 	private void OnNext()
 	{
 		SuggestionLabels.ForceAdd = true;
-		var address = _wallet.GetNextReceiveAddress(SuggestionLabels.Labels);
+		var address = _wallet.Addresses.NextReceiveAddress(SuggestionLabels.Labels);
 		SuggestionLabels.Labels.Clear();
 
 		Navigate().To().ReceiveAddress(_wallet, address, Services.UiConfig.Autocopy);
@@ -70,4 +75,6 @@ public partial class ReceiveViewModel : RoutableViewModel
 	{
 		UiContext.Navigate(NavigationTarget.DialogScreen).To().ReceiveAddresses(_wallet);
 	}
+
+	public void Dispose() => _disposables.Dispose();
 }

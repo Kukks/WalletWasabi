@@ -1,16 +1,16 @@
 using System.Collections.Generic;
 using System.Linq;
-using System.Reactive.Linq;
 using ReactiveUI;
-using WalletWasabi.Fluent.Helpers;
 using WalletWasabi.Fluent.Models;
 using WalletWasabi.Logging;
 using System.Windows.Input;
+using WalletWasabi.Fluent.Infrastructure;
 using WalletWasabi.Fluent.Models.UI;
 using WalletWasabi.Fluent.ViewModels.Navigation;
 
 namespace WalletWasabi.Fluent.ViewModels.Settings;
 
+[AppLifetime]
 [NavigationMetaData(
 	Title = "General",
 	Caption = "Manage general settings",
@@ -45,6 +45,8 @@ public partial class GeneralSettingsTabViewModel : RoutableViewModel
 			}
 		});
 	}
+
+	public bool IsReadOnly => Settings.IsOverridden;
 
 	public IApplicationSettings Settings { get; }
 

@@ -1,11 +1,11 @@
 using System.Collections.ObjectModel;
 using System.Linq;
-using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Threading.Tasks;
 using DynamicData;
 using DynamicData.Binding;
 using ReactiveUI;
+using WalletWasabi.Fluent.Infrastructure;
 using WalletWasabi.Fluent.Models.UI;
 using WalletWasabi.Fluent.Models.Wallets;
 using WalletWasabi.Fluent.ViewModels.Navigation;
@@ -16,9 +16,11 @@ namespace WalletWasabi.Fluent.ViewModels.NavBar;
 /// <summary>
 /// The ViewModel that represents the structure of the sidebar.
 /// </summary>
-public partial class NavBarViewModel : ViewModelBase, IWalletNavigation
+[AppLifetime]
+public partial class NavBarViewModel : ViewModelBase, IWalletSelector
 {
 	[AutoNotify] private WalletPageViewModel? _selectedWallet;
+	private IWalletModel? _selectedWalletModel;
 
 	public NavBarViewModel(UiContext uiContext)
 	{
@@ -28,6 +30,7 @@ public partial class NavBarViewModel : ViewModelBase, IWalletNavigation
 
 		UiContext.WalletRepository
 				 .Wallets
+				 .Connect()
 				 .Transform(newWallet => new WalletPageViewModel(UiContext, newWallet))
 				 .AutoRefresh(x => x.IsLoggedIn)
 				 .Sort(SortExpressionComparer<WalletPageViewModel>.Descending(i => i.IsLoggedIn).ThenByAscending(x => x.WalletModel.Name))
@@ -40,6 +43,15 @@ public partial class NavBarViewModel : ViewModelBase, IWalletNavigation
 	public ObservableCollection<NavBarItemViewModel> BottomItems { get; }
 
 	public ReadOnlyObservableCollection<WalletPageViewModel> Wallets { get; }
+
+	// AutoInterfaces (such as IWalletModel) cannot be seen by AutoNotifyGenerator.
+	public IWalletModel? SelectedWalletModel
+	{
+		get => _selectedWalletModel;
+		set => this.RaiseAndSetIfChanged(ref _selectedWalletModel, value);
+	}
+
+	IWalletViewModel? IWalletSelector.SelectedWallet => SelectedWallet?.WalletViewModel;
 
 	public void Activate()
 	{
@@ -62,7 +74,10 @@ public partial class NavBarViewModel : ViewModelBase, IWalletNavigation
 			})
 			.Subscribe();
 
-		SelectedWallet = Wallets.FirstOrDefault(x => x.WalletModel.Name == UiContext.WalletRepository.DefaultWalletName);
+		this.WhenAnyValue(x => x.SelectedWallet!.WalletModel)
+			.BindTo(this, x => x.SelectedWalletModel);
+
+		SelectedWallet = Wallets.FirstOrDefault(x => x.WalletModel.Name == UiContext.WalletRepository.DefaultWalletName) ?? Wallets.FirstOrDefault();
 	}
 
 	public async Task InitialiseAsync()

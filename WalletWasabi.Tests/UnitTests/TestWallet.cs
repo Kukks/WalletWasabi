@@ -151,6 +151,8 @@ public class TestWallet : IKeyChain, IDestinationProvider
 	public Task<IEnumerable<IDestination>> GetNextDestinationsAsync(int count, bool preferTaproot) =>
 		Task.FromResult<IEnumerable<IDestination>>(Enumerable.Range(0, count).Select(_ => CreateNewAddress()));
 
+	public IEnumerable<ScriptType> SupportedScriptTypes { get; } = [ScriptType.P2WPKH];
+
 	public IEnumerable<IDestination> GetNextInternalDestinations(int count) =>
 		Enumerable.Range(0, count).Select(_ => CreateNewAddress(true));
 

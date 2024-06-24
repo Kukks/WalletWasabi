@@ -201,7 +201,7 @@ public static class NBitcoinExtensions
 			}
 		}
 		var nodes = lookup.Values;
-		return nodes.Where(x => !x.Parents.Any());
+		return nodes.Where(x => x.Parents.Count == 0);
 	}
 
 	public static IEnumerable<Transaction> OrderByDependency(this IEnumerable<TransactionDependencyNode> roots)
@@ -226,7 +226,7 @@ public static class NBitcoinExtensions
 		}
 
 		var nodes = parentCounter.Where(x => x.Value == 0).Select(x => x.Key).Distinct().ToArray();
-		while (nodes.Any())
+		while (nodes.Length != 0)
 		{
 			foreach (var node in nodes)
 			{
@@ -342,22 +342,22 @@ public static class NBitcoinExtensions
 		{
 			ScriptType.P2WPKH => Constants.P2wpkhInputVirtualSize,
 			ScriptType.Taproot => Constants.P2trInputVirtualSize,
+			ScriptType.P2PKH => Constants.P2pkhInputVirtualSize,
+			ScriptType.P2SH => Constants.P2shInputVirtualSize,
+			ScriptType.P2WSH => Constants.P2wshInputVirtualSize,
 			_ => throw new NotImplementedException($"Size estimation isn't implemented for provided script type.")
 		};
 
-	public static int EstimateOutputVsize(this ScriptType scriptType) 
-	{
-		switch (scriptType)
+	public static int EstimateOutputVsize(this ScriptType scriptType) =>
+		scriptType switch
 		{
-				case ScriptType.P2WPKH: return Constants.P2wpkhOutputVirtualSize;
-				case ScriptType.Taproot: return Constants.P2trOutputVirtualSize;
-				case ScriptType.P2PKH: return Constants.P2pkhOutputVirtualSize;
-				case ScriptType.P2SH: return Constants.P2shOutputVirtualSize;
-				case ScriptType.P2WSH: return Constants.P2wshOutputVirtualSize;
-				default: throw new NotImplementedException($"Size estimation isn't implemented for provided script type.");
-		}
-
-	}
+			ScriptType.P2WPKH => Constants.P2wpkhOutputVirtualSize,
+			ScriptType.Taproot => Constants.P2trOutputVirtualSize,
+			ScriptType.P2PKH => Constants.P2pkhOutputVirtualSize,
+			ScriptType.P2SH => Constants.P2shOutputVirtualSize,
+			ScriptType.P2WSH => Constants.P2wshOutputVirtualSize,
+			_ => throw new NotImplementedException($"Size estimation isn't implemented for provided script type.")
+		};
 
 	public static Money EffectiveCost(this TxOut output, FeeRate feeRate) =>
 		output.Value + feeRate.GetFee(output.ScriptPubKey.EstimateOutputVsize());

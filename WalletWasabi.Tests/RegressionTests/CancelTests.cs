@@ -22,6 +22,7 @@ using Xunit;
 using WalletWasabi.Helpers;
 using WalletWasabi.Logging;
 using WalletWasabi.Tests.Helpers;
+using WalletWasabi.Wallets.FilterProcessor;
 
 namespace WalletWasabi.Tests.RegressionTests;
 
@@ -61,7 +62,7 @@ public class CancelTests : IClassFixture<RegTestFixture>
 
 		// 3. Create wasabi synchronizer service.
 		await using WasabiHttpClientFactory httpClientFactory = new(torEndPoint: null, backendUriGetter: () => new Uri(RegTestFixture.BackendEndPoint));
-		WasabiSynchronizer synchronizer = new(requestInterval: TimeSpan.FromSeconds(3), 10000, bitcoinStore, httpClientFactory);
+		using WasabiSynchronizer synchronizer = new(period: TimeSpan.FromSeconds(3), 10000, bitcoinStore, httpClientFactory);
 		HybridFeeProvider feeProvider = new(synchronizer, null);
 
 		// 4. Create key manager service.
@@ -73,14 +74,13 @@ public class CancelTests : IClassFixture<RegTestFixture>
 		using MemoryCache cache = BitcoinFactory.CreateMemoryCache();
 		await using SpecificNodeBlockProvider specificNodeBlockProvider = new(network, serviceConfiguration, httpClientFactory.TorEndpoint);
 
-		var blockProvider = new SmartBlockProvider(
+		using BlockDownloadService blockDownloadService = new(
 			bitcoinStore.BlockRepository,
-			rpcBlockProvider: null,
-			specificNodeBlockProvider,
-			new P2PBlockProvider(network, nodes, httpClientFactory.IsTorEnabled),
-			cache);
+			[specificNodeBlockProvider],
+			new P2PBlockProvider(network, nodes, httpClientFactory.IsTorEnabled));
 
-		WalletManager walletManager = new(network, workDir, new WalletDirectories(network, workDir), bitcoinStore, synchronizer, feeProvider, blockProvider, serviceConfiguration);
+		WalletFactory walletFactory = new(workDir, network, bitcoinStore, synchronizer, serviceConfiguration, feeProvider, blockDownloadService);
+		WalletManager walletManager = new(network, workDir, new WalletDirectories(network, workDir), walletFactory);
 		walletManager.Initialize();
 
 		// Get some money, make it confirm.
@@ -94,7 +94,7 @@ public class CancelTests : IClassFixture<RegTestFixture>
 			Interlocked.Exchange(ref setup.FiltersProcessedByWalletCount, 0);
 			nodes.Connect(); // Start connection service.
 			node.VersionHandshake(); // Start mempool service.
-			synchronizer.Start(); // Start wasabi synchronizer service.
+			await synchronizer.StartAsync(CancellationToken.None); // Start wasabi synchronizer service.
 			await feeProvider.StartAsync(CancellationToken.None);
 
 			// Start wallet and filter processing service
@@ -239,7 +239,7 @@ public class CancelTests : IClassFixture<RegTestFixture>
 
 			#region CantCancel
 
-			// Can't cancel cancelled transacion.
+			// Can't cancel cancelled transaction.
 			Assert.Throws<InvalidOperationException>(() => wallet.CancelTransaction(cancellingTx.Transaction));
 
 			// Can't cancel cancellation transaction.
@@ -327,7 +327,7 @@ public class CancelTests : IClassFixture<RegTestFixture>
 		{
 			bitcoinStore.IndexStore.NewFilters -= setup.Wallet_NewFiltersProcessed;
 			await walletManager.RemoveAndStopAllAsync(CancellationToken.None);
-			await synchronizer.StopAsync();
+			await synchronizer.StopAsync(CancellationToken.None);
 			await feeProvider.StopAsync(CancellationToken.None);
 			nodes?.Dispose();
 			node?.Disconnect();

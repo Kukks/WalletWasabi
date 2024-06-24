@@ -124,11 +124,6 @@ return coin;
 	/// <remarks>Context: https://github.com/zkSNACKs/WalletWasabi/issues/10567</remarks>
 	public bool IsSufficientlyDistancedFromExternalKeys { get; set; } = true;
 
-	public bool IsImmature(int bestHeight)
-	{
-		return Transaction.Transaction.IsCoinBase && Height >= bestHeight - 100;
-	}
-	
 	[MemberNotNullWhen(returnValue: true, nameof(SpenderTransaction))]
 	public bool IsSpent() => SpenderTransaction is not null;
 
@@ -136,8 +131,6 @@ return coin;
 	/// IsUnspent() AND !SpentAccordingToBackend AND !CoinJoinInProgress
 	/// </summary>
 	public bool IsAvailable() => SpenderTransaction is null && !SpentAccordingToBackend && !CoinJoinInProgress;
-
-	public bool IsReplaceable() => Transaction.IsRBF;
 
 	public override string ToString() => $"{TransactionId.ToString()[..7]}.. - {Index}, {ScriptPubKey.ToString()[..7]}.. - {Amount} BTC";
 
@@ -159,11 +152,9 @@ return coin;
 		{
 			return false;
 		}
-		else
-		{
-			var hashEquals = x.GetHashCode() == y.GetHashCode();
-			return hashEquals && y.TransactionId == x.TransactionId && y.Index == x.Index;
-		}
+
+		// Indices are fast to compare, so compare them first.
+		return (y.Index == x.Index) && (x.GetHashCode() == y.GetHashCode()) && (y.TransactionId == x.TransactionId);
 	}
 
 	public static bool operator !=(SmartCoin? x, SmartCoin? y) => !(x == y);

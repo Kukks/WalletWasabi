@@ -28,12 +28,13 @@ using WalletWasabi.Wallets;
 using Xunit;
 using WalletWasabi.WabiSabi.Backend.Rounds.CoinJoinStorage;
 using WalletWasabi.BitcoinCore.Mempool;
+using WalletWasabi.WabiSabi.Client.CoinJoin.Client;
 
 namespace WalletWasabi.Tests.UnitTests.WabiSabi.Client;
 
 public class ArenaClientTests
 {
-	public MempoolMirror DummyMempoolMirror { get; } = new (TimeSpan.Zero, null!, null!);
+	public MempoolMirror DummyMempoolMirror { get; } = new(TimeSpan.Zero, null!, null!);
 
 	[Fact]
 	public async Task FullP2wpkhCoinjoinTestAsync()
@@ -86,10 +87,10 @@ public class ArenaClientTests
 		var keyChain = new KeyChain(km, new Kitchen(password));
 		var destinationProvider = new InternalDestinationProvider(km);
 
-		var coins = (await destinationProvider.GetNextDestinationsAsync(2, false))
-			.Select(dest => (
-				Coin: new Coin(BitcoinFactory.CreateOutPoint(), new TxOut(Money.Coins(1.0m), dest)),
-				OwnershipProof: keyChain.GetOwnershipProof(dest, WabiSabiFactory.CreateCommitmentData(round.Id))))
+		var coins = destinationProvider.GetNextDestinations(2, false)
+			.Select(destination => (
+				Coin: new Coin(BitcoinFactory.CreateOutPoint(), new TxOut(Money.Coins(1.0m), destination)),
+				OwnershipProof: keyChain.GetOwnershipProof(destination, WabiSabiFactory.CreateCommitmentData(round.Id))))
 			.ToArray();
 
 		Alice alice1 = WabiSabiFactory.CreateAlice(coins[0].Coin, coins[0].OwnershipProof, round: round);
@@ -160,7 +161,7 @@ public class ArenaClientTests
 		using var key = new Key();
 		var outpoint = BitcoinFactory.CreateOutPoint();
 		var mockRpc = WabiSabiFactory.CreatePreconfiguredRpcClient();
-		mockRpc.OnGetTxOutAsync = (_,_,_) =>
+		mockRpc.OnGetTxOutAsync = (_, _, _) =>
 			new GetTxOutResponse
 			{
 				IsCoinBase = false,
@@ -178,7 +179,7 @@ public class ArenaClientTests
 			{
 				MinRelayTxFee = 1
 			});
-		mockRpc.OnGetRawTransactionAsync = (_,_) =>
+		mockRpc.OnGetRawTransactionAsync = (_, _) =>
 			Task.FromResult(BitcoinFactory.CreateTransaction());
 
 		using Arena arena = await ArenaBuilder.From(config).With(mockRpc).CreateAndStartAsync(round);

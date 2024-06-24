@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
 using NBitcoin;
@@ -53,16 +54,16 @@ public static partial class TextHelpers
 		return result;
 	}
 
-	public static string ToBtcWithUnit(this Money money)
+	public static string ToBtcWithUnit(this Money money, bool fplus = false)
 	{
-		return money.ToFormattedString() + " BTC";
+		return money.ToFormattedString(fplus) + " BTC";
 	}
 
-	public static string ToFormattedString(this Money money)
+	public static string ToFormattedString(this Money money, bool fplus = false)
 	{
 		const int WholeGroupSize = 3;
 
-		var moneyString = money.ToString();
+		var moneyString = money.ToString(fplus: fplus, false);
 
 		moneyString = moneyString.Insert(moneyString.Length - 4, " ");
 
@@ -93,5 +94,28 @@ public static partial class TextHelpers
 	public static string GetPrivacyMask(int repeatCount)
 	{
 		return new string(UiConstants.PrivacyChar, repeatCount);
+	}
+
+	public static string GetConfirmationText(int confirmations)
+	{
+		return $"Confirmed ({confirmations} confirmation{AddSIfPlural(confirmations)})";
+	}
+
+	public static string FormatPercentageDiff(double n)
+	{
+		var precision = 0.01m;
+		var withFriendlyDecimals = (n * 100).WithFriendlyDecimals();
+
+		if (Math.Abs(withFriendlyDecimals) < precision)
+		{
+			var threshold = n > 0 ? "+" + precision : "-" + precision;
+			return "less than " + threshold.ToString(CultureInfo.InvariantCulture) + "%";
+		}
+		else
+		{
+			var diffPart = withFriendlyDecimals.ToString();
+			var numericPart = n > 0 ? "+" + diffPart : diffPart;
+			return numericPart + "%";
+		}
 	}
 }

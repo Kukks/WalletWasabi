@@ -27,7 +27,7 @@ public class AllFeeEstimateTests
 				{ 3, 20 },
 				{ 19, 1 }
 			};
-		var allFee = new AllFeeEstimate(EstimateSmartFeeMode.Conservative, estimations, true);
+		var allFee = new AllFeeEstimate(estimations);
 		var serialized = JsonConvert.SerializeObject(allFee);
 		var deserialized = JsonConvert.DeserializeObject<AllFeeEstimate>(serialized);
 
@@ -35,7 +35,6 @@ public class AllFeeEstimateTests
 		Assert.Equal(estimations[2], deserialized!.Estimations[2]);
 		Assert.Equal(estimations[3], deserialized!.Estimations[3]);
 		Assert.Equal(estimations[19], deserialized!.Estimations[36]);
-		Assert.Equal(EstimateSmartFeeMode.Conservative, deserialized!.Type);
 	}
 
 	[Fact]
@@ -49,7 +48,7 @@ public class AllFeeEstimateTests
 				{ 20, 1 }
 			};
 
-		var allFee = new AllFeeEstimate(EstimateSmartFeeMode.Conservative, estimations, true);
+		var allFee = new AllFeeEstimate(estimations);
 		Assert.Equal(estimations[2], allFee.Estimations[2]);
 		Assert.Equal(estimations[3], allFee.Estimations[3]);
 		Assert.Equal(estimations[19], allFee.Estimations[36]);
@@ -64,7 +63,7 @@ public class AllFeeEstimateTests
 				{ 3, 20 }
 			};
 
-		var allFee = new AllFeeEstimate(EstimateSmartFeeMode.Conservative, estimations, true);
+		var allFee = new AllFeeEstimate(estimations);
 		Assert.Single(allFee.Estimations);
 		Assert.Equal(estimations[2], allFee.Estimations[2]);
 	}
@@ -78,7 +77,7 @@ public class AllFeeEstimateTests
 				{ 1, 20 }
 			};
 
-		var allFees = new AllFeeEstimate(EstimateSmartFeeMode.Conservative, estimations, true);
+		var allFees = new AllFeeEstimate(estimations);
 		Assert.Single(allFees.Estimations);
 		Assert.Equal(estimations[1], allFees.Estimations[2]);
 
@@ -89,7 +88,7 @@ public class AllFeeEstimateTests
 				{ 2, 21 }
 			};
 
-		allFees = new AllFeeEstimate(EstimateSmartFeeMode.Conservative, estimations, true);
+		allFees = new AllFeeEstimate(estimations);
 		Assert.Single(allFees.Estimations);
 		Assert.Equal(estimations[2], allFees.Estimations[2]);
 	}
@@ -102,7 +101,7 @@ public class AllFeeEstimateTests
 				{ 1007, 20 }
 			};
 
-		var allFees = new AllFeeEstimate(EstimateSmartFeeMode.Conservative, estimations, true);
+		var allFees = new AllFeeEstimate(estimations);
 		var est = Assert.Single(allFees.Estimations);
 		Assert.Equal(1008, est.Key);
 	}
@@ -116,7 +115,7 @@ public class AllFeeEstimateTests
 				{ 3, 21 }
 			};
 
-		var allFee = new AllFeeEstimate(EstimateSmartFeeMode.Conservative, estimations, true);
+		var allFee = new AllFeeEstimate(estimations);
 		Assert.Single(allFee.Estimations);
 		Assert.Equal(estimations[2], allFee.Estimations[2]);
 
@@ -129,7 +128,7 @@ public class AllFeeEstimateTests
 				{ 6, 4 },
 			};
 
-		allFee = new AllFeeEstimate(EstimateSmartFeeMode.Conservative, estimations, true);
+		allFee = new AllFeeEstimate(estimations);
 		Assert.Equal(2, allFee.Estimations.Count);
 		Assert.Equal(estimations[2], allFee.Estimations[2]);
 		Assert.Equal(estimations[6], allFee.Estimations[6]);
@@ -153,7 +152,7 @@ public class AllFeeEstimateTests
 			{
 				MemPoolMinFee = 0.00001000 // 1 s/b (default value)
 			});
-		mockRpc.OnEstimateSmartFeeAsync = (_,_) =>
+		mockRpc.OnEstimateSmartFeeAsync = (_, _) =>
 			throw new NoEstimationException(1);
 
 		await Assert.ThrowsAsync<NoEstimationException>(async () => await mockRpc.EstimateAllFeeAsync());
@@ -167,7 +166,7 @@ public class AllFeeEstimateTests
 		mockRpc.OnGetBlockchainInfoAsync = () =>
 			Task.FromException<BlockchainInfo>(new RPCException(RPCErrorCode.RPC_CLIENT_NOT_CONNECTED, "Error-GetBlockchainInfo", null));
 
-		mockRpc.OnEstimateSmartFeeAsync = (_,_) =>
+		mockRpc.OnEstimateSmartFeeAsync = (_, _) =>
 			Task.FromException<EstimateSmartFeeResponse>(new RPCException(RPCErrorCode.RPC_CLIENT_NOT_CONNECTED, "Error-EstimateSmartFee", null));
 
 		mockRpc.OnGetMempoolInfoAsync = () =>
@@ -226,7 +225,6 @@ public class AllFeeEstimateTests
 			};
 
 		var allFee = await mockRpc.EstimateAllFeeAsync();
-		Assert.True(allFee.IsAccurate);
 		Assert.Equal(3, allFee.Estimations.Count);
 		Assert.Equal(99, allFee.Estimations[2]);
 		Assert.Equal(75, allFee.Estimations[6]);
@@ -256,9 +254,9 @@ public class AllFeeEstimateTests
 		mockRpc.OnEstimateSmartFeeAsync = (target, _) =>
 			target switch
 			{
-				2 =>  Task.FromResult(FeeRateResponse(2, 3_500m)),
-				3 =>  Task.FromResult(FeeRateResponse(3, 500m)),
-				6 =>  Task.FromResult(FeeRateResponse(6, 10m)),
+				2 => Task.FromResult(FeeRateResponse(2, 3_500m)),
+				3 => Task.FromResult(FeeRateResponse(3, 500m)),
+				6 => Task.FromResult(FeeRateResponse(6, 10m)),
 				18 => Task.FromResult(FeeRateResponse(18, 5m)),
 				36 => Task.FromResult(FeeRateResponse(36, 5m)),
 				1008 => Task.FromResult(FeeRateResponse(1008, 1m)),
@@ -295,7 +293,7 @@ public class AllFeeEstimateTests
 			var mockRpc = CreateAndConfigureRpcClient(hasPeersInfo: true);
 			var mempoolInfo = MempoolInfoGenerator.GenerateMempoolInfo();
 			mockRpc.OnGetMempoolInfoAsync = () => Task.FromResult(mempoolInfo);
-			mockRpc.OnEstimateSmartFeeAsync = (_,_) => Task.FromResult(FeeRateResponse(2, 120m));
+			mockRpc.OnEstimateSmartFeeAsync = (_, _) => Task.FromResult(FeeRateResponse(2, 120m));
 			var feeRates = await mockRpc.EstimateAllFeeAsync();
 			var estimations = feeRates.Estimations;
 
@@ -312,7 +310,7 @@ public class AllFeeEstimateTests
 		var mockRpc = CreateAndConfigureRpcClient(hasPeersInfo: true);
 		var mempoolInfo = MempoolInfoGenerator.GenerateRealMempoolInfo();
 		mockRpc.OnGetMempoolInfoAsync = () => Task.FromResult(mempoolInfo);
-		mockRpc.OnEstimateSmartFeeAsync = (_,_) => Task.FromResult(FeeRateResponse(2, 0m));
+		mockRpc.OnEstimateSmartFeeAsync = (_, _) => Task.FromResult(FeeRateResponse(2, 0m));
 		var feeRates = await mockRpc.EstimateAllFeeAsync();
 		var estimations = feeRates.Estimations;
 		var minFee = estimations.Min(x => x.Value);
@@ -329,7 +327,7 @@ public class AllFeeEstimateTests
 		var mockRpc = CreateAndConfigureRpcClient(hasPeersInfo: true);
 		var mempoolInfo = MempoolInfoGenerator.GenerateRealBitcoinKnotsMemPoolInfo(filePath);
 		mockRpc.OnGetMempoolInfoAsync = () => Task.FromResult(mempoolInfo);
-		mockRpc.OnEstimateSmartFeeAsync = (_,_) => Task.FromResult(FeeRateResponse(2, 0m));
+		mockRpc.OnEstimateSmartFeeAsync = (_, _) => Task.FromResult(FeeRateResponse(2, 0m));
 		var feeRates = await mockRpc.EstimateAllFeeAsync();
 		var estimations = feeRates.Estimations;
 		var minFee = estimations.Min(x => x.Value);
@@ -375,7 +373,7 @@ public class AllFeeEstimateTests
 				{ 18, 1 } // 3h
 			};
 
-		var allFee = new AllFeeEstimate(EstimateSmartFeeMode.Conservative, estimations, true);
+		var allFee = new AllFeeEstimate(estimations);
 
 		Assert.Equal(7, allFee.WildEstimations.Count());
 		Assert.Equal(new FeeRate(102m), allFee.WildEstimations.First().feeRate); // 20m

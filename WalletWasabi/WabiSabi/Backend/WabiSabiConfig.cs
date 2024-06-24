@@ -19,6 +19,7 @@ using WalletWasabi.Affiliation;
 using WalletWasabi.WabiSabi.Backend.Rounds;
 using WalletWasabi.WabiSabi.Models;
 using WalletWasabi.Affiliation.Serialization;
+using WalletWasabi.WabiSabi.Backend.DoSPrevention;
 using WalletWasabi.Helpers;
 
 namespace WalletWasabi.WabiSabi.Backend;
@@ -142,6 +143,16 @@ public class WabiSabiConfig : ConfigBase
 
 	public int MinInputCountByRound => Math.Max(1, (int)(MaxInputCountByRound * MinInputCountByRoundMultiplier));
 
+	[DefaultValue(0.4)]
+	[JsonProperty(PropertyName = "MinInputCountByBlameRoundMultiplier", DefaultValueHandling = DefaultValueHandling.Populate)]
+	public double MinInputCountByBlameRoundMultiplier { get; set; } = 0.4;
+
+	public int MinInputCountByBlameRound => Math.Max(1, (int)(MaxInputCountByRound * MinInputCountByBlameRoundMultiplier));
+
+	[DefaultValue(375)]
+	[JsonProperty(PropertyName = "RoundDestroyerThreshold", DefaultValueHandling = DefaultValueHandling.Populate)]
+	public int RoundDestroyerThreshold { get; set; } = 375;
+
 	[DefaultValueCoordinationFeeRate(0.003, 0.01)]
 	[JsonProperty(PropertyName = "CoordinationFeeRate", DefaultValueHandling = DefaultValueHandling.Populate)]
 	public CoordinationFeeRate CoordinationFeeRate { get; set; } = new CoordinationFeeRate(0.003m, Money.Coins(0.01m));
@@ -252,7 +263,7 @@ public class WabiSabiConfig : ConfigBase
 	[JsonProperty(PropertyName = "DelayTransactionSigning", DefaultValueHandling = DefaultValueHandling.Populate)]
 	public bool DelayTransactionSigning { get; set; } = false;
 
-	public ImmutableSortedSet<ScriptType> AllowedInputTypes => GetScriptTypes(AllowP2wpkhInputs, AllowP2trInputs);
+	public ImmutableSortedSet<ScriptType> AllowedInputTypes => GetScriptTypes(AllowP2wpkhInputs, AllowP2trInputs, false, false, false);
 
 	[JsonProperty(PropertyName = "AllowedOutputTypes", ItemConverterType = typeof(StringEnumConverter))]
 	public ImmutableSortedSet<ScriptType> AllowedOutputTypes { get; set; } = ImmutableSortedSet.Create(ScriptType.P2WPKH, ScriptType.Taproot);
@@ -285,7 +296,18 @@ public class WabiSabiConfig : ConfigBase
 		public abstract Task<Script?> ResolveScript(string type, string value, Network network, CancellationToken cancellationToken);
 	}
 
-	private static ImmutableSortedSet<ScriptType> GetScriptTypes(bool p2wpkh, bool p2tr)
+	public DoSConfiguration GetDoSConfiguration() =>
+		new(
+			SeverityInBitcoinsPerHour: DoSSeverity.ToDecimal(MoneyUnit.BTC),
+			MinTimeForFailedToVerify: DoSMinTimeForFailedToVerify,
+			MinTimeForCheating: DoSMinTimeForCheating,
+			PenaltyFactorForDisruptingConfirmation: (decimal) DoSPenaltyFactorForDisruptingConfirmation,
+			PenaltyFactorForDisruptingSignalReadyToSign: (decimal) DoSPenaltyFactorForDisruptingSignalReadyToSign,
+			PenaltyFactorForDisruptingSigning: (decimal) DoSPenaltyFactorForDisruptingSigning,
+			PenaltyFactorForDisruptingByDoubleSpending: (decimal) DoSPenaltyFactorForDisruptingByDoubleSpending,
+			MinTimeInPrison: DoSMinTimeInPrison);
+
+	private static ImmutableSortedSet<ScriptType> GetScriptTypes(bool p2wpkh, bool p2tr, bool p2pkh, bool p2sh, bool p2wsh)
 	{
 		var scriptTypes = new List<ScriptType>();
 		if (p2wpkh)
@@ -295,6 +317,18 @@ public class WabiSabiConfig : ConfigBase
 		if (p2tr)
 		{
 			scriptTypes.Add(ScriptType.Taproot);
+		}
+		if (p2pkh)
+		{
+			scriptTypes.Add(ScriptType.P2PKH);
+		}
+		if (p2sh)
+		{
+			scriptTypes.Add(ScriptType.P2SH);
+		}
+		if (p2wsh)
+		{
+			scriptTypes.Add(ScriptType.P2WSH);
 		}
 
 		// When adding new script types, please see

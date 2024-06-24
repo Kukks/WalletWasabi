@@ -22,6 +22,7 @@ using WalletWasabi.Wallets;
 using WalletWasabi.WebClients.Wasabi;
 using Xunit;
 using WalletWasabi.Tests.Helpers;
+using WalletWasabi.Wallets.FilterProcessor;
 
 namespace WalletWasabi.Tests.RegressionTests;
 
@@ -59,7 +60,7 @@ public class ReplaceByFeeTxTest : IClassFixture<RegTestFixture>
 
 		// 3. Create wasabi synchronizer service.
 		await using WasabiHttpClientFactory httpClientFactory = new(torEndPoint: null, backendUriGetter: () => new Uri(RegTestFixture.BackendEndPoint));
-		WasabiSynchronizer synchronizer = new(requestInterval: TimeSpan.FromSeconds(3), 10000, bitcoinStore, httpClientFactory);
+		using WasabiSynchronizer synchronizer = new(period: TimeSpan.FromSeconds(3), 10000, bitcoinStore, httpClientFactory);
 		HybridFeeProvider feeProvider = new(synchronizer, null);
 
 		// 4. Create key manager service.
@@ -68,17 +69,16 @@ public class ReplaceByFeeTxTest : IClassFixture<RegTestFixture>
 		// 5. Create wallet service.
 		var workDir = Common.GetWorkDir();
 
-		using MemoryCache cache = BitcoinFactory.CreateMemoryCache();
 		await using SpecificNodeBlockProvider specificNodeBlockProvider = new(network, serviceConfiguration, httpClientFactory.TorEndpoint);
 
-		var blockProvider = new SmartBlockProvider(
+		using BlockDownloadService blockDownloadService = new(
 			bitcoinStore.BlockRepository,
-			rpcBlockProvider: null,
-			specificNodeBlockProvider,
-			new P2PBlockProvider(network, nodes, httpClientFactory.IsTorEnabled),
-			cache);
+			[specificNodeBlockProvider],
+			new P2PBlockProvider(network, nodes, httpClientFactory.IsTorEnabled));
 
-		using var wallet = Wallet.CreateAndRegisterServices(network, bitcoinStore, keyManager, synchronizer, workDir, serviceConfiguration, feeProvider, blockProvider);
+		WalletFactory walletFactory = new(workDir, network, bitcoinStore, synchronizer, serviceConfiguration, feeProvider, blockDownloadService);
+		using Wallet wallet = walletFactory.CreateAndInitialize(keyManager);
+
 		wallet.NewFiltersProcessed += setup.Wallet_NewFiltersProcessed;
 
 		Assert.Empty(wallet.Coins);
@@ -90,7 +90,7 @@ public class ReplaceByFeeTxTest : IClassFixture<RegTestFixture>
 		{
 			nodes.Connect(); // Start connection service.
 			node.VersionHandshake(); // Start mempool service.
-			synchronizer.Start(); // Start wasabi synchronizer service.
+			await synchronizer.StartAsync(CancellationToken.None); // Start wasabi synchronizer service.
 			await feeProvider.StartAsync(CancellationToken.None);
 
 			using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30)))
@@ -111,20 +111,20 @@ public class ReplaceByFeeTxTest : IClassFixture<RegTestFixture>
 			}
 
 			Assert.Single(wallet.Coins);
-			Assert.True(wallet.Coins.First().IsReplaceable());
+			Assert.True(wallet.Coins.First().Transaction.IsRBF);
 
 			var bfr = await rpc.BumpFeeAsync(tx0Id);
 			var tx1Id = bfr.TransactionId;
 			await Task.Delay(2000); // Waits for the replacement transaction get to the mempool.
 			Assert.Single(wallet.Coins);
-			Assert.True(wallet.Coins.First().IsReplaceable());
+			Assert.True(wallet.Coins.First().Transaction.IsRBF);
 			Assert.Equal(tx1Id, wallet.Coins.First().TransactionId);
 
 			bfr = await rpc.BumpFeeAsync(tx1Id);
 			var tx2Id = bfr.TransactionId;
 			await Task.Delay(2000); // Waits for the replacement transaction get to the mempool.
 			Assert.Single(wallet.Coins);
-			Assert.True(wallet.Coins.First().IsReplaceable());
+			Assert.True(wallet.Coins.First().Transaction.IsRBF);
 			Assert.Equal(tx2Id, wallet.Coins.First().TransactionId);
 
 			Interlocked.Exchange(ref setup.FiltersProcessedByWalletCount, 0);
@@ -133,13 +133,13 @@ public class ReplaceByFeeTxTest : IClassFixture<RegTestFixture>
 
 			var coin = Assert.Single(wallet.Coins);
 			Assert.True(coin.Confirmed);
-			Assert.False(coin.IsReplaceable());
+			Assert.False(coin.Transaction.IsRBF);
 			Assert.Equal(tx2Id, coin.TransactionId);
 		}
 		finally
 		{
 			await wallet.StopAsync(CancellationToken.None);
-			await synchronizer.StopAsync();
+			await synchronizer.StopAsync(CancellationToken.None);
 			await feeProvider.StopAsync(CancellationToken.None);
 			nodes?.Dispose();
 			node?.Disconnect();

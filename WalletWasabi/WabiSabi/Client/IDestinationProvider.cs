@@ -1,7 +1,5 @@
 using NBitcoin;
 using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Linq;
 using System.Threading.Tasks;
 using WalletWasabi.WabiSabi.Backend.Rounds;
 
@@ -11,9 +9,9 @@ public interface IDestinationProvider
 {
 	Task<IEnumerable<IDestination>> GetNextDestinationsAsync(int count, bool mixedOutputs, bool privateEnough);
 
-	Task<IEnumerable<PendingPayment>> GetPendingPaymentsAsync(UtxoSelectionParameters roundParameters);
+	Task<IEnumerable<PendingPayment>> GetPendingPaymentsAsync(RoundParameters roundParameters);
 
-	Task<ScriptType> GetScriptTypeAsync();
+	Task<ScriptType[]> GetScriptTypeAsync();
 }
 
 

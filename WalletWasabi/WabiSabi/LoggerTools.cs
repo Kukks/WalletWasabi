@@ -32,7 +32,7 @@ public static class LoggerTools
 
 	public static void Log(this RoundState roundState, IWallet wallet,  LogLevel logLevel, string logMessage, [CallerFilePath] string callerFilePath = "", [CallerMemberName] string callerMemberName = "", [CallerLineNumber] int callerLineNumber = -1)
 	{
-		string round = roundState.BlameOf == uint256.Zero ? "Round" : "Blame Round";
+		string round = !roundState.IsBlame ? "Round" : "Blame Round";
 		round += $" ({roundState.Id.ToString()[..7] + "..." + roundState.Id.ToString()[^7..]})";
 		if (wallet is null)
 		{

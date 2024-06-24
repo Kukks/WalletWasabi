@@ -10,15 +10,17 @@ public static class EnumerableExtensions
 			.Where(x => x is not null)
 			.Select(x => x!);
 
-#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
-
-	public static async IAsyncEnumerable<T> ToAsyncEnumerable<T>(this IEnumerable<T> enumerable)
+	public static IEnumerable<T> Delimit<T>(this IEnumerable<T> source, T delimiter)
 	{
-		foreach (var item in enumerable)
+		foreach (T item in source.Take(1))
 		{
 			yield return item;
 		}
+		
+		foreach (T item in source.Skip(1))
+		{
+			yield return delimiter;
+			yield return item;
+		}
 	}
-
-#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
 }

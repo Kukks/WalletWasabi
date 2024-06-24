@@ -12,6 +12,9 @@ public class InternalDestinationProvider : IDestinationProvider
 	public InternalDestinationProvider(KeyManager keyManager)
 	{
 		KeyManager = keyManager;
+	    SupportedScriptTypes = KeyManager.TaprootExtPubKey is not null
+			? [ScriptType.P2WPKH, ScriptType.Taproot]
+			: [ScriptType.P2WPKH];
 	}
 
 	private KeyManager KeyManager { get; }
@@ -36,13 +39,15 @@ public class InternalDestinationProvider : IDestinationProvider
 		return Task.FromResult(destinations.Select(x => (IDestination) x.GetAddress(KeyManager.GetNetwork())));
 	}
 
-	public Task<IEnumerable<PendingPayment>> GetPendingPaymentsAsync(UtxoSelectionParameters roundParameters)
+	public Task<IEnumerable<PendingPayment>> GetPendingPaymentsAsync(RoundParameters roundParameters)
 	{
 		return Task.FromResult(Enumerable.Empty<PendingPayment>());
 	}
 
-	public Task<ScriptType> GetScriptTypeAsync()
+	public Task<ScriptType[]> GetScriptTypeAsync()
 	{
-		return Task.FromResult(ScriptType.P2WPKH);
+		return Task.FromResult(SupportedScriptTypes.ToArray());
 	}
+
+	public IEnumerable<ScriptType> SupportedScriptTypes { get; }
 }

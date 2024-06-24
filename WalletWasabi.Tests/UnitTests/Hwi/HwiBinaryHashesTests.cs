@@ -22,9 +22,9 @@ public class HwiBinaryHashesTests
 
 		Dictionary<OSPlatform, string> expectedHashes = new()
 		{
-			{ OSPlatform.Windows, "460c8b83a9d8888ad769ffdc34dbe3ad7ecd27b22035494bdeb268d943be1791" },
-			{ OSPlatform.Linux, "9519023b3a485b68668675db8ab70be2e338be100fd2731eeddd6d34fc440580" },
-			{ OSPlatform.OSX, "9059b8f7cf6fe42f6e37cd8015cd11cb8fb736650797b25da849c625ed61ea62" },
+			{ OSPlatform.Windows, "38b3f02374c300516b4583a1195ffe1cac1159f9885b8ab434fd450e290c907a" },
+			{ OSPlatform.Linux,   "9b70aab37a1265457de4aaa242bd24a0abef5056357d8337bd79232e9b85bc1c" },
+			{ OSPlatform.OSX,     "d05c046d5718bf92b348a786aad15cb0f0132fcccf57a646758610240327a977" },
 		};
 
 		foreach (var item in expectedHashes)
@@ -34,6 +34,7 @@ public class HwiBinaryHashesTests
 
 			using SHA256 sha256 = SHA256.Create();
 			using FileStream fileStream = File.OpenRead(filePath);
+
 			Assert.Equal(item.Value, ByteHelpers.ToHex(sha256.ComputeHash(fileStream)).ToLowerInvariant());
 		}
 	}

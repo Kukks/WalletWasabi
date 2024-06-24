@@ -1,6 +1,8 @@
+using System.Reactive.Disposables;
 using ReactiveUI;
 using System.Reactive.Linq;
 using System.Threading.Tasks;
+using WalletWasabi.Fluent.Infrastructure;
 using WalletWasabi.Fluent.Models.UI;
 using WalletWasabi.Fluent.Models.Wallets;
 using WalletWasabi.Fluent.ViewModels.Dialogs.Base;
@@ -8,6 +10,7 @@ using WalletWasabi.Fluent.ViewModels.Wallets;
 
 namespace WalletWasabi.Fluent.ViewModels.Navigation;
 
+[AppLifetime]
 public class NavigationState : ReactiveObject, INavigate
 {
 	private readonly IWalletNavigation _walletNavigation;
@@ -56,6 +59,12 @@ public class NavigationState : ReactiveObject, INavigate
 	public INavigationStack<RoutableViewModel> CompactDialogScreen { get; }
 
 	public IObservable<bool> IsDialogOpen { get; }
+
+	public bool IsAnyPageBusy =>
+		HomeScreen.CurrentPage is { IsBusy: true } ||
+		DialogScreen.CurrentPage is { IsBusy: true } ||
+		FullScreen.CurrentPage is { IsBusy: true } ||
+		CompactDialogScreen.CurrentPage is { IsBusy: true };
 
 	public INavigationStack<RoutableViewModel> Navigate(NavigationTarget currentTarget)
 	{

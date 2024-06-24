@@ -1,11 +1,14 @@
 using System.Reactive.Disposables;
+using System.Reactive.Linq;
+using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
-using ReactiveUI;
+using NBitcoin;
+using Avalonia.Xaml.Interactions.Custom;
 using WalletWasabi.Fluent.ViewModels.Wallets.Home.History.HistoryItems;
 
 namespace WalletWasabi.Fluent.Behaviors;
 
-public class HistoryItemTypeClassBehavior : AttachedToVisualTreeBehavior<TreeDataGridRow>
+public class HistoryItemTypeClassBehavior : AttachedToVisualTreeBehavior<Avalonia.Controls.TreeDataGrid>
 {
 	private const string TransactionClass = "Transaction";
 
@@ -15,74 +18,67 @@ public class HistoryItemTypeClassBehavior : AttachedToVisualTreeBehavior<TreeDat
 
 	private const string SpeedUpClass = "SpeedUp";
 
+	private const string PositiveAmountClass = "PositiveAmount";
+
 	protected override void OnAttachedToVisualTree(CompositeDisposable disposable)
 	{
-		AssociatedObject?.WhenAnyValue(x => x.DataContext)
-			.Subscribe(x =>
-			{
-				RemoveClasses();
-				AddClasses(x);
-			})
+		if (AssociatedObject is null)
+		{
+			return;
+		}
+
+		Observable
+			.FromEventPattern<TreeDataGridRowEventArgs>(
+				AssociatedObject,
+				nameof(Avalonia.Controls.TreeDataGrid.RowPrepared))
+			.Select(x => x.EventArgs.Row)
+			.Subscribe(AddClasses)
+			.DisposeWith(disposable);
+
+		Observable
+			.FromEventPattern<TreeDataGridRowEventArgs>(
+				AssociatedObject,
+				nameof(Avalonia.Controls.TreeDataGrid.RowClearing))
+			.Select(x => x.EventArgs.Row)
+			.Subscribe(RemoveClasses)
 			.DisposeWith(disposable);
 	}
 
-	protected override void OnDetachedFromVisualTree()
+	private void AddClasses(TreeDataGridRow row)
 	{
-		RemoveClasses();
-	}
-
-	private void AddClasses(object? dataContext)
-	{
-		if (AssociatedObject is null)
+		if (row.DataContext is HistoryItemViewModelBase historyItemViewModelBase)
 		{
-			return;
+			if (historyItemViewModelBase.Transaction.DisplayAmount > Money.Zero)
+			{
+				row.Classes.Add(PositiveAmountClass);
+			}
 		}
-
-		switch (dataContext)
+		switch (row.DataContext)
 		{
 			case TransactionHistoryItemViewModel:
-				AssociatedObject.Classes.Add(TransactionClass);
+				row.Classes.Add(TransactionClass);
 				break;
 
 			case CoinJoinHistoryItemViewModel:
-				AssociatedObject.Classes.Add(CoinJoinClass);
+				row.Classes.Add(CoinJoinClass);
 				break;
 
 			case CoinJoinsHistoryItemViewModel:
-				AssociatedObject.Classes.Add(CoinJoinsClass);
+				row.Classes.Add(CoinJoinsClass);
 				break;
 
 			case SpeedUpHistoryItemViewModel:
-				AssociatedObject.Classes.Add(SpeedUpClass);
+				row.Classes.Add(SpeedUpClass);
 				break;
 		}
 	}
 
-	private void RemoveClasses()
+	private void RemoveClasses(TreeDataGridRow row)
 	{
-		if (AssociatedObject is null)
-		{
-			return;
-		}
-
-		if (AssociatedObject.Classes.Contains(TransactionClass))
-		{
-			AssociatedObject.Classes.Remove(TransactionClass);
-		}
-
-		if (AssociatedObject.Classes.Contains(CoinJoinClass))
-		{
-			AssociatedObject.Classes.Remove(CoinJoinClass);
-		}
-
-		if (AssociatedObject.Classes.Contains(CoinJoinsClass))
-		{
-			AssociatedObject.Classes.Remove(CoinJoinsClass);
-		}
-
-		if (AssociatedObject.Classes.Contains(SpeedUpClass))
-		{
-			AssociatedObject.Classes.Remove(SpeedUpClass);
-		}
+		row.Classes.Remove(PositiveAmountClass);
+		row.Classes.Remove(TransactionClass);
+		row.Classes.Remove(CoinJoinClass);
+		row.Classes.Remove(CoinJoinsClass);
+		row.Classes.Remove(SpeedUpClass);
 	}
 }

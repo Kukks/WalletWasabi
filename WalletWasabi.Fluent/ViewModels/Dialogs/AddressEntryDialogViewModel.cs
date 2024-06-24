@@ -7,6 +7,7 @@ using System.Reactive.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using WalletWasabi.Extensions;
+using WalletWasabi.Fluent.Helpers;
 using WalletWasabi.Fluent.Validation;
 using WalletWasabi.Fluent.ViewModels.Dialogs.Base;
 using WalletWasabi.Models;
@@ -15,7 +16,7 @@ using WalletWasabi.Userfacing.Bip21;
 
 namespace WalletWasabi.Fluent.ViewModels.Dialogs;
 
-[NavigationMetaData(Title = "Address")]
+[NavigationMetaData(Title = "Address", NavigationTarget = NavigationTarget.CompactDialogScreen)]
 public partial class AddressEntryDialogViewModel : DialogViewModelBase<Bip21UriParser.Result?>
 {
 	private readonly Network _network;

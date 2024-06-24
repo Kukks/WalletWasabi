@@ -1,24 +1,30 @@
-using System.Linq;
 using System.Reactive.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using Avalonia.Threading;
 using ReactiveUI;
 using WalletWasabi.Fluent.Extensions;
+using WalletWasabi.Fluent.Infrastructure;
+using WalletWasabi.Fluent.Models.UI;
 using WalletWasabi.Fluent.Models.Wallets;
 using WalletWasabi.Fluent.State;
+using WalletWasabi.Fluent.ViewModels.Wallets.Settings;
 using WalletWasabi.WabiSabi.Backend.Rounds;
 using WalletWasabi.WabiSabi.Client.CoinJoinProgressEvents;
 using WalletWasabi.WabiSabi.Client.StatusChangedEvents;
 
 namespace WalletWasabi.Fluent.ViewModels.Wallets;
 
+[AppLifetime]
 public partial class CoinJoinStateViewModel : ViewModelBase
 {
 	private const string CountDownMessage = "Awaiting auto-start of coinjoin";
 	private const string WaitingMessage = "Awaiting coinjoin";
+	private const string UneconomicalRoundMessage = "Awaiting cheaper coinjoins";
+	private const string RandomlySkippedRoundMessage = "Skipping a round for better privacy";
 	private const string PauseMessage = "Coinjoin is paused";
 	private const string StoppedMessage = "Coinjoin has stopped";
+	private const string PressPlayToStartMessage = "Press Play to start";
 	private const string RoundSucceedMessage = "Coinjoin successful! Continuing...";
 	private const string RoundFinishedMessage = "Round ended, awaiting next round";
 	private const string AbortedNotEnoughAlicesMessage = "Insufficient participants, retrying...";
@@ -27,7 +33,7 @@ public partial class CoinJoinStateViewModel : ViewModelBase
 	private const string WaitingForBlameRoundMessage = "Awaiting the blame round";
 	private const string WaitingRoundMessage = "Awaiting a round";
 	private const string PlebStopMessage = "Coinjoin may be uneconomical";
-	private const string PlebStopMessageBelow = "Add more funds or press 'Play' to bypass";
+	private const string PlebStopMessageBelow = "Add more funds or press Play to bypass";
 	private const string NoCoinsEligibleToMixMessage = "Insufficient funds eligible for coinjoin";
 	private const string UserInSendWorkflowMessage = "Awaiting closure of send dialog";
 	private const string AllPrivateMessage = "Hurray! All your funds are private!";
@@ -60,8 +66,9 @@ public partial class CoinJoinStateViewModel : ViewModelBase
 	private DateTimeOffset _countDownStartTime;
 	private DateTimeOffset _countDownEndTime;
 
-	private CoinJoinStateViewModel(IWalletModel wallet)
+	public CoinJoinStateViewModel(UiContext uiContext, IWalletModel wallet, WalletSettingsViewModel settings)
 	{
+		UiContext = uiContext;
 		_wallet = wallet;
 
 		wallet.Coinjoin.StatusUpdated
@@ -90,9 +97,13 @@ public partial class CoinJoinStateViewModel : ViewModelBase
 
 		ConfigureStateMachine();
 
-		wallet.Balances.Btc
-					   .Do(_ => _stateMachine.Fire(Trigger.BalanceChanged))
-					   .Subscribe();
+		wallet.Balances
+			  .Do(_ => _stateMachine.Fire(Trigger.BalanceChanged))
+			  .Subscribe();
+
+		this.WhenAnyValue(x => x.AreAllCoinsPrivate)
+			.Do(_ => _stateMachine.Fire(Trigger.AreAllCoinsPrivateChanged))
+			.Subscribe();
 
 		PlayCommand = ReactiveCommand.CreateFromTask(async () =>
 		{
@@ -143,6 +154,17 @@ public partial class CoinJoinStateViewModel : ViewModelBase
 		_countdownTimer.Tick += (_, _) => _stateMachine.Fire(Trigger.Tick);
 
 		_stateMachine.Start();
+
+		var coinJoinSettingsCommand = ReactiveCommand.Create(
+			() =>
+			{
+				settings.SelectedTab = 1;
+				UiContext.Navigate(NavigationTarget.DialogScreen).To(settings);
+			},
+			Observable.Return(!_wallet.IsWatchOnlyWallet));
+
+		NavigateToSettingsCommand = coinJoinSettingsCommand;
+		CanNavigateToCoinjoinSettings = coinJoinSettingsCommand.CanExecute;
 	}
 
 	private enum State
@@ -165,8 +187,13 @@ public partial class CoinJoinStateViewModel : ViewModelBase
 		PlebStopChanged,
 		WalletStartedCoinJoin,
 		WalletStoppedCoinJoin,
-		AutoCoinJoinOff
+		AutoCoinJoinOff,
+		AreAllCoinsPrivateChanged
 	}
+
+	public IObservable<bool> CanNavigateToCoinjoinSettings { get; }
+
+	public ICommand NavigateToSettingsCommand { get; }
 
 	public bool IsAutoCoinJoinEnabled => _wallet.Settings.AutoCoinjoin;
 
@@ -216,12 +243,17 @@ public partial class CoinJoinStateViewModel : ViewModelBase
 			.OnEntry(() =>
 			{
 				StopCountDown();
-				PlayVisible = true;
 				PauseVisible = false;
 				PauseSpreading = false;
 				StopVisible = false;
-				CurrentStatus = IsAutoCoinJoinEnabled ? PauseMessage : StoppedMessage;
-				LeftText = "Press Play to start";
+
+				// PlayVisible, CurrentStatus and LeftText set inside.
+				RefreshButtonAndTextInStateStoppedOrPaused();
+			})
+			.OnTrigger(Trigger.AreAllCoinsPrivateChanged, () =>
+			{
+				// Refresh the UI according to AreAllCoinsPrivate, the play button and the left-text.
+				RefreshButtonAndTextInStateStoppedOrPaused();
 			})
 			.OnExit(() => LeftText = "");
 
@@ -254,6 +286,28 @@ public partial class CoinJoinStateViewModel : ViewModelBase
 				LeftText = PlebStopMessageBelow;
 			})
 			.OnExit(() => LeftText = "");
+	}
+
+	private void RefreshButtonAndTextInStateStoppedOrPaused()
+	{
+		if (IsAutoCoinJoinEnabled)
+		{
+			PlayVisible = true;
+			CurrentStatus = PauseMessage;
+			LeftText = PressPlayToStartMessage;
+		}
+		else if (AreAllCoinsPrivate)
+		{
+			PlayVisible = false;
+			LeftText = "";
+			CurrentStatus = AllPrivateMessage;
+		}
+		else
+		{
+			PlayVisible = true;
+			CurrentStatus = StoppedMessage;
+			LeftText = PressPlayToStartMessage;
+		}
 	}
 
 	private void UpdateCountDown()
@@ -314,8 +368,12 @@ public partial class CoinJoinStateViewModel : ViewModelBase
 					CoinjoinError.CoinsRejected => CoinsRejectedMessage,
 					CoinjoinError.OnlyImmatureCoinsAvailable => OnlyImmatureCoinsAvailableMessage,
 					CoinjoinError.OnlyExcludedCoinsAvailable => OnlyExcludedCoinsAvailableMessage,
+					CoinjoinError.UneconomicalRound => UneconomicalRoundMessage,
+					CoinjoinError.RandomlySkippedRound => RandomlySkippedRoundMessage,
 					_ => GeneralErrorMessage
 				};
+
+				StopCountDown();
 				break;
 
 			case CoinJoinStatusEventArgs coinJoinStatusEventArgs:

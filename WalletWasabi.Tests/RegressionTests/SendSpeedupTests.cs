@@ -25,6 +25,7 @@ using WalletWasabi.Helpers;
 using WalletWasabi.Blockchain.Transactions;
 using WalletWasabi.Exceptions;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using WalletWasabi.Wallets.FilterProcessor;
 
 namespace WalletWasabi.Tests.RegressionTests;
 
@@ -64,7 +65,7 @@ public class SendSpeedupTests : IClassFixture<RegTestFixture>
 
 		// 3. Create wasabi synchronizer service.
 		await using WasabiHttpClientFactory httpClientFactory = new(torEndPoint: null, backendUriGetter: () => new Uri(RegTestFixture.BackendEndPoint));
-		WasabiSynchronizer synchronizer = new(requestInterval: TimeSpan.FromSeconds(3), 10000, bitcoinStore, httpClientFactory);
+		using WasabiSynchronizer synchronizer = new(period: TimeSpan.FromSeconds(3), 10000, bitcoinStore, httpClientFactory);
 		HybridFeeProvider feeProvider = new(synchronizer, null);
 
 		// 4. Create key manager service.
@@ -76,14 +77,13 @@ public class SendSpeedupTests : IClassFixture<RegTestFixture>
 		using MemoryCache cache = BitcoinFactory.CreateMemoryCache();
 		await using SpecificNodeBlockProvider specificNodeBlockProvider = new(network, serviceConfiguration, httpClientFactory.TorEndpoint);
 
-		var blockProvider = new SmartBlockProvider(
+		using BlockDownloadService blockDownloadService = new(
 			bitcoinStore.BlockRepository,
-			rpcBlockProvider: null,
-			specificNodeBlockProvider,
-			new P2PBlockProvider(network, nodes, httpClientFactory.IsTorEnabled),
-			cache);
+			[specificNodeBlockProvider],
+			new P2PBlockProvider(network, nodes, httpClientFactory.IsTorEnabled));
 
-		WalletManager walletManager = new(network, workDir, new WalletDirectories(network, workDir), bitcoinStore, synchronizer, feeProvider, blockProvider, serviceConfiguration);
+		WalletFactory walletFactory = new(workDir, network, bitcoinStore, synchronizer, serviceConfiguration, feeProvider, blockDownloadService);
+		WalletManager walletManager = new(network, workDir, new WalletDirectories(network, workDir), walletFactory);
 		walletManager.Initialize();
 
 		// Get some money, make it confirm.
@@ -97,7 +97,7 @@ public class SendSpeedupTests : IClassFixture<RegTestFixture>
 			Interlocked.Exchange(ref setup.FiltersProcessedByWalletCount, 0);
 			nodes.Connect(); // Start connection service.
 			node.VersionHandshake(); // Start mempool service.
-			synchronizer.Start(); // Start wasabi synchronizer service.
+			await synchronizer.StartAsync(CancellationToken.None); // Start wasabi synchronizer service.
 			await feeProvider.StartAsync(CancellationToken.None);
 
 			// Start wallet and filter processing service
@@ -468,7 +468,7 @@ public class SendSpeedupTests : IClassFixture<RegTestFixture>
 			#region MarnixFoundBug
 
 			// https://github.com/zkSNACKs/WalletWasabi/pull/10976#pullrequestreview-1542077218
-			// I speed up a tx which has change, but the the additional fee was deducted from the original send amount not from the change utxo?
+			// I speed up a tx which has change, but the additional fee was deducted from the original send amount not from the change utxo?
 			// https://mempool.space/testnet/tx/b0de46a002e6487dac3a3a98841380d4ced7e4e8482217b2758dd53df0760af8
 			// I sent the 0.0004
 
@@ -555,7 +555,7 @@ public class SendSpeedupTests : IClassFixture<RegTestFixture>
 		{
 			bitcoinStore.IndexStore.NewFilters -= setup.Wallet_NewFiltersProcessed;
 			await walletManager.RemoveAndStopAllAsync(CancellationToken.None);
-			await synchronizer.StopAsync();
+			await synchronizer.StopAsync(CancellationToken.None);
 			await feeProvider.StopAsync(CancellationToken.None);
 			nodes?.Dispose();
 			node?.Disconnect();

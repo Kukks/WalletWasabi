@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using NBitcoin;
+using WalletWasabi.Fluent.Infrastructure;
 using WalletWasabi.Fluent.Models.UI;
 using WalletWasabi.Fluent.Validation;
 using WalletWasabi.Fluent.ViewModels.Navigation;
@@ -9,6 +10,7 @@ using WalletWasabi.Userfacing;
 
 namespace WalletWasabi.Fluent.ViewModels.Settings;
 
+[AppLifetime]
 [NavigationMetaData(
 	Title = "Bitcoin",
 	Caption = "Manage Bitcoin settings",
@@ -36,6 +38,8 @@ public partial class BitcoinTabSettingsViewModel : RoutableViewModel
 		_dustThreshold = settings.DustThreshold;
 	}
 
+	public bool IsReadOnly => Settings.IsOverridden;
+
 	public IApplicationSettings Settings { get; }
 
 	public Version BitcoinCoreVersion => Constants.BitcoinCoreVersion;
@@ -50,6 +54,10 @@ public partial class BitcoinTabSettingsViewModel : RoutableViewModel
 			{
 				errors.Add(ErrorSeverity.Error, "Invalid endpoint.");
 			}
+			else
+			{
+				Settings.BitcoinP2PEndPoint = BitcoinP2PEndPoint;
+			}
 		}
 	}
 
@@ -58,16 +66,25 @@ public partial class BitcoinTabSettingsViewModel : RoutableViewModel
 		var dustThreshold = DustThreshold;
 		if (!string.IsNullOrWhiteSpace(dustThreshold))
 		{
+			bool error = false;
+
 			if (!string.IsNullOrEmpty(dustThreshold) && dustThreshold.Contains(
 				',',
 				StringComparison.InvariantCultureIgnoreCase))
 			{
+				error = true;
 				errors.Add(ErrorSeverity.Error, "Use decimal point instead of comma.");
 			}
 
 			if (!decimal.TryParse(dustThreshold, out var dust) || dust < 0)
 			{
+				error = true;
 				errors.Add(ErrorSeverity.Error, "Invalid dust threshold.");
+			}
+
+			if (!error)
+			{
+				Settings.DustThreshold = dustThreshold;
 			}
 		}
 	}

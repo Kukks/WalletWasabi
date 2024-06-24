@@ -3,8 +3,9 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Collections.Generic;
 using System.Linq;
+using WalletWasabi.Fluent.Generators.Abstractions;
 
-namespace WalletWasabi.Fluent.Generators;
+namespace WalletWasabi.Fluent.Generators.Generators;
 
 internal class AutoInterfaceGenerator : GeneratorStep<ClassDeclarationSyntax>
 {
@@ -40,11 +41,10 @@ internal class AutoInterfaceGenerator : GeneratorStep<ClassDeclarationSyntax>
 		var interfaceNamespace = namedTypeSymbol.ContainingNamespace.ToDisplayString();
 		var interfaceName = $"I{namedTypeSymbol.Name}";
 
-		var members =
-			namedTypeSymbol.GetMembers()
-						   .Where(x => x.DeclaredAccessibility == Accessibility.Public)
-						   .Where(x => !x.IsStatic)
-						   .ToList();
+		var members = namedTypeSymbol.GetMembers()
+			.Where(x => x.DeclaredAccessibility == Accessibility.Public)
+			.Where(x => !x.IsStatic)
+			.ToList();
 
 		var namespaces = new List<string>();
 		var properties = new List<string>();
@@ -54,9 +54,12 @@ internal class AutoInterfaceGenerator : GeneratorStep<ClassDeclarationSyntax>
 			if (member is IPropertySymbol property)
 			{
 				var accessors =
-					property.SetMethod is { }
-					? "{ get; set; }"
-					: "{ get; }";
+					property.SetMethod switch
+					{
+						IMethodSymbol s when s.IsInitOnly => "{ get; init; }",
+						IMethodSymbol s => "{ get; set; }",
+						_ => "{ get; }"
+					};
 
 				var type = property.Type.SimplifyType(namespaces);
 				properties.Add($"\t{type} {property.Name} {accessors}");
@@ -64,50 +67,50 @@ internal class AutoInterfaceGenerator : GeneratorStep<ClassDeclarationSyntax>
 			else if (member is IMethodSymbol method && method.MethodKind == MethodKind.Ordinary)
 			{
 				var returnType = method.ReturnType.SimplifyType(namespaces);
+				string genericTypeOrEmpty = "";
 
-				var signature = "\t";
-
-				signature += returnType;
-
-				signature += $" {method.Name}";
 				if (method.IsGenericMethod)
 				{
-					signature += "<";
-
 					var typeArgs =
 						from argument in method.TypeArguments
 						let typeName = argument.SimplifyType(namespaces)
 						select typeName;
 
-					signature += string.Join(", ", typeArgs);
-
-					signature += ">";
+					genericTypeOrEmpty = $"<{string.Join(", ", typeArgs)}>";
 				}
-
-				signature += "(";
 
 				var parameters =
 					from parameter in method.Parameters
+					let declaration = parameter.DeclaringSyntaxReferences.First().GetSyntax()
+					let attributeList = declaration.DescendantNodes().OfType<AttributeListSyntax>().FirstOrDefault()
+					let attributeTypes = parameter.GetAttributes().Select(attr => attr.AttributeClass?.SimplifyType(namespaces)).ToList()
+					let refKind = parameter.RefKind == RefKind.Out ? "out " : ""
 					let type = parameter.Type.SimplifyType(namespaces)
 					let name = parameter.Name
 					let defaultValue = parameter.GetExplicitDefaultValueString()
 					let defaultValueString = defaultValue != null ? " = " + defaultValue : null
-					select $"{type} {name}{defaultValueString}";
+					select $"{attributeList?.ToFullString()}{refKind}{type} {name}{defaultValueString}";
 
-				signature += string.Join(", ", parameters);
+				string methodSignature;
 
-				signature += ");";
+				if (!IsInterfaceMethodImplementation(method))
+				{
+					methodSignature = $"\t {returnType} {method.Name}{genericTypeOrEmpty}({string.Join(", ", parameters)});";
+				}
+				else
+				{
+					methodSignature = $"\t /* SKIPPED: Implements an interface */ /* {returnType} {method.Name}{genericTypeOrEmpty}({string.Join(", ", parameters)}); */";
+				}
 
-				methods.Add(signature);
+				methods.Add(methodSignature);
 			}
 		}
 
-		namespaces =
-			namespaces.Distinct()
-					  .OrderBy(x => x)
-					  .Where(x => x != interfaceNamespace)
-					  .Select(x => $"using {x};")
-					  .ToList();
+		namespaces = namespaces.Distinct()
+			.OrderBy(x => x)
+			.Where(x => x != interfaceNamespace)
+			.Select(x => $"using {x};")
+			.ToList();
 
 		var source =
 			$$"""
@@ -131,5 +134,23 @@ internal class AutoInterfaceGenerator : GeneratorStep<ClassDeclarationSyntax>
 			""";
 
 		AddSource($"{className}.AutoInterface.g.cs", source);
+	}
+
+	private static bool IsInterfaceMethodImplementation(IMethodSymbol method)
+	{
+		foreach (INamedTypeSymbol implementedInterfaceSymbol in method.ContainingType.AllInterfaces)
+		{
+			foreach (ISymbol interfaceMember in implementedInterfaceSymbol.GetMembers())
+			{
+				ISymbol? foundMember = method.ContainingType.FindImplementationForInterfaceMember(interfaceMember);
+
+				if (SymbolEqualityComparer.IncludeNullability.Equals(method, foundMember))
+				{
+					return true;
+				}
+			}
+		}
+
+		return false;
 	}
 }

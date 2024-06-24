@@ -46,9 +46,30 @@ public class HwiEnumerateEntry
 		{
 			HardwareWalletModels.Coldcard or HardwareWalletModels.Coldcard_Simulator => WalletType.Coldcard,
 			HardwareWalletModels.Ledger_Nano_S or HardwareWalletModels.Ledger_Nano_X or HardwareWalletModels.Ledger_Nano_S_Plus => WalletType.Ledger,
-			HardwareWalletModels.Trezor_1 or HardwareWalletModels.Trezor_1_Simulator or HardwareWalletModels.Trezor_T or HardwareWalletModels.Trezor_T_Simulator => WalletType.Trezor,
+			HardwareWalletModels.Trezor_1 or HardwareWalletModels.Trezor_1_Simulator or HardwareWalletModels.Trezor_T or HardwareWalletModels.Trezor_T_Simulator or HardwareWalletModels.Trezor_Safe_3 => WalletType.Trezor,
+			HardwareWalletModels.Jade => WalletType.Jade,
+			HardwareWalletModels.BitBox02_BTCOnly => WalletType.BitBox,
 			_ => WalletType.Hardware
 		};
+
+	/// <summary>
+	/// Returns true if the device supports offline PSBT signing.
+	/// </summary>
+	public bool IsOfflinePsbtWorkflowCompatible()
+	{
+		return Model switch
+		{
+			HardwareWalletModels.Coldcard => true,
+			HardwareWalletModels.Ledger_Nano_S or HardwareWalletModels.Ledger_Nano_X or HardwareWalletModels.Ledger_Nano_S_Plus => false,
+			HardwareWalletModels.Trezor_1 => false,
+			HardwareWalletModels.Trezor_T => false,
+			HardwareWalletModels.Trezor_Safe_3 => false,
+			HardwareWalletModels.Trezor_1_Simulator or HardwareWalletModels.Trezor_T_Simulator or HardwareWalletModels.Coldcard_Simulator => false,
+			HardwareWalletModels.Jade => false,
+			HardwareWalletModels.BitBox02_BTCOnly => false,
+			_ => false
+		};
+	}
 
 	public bool IsInitialized()
 	{

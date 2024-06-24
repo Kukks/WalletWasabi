@@ -13,6 +13,11 @@ using WalletWasabi.WabiSabi.Client;
 using WalletWasabi.WabiSabi.Models;
 using WalletWasabi.WabiSabi.Models.MultipartyTransaction;
 using LogLevel = WalletWasabi.Logging.LogLevel;
+using WalletWasabi.Models;
+using WalletWasabi.WabiSabi.Client;
+using WalletWasabi.WabiSabi.Client.Batching;
+using WalletWasabi.WabiSabi.Client.CoinJoin.Client;
+using PendingPayment = WalletWasabi.WabiSabi.Client.PendingPayment;
 
 namespace WalletWasabi.Wallets;
 
@@ -29,6 +34,7 @@ public interface IWallet
 	void Log(LogLevel logLevel, string logMessage, [CallerFilePath] string callerFilePath = "",
 		[CallerMemberName] string callerMemberName = "", [CallerLineNumber] int callerLineNumber = -1);
 	string WalletName { get; }
+	WalletId WalletId { get; }
 	bool IsUnderPlebStop { get; }
 	bool IsMixable(string coordinator);
 
@@ -38,6 +44,9 @@ public interface IWallet
 	IKeyChain? KeyChain { get; }
 
 	IDestinationProvider DestinationProvider { get; }
+	OutputProvider GetOutputProvider (string coordinatorName);
+	PaymentBatch BatchedPayments => new();
+
 	int AnonScoreTarget { get; }
 	ConsolidationModeType ConsolidationMode { get; }
 	TimeSpan FeeRateMedianTimeFrame { get; }
@@ -77,5 +86,5 @@ public interface IRoundCoinSelector
 {
 	Task<(ImmutableList<SmartCoin> selected, Func<IEnumerable<AliceClient>, Task<bool>> acceptableRegistered, Func<ImmutableArray<AliceClient>, (IEnumerable<TxOut> outputTxOuts, Dictionary<TxOut, PendingPayment> batchedPayments), TransactionWithPrecomputedData, RoundState, Task<bool>> acceptableOutputs)>
 		SelectCoinsAsync((IEnumerable<SmartCoin> Candidates, IEnumerable<SmartCoin> Ineligible) candidates,
-			UtxoSelectionParameters utxoSelectionParameters, Money liquidityClue, SecureRandom secureRandom);
+			RoundParameters roundParameters, Money liquidityClue, SecureRandom secureRandom, string coordinatorName);
 }

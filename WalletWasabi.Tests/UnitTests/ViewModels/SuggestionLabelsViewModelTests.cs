@@ -1,11 +1,9 @@
 using System.Collections.Generic;
-using System.Reactive;
-using System.Threading.Tasks;
+using System.ComponentModel;
+using System.Reactive.Disposables;
 using DynamicData;
 using NBitcoin;
-using WalletWasabi.Blockchain.Transactions;
 using WalletWasabi.Fluent.Models.Wallets;
-using WalletWasabi.Fluent.ViewModels.Wallets;
 using WalletWasabi.Fluent.ViewModels.Wallets.Labels;
 using WalletWasabi.Wallets;
 using Xunit;
@@ -30,7 +28,7 @@ public class SuggestionLabelsViewModelTests
 				("Label 4", 5),
 				("Label 5", 4)
 			});
-		var sut = new SuggestionLabelsViewModel(wallet, Intent.Send, maxSuggestions);
+		var sut = CreateSut(wallet, Intent.Send, maxSuggestions);
 
 		Assert.Equal(expectedSuggestionsCount, sut.TopSuggestions.Count);
 	}
@@ -48,7 +46,7 @@ public class SuggestionLabelsViewModelTests
 				("Label 5", 5),
 			});
 
-		var sut = new SuggestionLabelsViewModel(wallet, Intent.Send, 3);
+		var sut = CreateSut(wallet, Intent.Send, 3);
 
 		sut.Labels.Add("Label 3");
 
@@ -58,7 +56,7 @@ public class SuggestionLabelsViewModelTests
 	[Fact]
 	public void NoLabelsShouldHaveNoSuggestions()
 	{
-		var sut = new SuggestionLabelsViewModel(new TestWallet(new List<(string Label, int Score)>()), Intent.Receive, 5);
+		var sut = CreateSut(new TestWallet(new List<(string Label, int Score)>()), Intent.Receive, 5);
 
 		Assert.Empty(sut.Suggestions);
 	}
@@ -66,7 +64,7 @@ public class SuggestionLabelsViewModelTests
 	[Fact]
 	public void NoLabelsShouldHaveNoTopSuggestions()
 	{
-		var sut = new SuggestionLabelsViewModel(new TestWallet(new List<(string Label, int Score)>()), Intent.Receive, 5);
+		var sut = CreateSut(new TestWallet(new List<(string Label, int Score)>()), Intent.Receive, 5);
 
 		Assert.Empty(sut.Suggestions);
 	}
@@ -81,7 +79,7 @@ public class SuggestionLabelsViewModelTests
 			("Label 3", 2),
 		};
 		var wallet = new TestWallet(mostUsedLabels);
-		var sut = new SuggestionLabelsViewModel(wallet, Intent.Send, 100);
+		var sut = CreateSut(wallet, Intent.Send, 100);
 
 		Assert.Equal(new[] { "Label 2", "Label 3", "Label 1" }, sut.Suggestions);
 	}
@@ -132,7 +130,7 @@ public class SuggestionLabelsViewModelTests
 			("Label 3", 2),
 		};
 		var wallet = new TestWallet(mostUsedLabels);
-		var sut = new SuggestionLabelsViewModel(wallet, Intent.Send, 1);
+		var sut = CreateSut(wallet, Intent.Send, 1);
 
 		sut.Labels.Add("Label 1");
 		sut.Labels.Add("Label 2");
@@ -154,9 +152,16 @@ public class SuggestionLabelsViewModelTests
 			("Label 3", 3),
 		};
 		var wallet = new TestWallet(labels);
-		var sut = new SuggestionLabelsViewModel(wallet, Intent.Send, 100);
+		var sut = CreateSut(wallet, Intent.Send, 100);
 
 		Assert.Equal(new[] { "label 3", "Label 2", "label 1" }, sut.Suggestions);
+	}
+
+	private static SuggestionLabelsViewModel CreateSut(TestWallet wallet, Intent intent, int maxSuggestions)
+	{
+		var sut = new SuggestionLabelsViewModel(wallet, intent, maxSuggestions);
+		sut.Activate(new CompositeDisposable());
+		return sut;
 	}
 
 	private class TestWallet : IWalletModel
@@ -168,41 +173,46 @@ public class SuggestionLabelsViewModelTests
 			_mostUsedLabels = mostUsedLabels;
 		}
 
-		public string Name => throw new NotSupportedException();
+		public event PropertyChangedEventHandler? PropertyChanged;
 
-		public IObservable<IChangeSet<TransactionSummary, uint256>> Transactions => throw new NotSupportedException();
+		public IAddressesModel Addresses => throw new NotSupportedException();
+		public WalletId Id => throw new NotSupportedException();
 
-		public IWalletBalancesModel Balances => throw new NotSupportedException();
-
-		public IObservable<IChangeSet<IAddress, string>> Addresses => throw new NotSupportedException();
-
-		public bool IsLoggedIn => throw new NotSupportedException();
+		public string Name
+		{
+			get => throw new NotSupportedException();
+			set => throw new NotSupportedException();
+		}
 
 		public IObservable<WalletState> State => throw new NotSupportedException();
-
 		bool IWalletModel.IsHardwareWallet => throw new NotSupportedException();
-
 		public bool IsWatchOnlyWallet => throw new NotSupportedException();
+		public IWalletAuthModel Auth => throw new NotSupportedException();
+		public IWalletLoadWorkflow Loader => throw new NotSupportedException();
+		public IWalletSettingsModel Settings => throw new NotSupportedException();
+		public IWalletCoinsModel Coins => throw new NotSupportedException();
+		public IWalletPrivacyModel Privacy => throw new NotSupportedException();
+		public IWalletCoinjoinModel Coinjoin => throw new NotSupportedException();
+		public Network Network => throw new NotSupportedException();
+		IWalletTransactionsModel IWalletModel.Transactions => throw new NotSupportedException();
+		public IObservable<Amount> Balances => throw new NotSupportedException();
+		public IObservable<bool> HasBalance => throw new NotSupportedException();
+		public IAmountProvider AmountProvider => throw new NotSupportedException();
+		public IBuyAnythingModel BuyAnything => throw new NotSupportedException();
 
-		public WalletType WalletType => throw new NotSupportedException();
+		public bool IsLoggedIn { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
 
-		public IWalletAuthModel Auth => throw new NotImplementedException();
-
-		public IWalletLoadWorkflow Loader => throw new NotImplementedException();
-
-		public IWalletSettingsModel Settings => throw new NotImplementedException();
-
-		public IWalletCoinsModel Coins => throw new NotImplementedException();
-
-		public IWalletPrivacyModel Privacy => throw new NotImplementedException();
-
-		public IWalletCoinjoinModel Coinjoin => throw new NotImplementedException();
-
-		public IObservable<Unit> TransactionProcessed => throw new NotImplementedException();
+		public bool IsLoaded { get; set; }
 
 		public IAddress GetNextReceiveAddress(IEnumerable<string> destinationLabels)
 		{
 			throw new NotSupportedException();
+		}
+
+		public void Rename(string newWalletName) => throw new NotSupportedException();
+
+		public void Dispose()
+		{
 		}
 
 		public IEnumerable<(string Label, int Score)> GetMostUsedLabels(Intent intent)
@@ -210,22 +220,12 @@ public class SuggestionLabelsViewModelTests
 			return _mostUsedLabels;
 		}
 
-		public Task<WalletLoginResult> TryLoginAsync(string password)
-		{
-			throw new NotSupportedException();
-		}
-
-		public void Login()
-		{
-			throw new NotSupportedException();
-		}
-
-		public void Logout()
-		{
-			throw new NotSupportedException();
-		}
-
 		public IWalletInfoModel GetWalletInfo()
+		{
+			throw new NotSupportedException();
+		}
+
+		public IWalletStatsModel GetWalletStats()
 		{
 			throw new NotImplementedException();
 		}

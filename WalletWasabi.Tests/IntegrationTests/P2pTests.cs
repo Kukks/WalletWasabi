@@ -20,6 +20,8 @@ using WalletWasabi.Services;
 using WalletWasabi.Stores;
 using WalletWasabi.Tests.Helpers;
 using WalletWasabi.Wallets;
+using WalletWasabi.Wallets.BlockProvider;
+using WalletWasabi.Wallets.FilterProcessor;
 using WalletWasabi.WebClients.Wasabi;
 using Xunit;
 
@@ -99,7 +101,7 @@ public class P2pTests
 
 		KeyManager keyManager = KeyManager.CreateNew(out _, "password", network);
 		await using WasabiHttpClientFactory httpClientFactory = new(Common.TorSocks5Endpoint, backendUriGetter: () => new Uri("http://localhost:12345"));
-		WasabiSynchronizer synchronizer = new(requestInterval: TimeSpan.FromSeconds(3), 10000, bitcoinStore, httpClientFactory);
+		using WasabiSynchronizer synchronizer = new(period: TimeSpan.FromSeconds(3), 10000, bitcoinStore, httpClientFactory);
 		var feeProvider = new HybridFeeProvider(synchronizer, null);
 
 		ServiceConfiguration serviceConfig = new(new IPEndPoint(IPAddress.Loopback, network.DefaultPort), Money.Coins(Constants.DefaultDustThreshold));
@@ -109,25 +111,18 @@ public class P2pTests
 			ExpirationScanFrequency = TimeSpan.FromSeconds(30)
 		});
 
-		IRepository<uint256, Block> blockRepository = bitcoinStore.BlockRepository;
+		IFileSystemBlockRepository blockRepository = bitcoinStore.BlockRepository;
 		await using SpecificNodeBlockProvider specificNodeBlockProvider = new(network, serviceConfig, httpClientFactory.TorEndpoint);
 
-		IBlockProvider blockProvider = new SmartBlockProvider(
-			blockRepository,
-			rpcBlockProvider: null,
-			specificNodeBlockProvider,
-			new P2PBlockProvider(network, nodes, httpClientFactory.IsTorEnabled),
-			cache);
+		using BlockDownloadService blockDownloadService = new(
+			bitcoinStore.BlockRepository,
+			[specificNodeBlockProvider],
+			new P2PBlockProvider(network, nodes, httpClientFactory.IsTorEnabled));
 
-		using Wallet wallet = Wallet.CreateAndRegisterServices(
-			network,
-			bitcoinStore,
-			keyManager,
-			synchronizer,
-			dataDir,
-			new ServiceConfiguration(new IPEndPoint(IPAddress.Loopback, network.DefaultPort), Money.Coins(Constants.DefaultDustThreshold)),
-			feeProvider,
-			blockProvider);
+		ServiceConfiguration serviceConfiguration = new(new IPEndPoint(IPAddress.Loopback, network.DefaultPort), Money.Coins(Constants.DefaultDustThreshold));
+		WalletFactory walletFactory = new(dataDir, network, bitcoinStore, synchronizer, serviceConfiguration, feeProvider, blockDownloadService);
+		using Wallet wallet = walletFactory.CreateAndInitialize(keyManager);
+
 		Assert.True(Directory.Exists(blocks.BlocksFolderPath));
 
 		try
@@ -144,11 +139,11 @@ public class P2pTests
 
 			nodes.Connect();
 
-			var downloadTasks = new List<Task<Block>>();
+			var downloadTasks = new List<Task<BlockDownloadService.IResult>>();
 			using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(4));
 			foreach (var hash in blocksToDownload)
 			{
-				downloadTasks.Add(blockProvider.GetBlockAsync(hash, cts.Token));
+				downloadTasks.Add(blockDownloadService.TryGetBlockAsync(P2pSourceRequest.Automatic, hash, new Priority(SyncType.Complete), cts.Token));
 			}
 
 			await nodeConnectionAwaiter.WaitAsync(TimeSpan.FromMinutes(3));
