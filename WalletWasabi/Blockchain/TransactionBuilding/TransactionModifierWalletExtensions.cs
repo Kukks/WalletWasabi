@@ -230,7 +230,7 @@ public static class TransactionModifierWalletExtensions
 		return rbf;
 	}
 
-	public static BuildTransactionResult CpfpTransaction(this Wallet wallet, SmartTransaction transactionToCpfp, FeeRate? preferredFeeRate = null)
+	public static BuildTransactionResult CpfpTransaction(this Wallet? wallet, SmartTransaction transactionToCpfp, FeeRate? preferredFeeRate = null)
 	{
 		var keyManager = wallet.KeyManager;
 		var ownOutput = transactionToCpfp.GetWalletOutputs(keyManager).Where(x => !x.IsSpent()).OrderByDescending(x => x.Amount).FirstOrDefault() ?? throw new InvalidOperationException($"Can't CPFP: transaction has no unspent wallet output.");
@@ -266,7 +266,7 @@ public static class TransactionModifierWalletExtensions
 		}
 	}
 
-	public static BuildTransactionResult CpfpTransaction(this Wallet wallet, SmartTransaction transactionToCpfp, IEnumerable<SmartCoin> allowedInputs, FeeRate? preferredFeeRate = null)
+	public static BuildTransactionResult CpfpTransaction(this Wallet? wallet, SmartTransaction transactionToCpfp, IEnumerable<SmartCoin> allowedInputs, FeeRate? preferredFeeRate = null)
 	{
 		var keyManager = wallet.KeyManager;
 		var network = wallet.Network;

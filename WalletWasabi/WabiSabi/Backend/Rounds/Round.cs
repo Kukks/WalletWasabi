@@ -93,7 +93,7 @@ public class Round
 			throw new ArgumentException($"Invalid phase {phase}. This is a bug.", nameof(phase));
 		}
 
-		this.LogInfo(null,$"Phase changed: {Phase} -> {phase}");
+		this.LogInfo(null,null,$"Phase changed: {Phase} -> {phase}");
 		Phase = phase;
 
 		if (phase == Phase.ConnectionConfirmation)

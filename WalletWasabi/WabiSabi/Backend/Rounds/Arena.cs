@@ -179,7 +179,7 @@ public partial class Arena : PeriodicRunner
 
 					MaxSuggestedAmountProvider.StepMaxSuggested(round, false);
 					EndRound(round, EndRoundState.AbortedNotEnoughAlices);
-					round.LogInfo(null,$"Not enough inputs ({round.InputCount}) in {nameof(Phase.InputRegistration)} phase. The minimum is ({round.Parameters.MinInputCountByRound}). {nameof(round.Parameters.MaxSuggestedAmount)} was '{round.Parameters.MaxSuggestedAmount}' BTC.");
+					round.LogInfo(null, null, $"Not enough inputs ({round.InputCount}) in {nameof(Phase.InputRegistration)} phase. The minimum is ({round.Parameters.MinInputCountByRound}). {nameof(round.Parameters.MaxSuggestedAmount)} was '{round.Parameters.MaxSuggestedAmount}' BTC.");
 				}
 				else if (round.IsInputRegistrationEnded(round.Parameters.MaxInputCountByRound))
 				{
@@ -190,7 +190,7 @@ public partial class Arena : PeriodicRunner
 			catch (Exception ex)
 			{
 				EndRound(round, EndRoundState.AbortedWithError);
-				round.LogError(null,ex.Message);
+				round.LogError(null,null,ex.Message);
 			}
 		}
 	}
@@ -213,7 +213,7 @@ public partial class Arena : PeriodicRunner
 						Prison.FailedToConfirm(alice.Coin.Outpoint, alice.Coin.Amount, round.Id);
 					}
 					var removedAliceCount = round.Alices.RemoveAll(x => alicesDidNotConfirm.Contains(x));
-					round.LogInfo(null,$"{removedAliceCount} alices removed because they didn't confirm.");
+					round.LogInfo(null, null, $"{removedAliceCount} alices removed because they didn't confirm.");
 
 					// Once an input is confirmed and non-zero credentials are issued, it is too late to do any
 					if (round.InputCount >= round.Parameters.MinInputCountByRound)
@@ -230,7 +230,7 @@ public partial class Arena : PeriodicRunner
 
 						if (offendingAliceCounter > 0)
 						{
-							round.LogInfo(null, $"There were {offendingAliceCounter} alices that spent the registered UTXO. Aborting...");
+							round.LogInfo(null, null,  $"There were {offendingAliceCounter} alices that spent the registered UTXO. Aborting...");
 
 							await EndRoundAndTryCreateBlameRoundAsync(round, cancel).ConfigureAwait(false);
 							return;
@@ -240,7 +240,7 @@ public partial class Arena : PeriodicRunner
 					if (round.InputCount < round.Parameters.MinInputCountByRound)
 					{
 						EndRound(round, EndRoundState.AbortedNotEnoughAlices);
-						round.LogInfo(null,$"Not enough inputs ({round.InputCount}) in {nameof(Phase.ConnectionConfirmation)} phase. The minimum is ({round.Parameters.MinInputCountByRound}).");
+						round.LogInfo(null, null, $"Not enough inputs ({round.InputCount}) in {nameof(Phase.ConnectionConfirmation)} phase. The minimum is ({round.Parameters.MinInputCountByRound}).");
 					}
 					else
 					{
@@ -252,7 +252,7 @@ public partial class Arena : PeriodicRunner
 			catch (Exception ex)
 			{
 				EndRound(round, EndRoundState.AbortedWithError);
-				round.LogError(null,ex.Message);
+				round.LogError(null,null,ex.Message);
 			}
 		}
 	}
@@ -270,8 +270,8 @@ public partial class Arena : PeriodicRunner
 				{
 					var coinjoin = round.Assert<ConstructionState>();
 
-					round.LogInfo(null,$"{coinjoin.Inputs.Count()} inputs were added.");
-					round.LogInfo(null,$"{coinjoin.Outputs.Count()} outputs were added.");
+					round.LogInfo(null, null, $"{coinjoin.Inputs.Count()} inputs were added.");
+					round.LogInfo(null, null, $"{coinjoin.Outputs.Count()} outputs were added.");
 
 					coinjoin = await AddCoordinationFee(round, coinjoin, cancellationToken).ConfigureAwait(false);
 					round.CoinjoinState = FinalizeTransaction(round.Id, coinjoin);
@@ -290,7 +290,7 @@ public partial class Arena : PeriodicRunner
 			catch (Exception ex)
 			{
 				EndRound(round, EndRoundState.AbortedWithError);
-				round.LogError(null,ex.Message);
+				round.LogError(null,null,ex.Message);
 			}
 		}
 	}
@@ -308,38 +308,38 @@ public partial class Arena : PeriodicRunner
 					Transaction coinjoin = state.CreateTransaction();
 
 					// Logging.
-					round.LogInfo(null,"Trying to broadcast coinjoin.");
+					round.LogInfo(null, null, "Trying to broadcast coinjoin.");
 					Coin[] spentCoins = round.CoinjoinState.Inputs.ToArray();
 					Money networkFee = coinjoin.GetFee(spentCoins);
-					round.LogInfo(null,$"Network Fee: {networkFee.ToString(false, false)} BTC.");
+					round.LogInfo(null, null, $"Network Fee: {networkFee.ToString(false, false)} BTC.");
 					uint256 roundId = round.Id;
 					FeeRate feeRate = coinjoin.GetFeeRate(spentCoins);
-					round.LogInfo(null,$"Network Fee Rate: {feeRate.SatoshiPerByte} sat/vByte.");
-					round.LogInfo(null,$"Desired Fee Rate: {round.Parameters.MiningFeeRate.SatoshiPerByte} sat/vByte.");
+					round.LogInfo(null, null, $"Network Fee Rate: {feeRate.SatoshiPerByte} sat/vByte.");
+					round.LogInfo(null, null, $"Desired Fee Rate: {round.Parameters.MiningFeeRate.SatoshiPerByte} sat/vByte.");
 
 					// Added for monitoring reasons.
 					try
 					{
 						FeeRate targetFeeRate = (await Rpc.EstimateConservativeSmartFeeAsync((int)Config.ConfirmationTarget, cancellationToken).ConfigureAwait(false)).FeeRate;
-						round.LogInfo(null,$"Current Fee Rate on the Network: {targetFeeRate.SatoshiPerByte} sat/vByte. Confirmation target is: {(int)Config.ConfirmationTarget} blocks.");
+						round.LogInfo(null, null, $"Current Fee Rate on the Network: {targetFeeRate.SatoshiPerByte} sat/vByte. Confirmation target is: {(int)Config.ConfirmationTarget} blocks.");
 					}
 					catch (Exception ex)
 					{
 						Logger.LogDebug($"Could not log fee rate monitoring: '{ex.Message}'.");
 					}
 
-					round.LogInfo(null,$"Number of inputs: {coinjoin.Inputs.Count}.");
-					round.LogInfo(null,$"Number of outputs: {coinjoin.Outputs.Count}.");
-					round.LogInfo(null,$"Serialized Size: {coinjoin.GetSerializedSize() / 1024.0} KB.");
-					round.LogInfo(null,$"VSize: {coinjoin.GetVirtualSize() / 1024.0} KB.");
+					round.LogInfo(null, null, $"Number of inputs: {coinjoin.Inputs.Count}.");
+					round.LogInfo(null, null, $"Number of outputs: {coinjoin.Outputs.Count}.");
+					round.LogInfo(null, null, $"Serialized Size: {coinjoin.GetSerializedSize() / 1024.0} KB.");
+					round.LogInfo(null, null, $"VSize: {coinjoin.GetVirtualSize() / 1024.0} KB.");
 					var indistinguishableOutputs = coinjoin.GetIndistinguishableOutputs(includeSingle: true);
 					foreach (var (value, count) in indistinguishableOutputs.Where(x => x.count > 1))
 					{
-						round.LogInfo(null,$"There are {count} occurrences of {value.ToString(true, false)} outputs.");
+						round.LogInfo(null, null, $"There are {count} occurrences of {value.ToString(true, false)} outputs.");
 					}
 
 					round.LogInfo(
-						null,$"There are {indistinguishableOutputs.Count(x => x.count == 1)} occurrences of unique outputs.");
+						null,null,$"There are {indistinguishableOutputs.Count(x => x.count == 1)} occurrences of unique outputs.");
 
 					// Store transaction.
 					if (TransactionArchiver is not null)
@@ -350,7 +350,7 @@ public partial class Arena : PeriodicRunner
 					// Broadcasting.
 					await Rpc.SendRawTransactionAsync(coinjoin, cancellationToken).ConfigureAwait(false);
 					EndRound(round, EndRoundState.TransactionBroadcasted);
-					round.LogInfo(null, $"Successfully broadcast the coinjoin: {coinjoin.GetHash()}.");
+					round.LogInfo(null, null,  $"Successfully broadcast the coinjoin: {coinjoin.GetHash()}.");
 
 
 					foreach (var address in coinjoin.Outputs
@@ -360,11 +360,11 @@ public partial class Arena : PeriodicRunner
 						if ( round.FeeTxOuts.Any(@out => @out.ScriptPubKey == address))
 						{
 							round.LogError(
-								null,$"Coordinator script pub key reuse detected: {address.ToHex()}");
+								null,null,$"Coordinator script pub key reuse detected: {address.ToHex()}");
 						}
 						else
 						{
-							round.LogError(null,$"Output script pub key reuse detected: {address.ToHex()}");
+							round.LogError(null,null,$"Output script pub key reuse detected: {address.ToHex()}");
 						}
 					}
 
@@ -373,7 +373,7 @@ public partial class Arena : PeriodicRunner
 				}
 				else if (round.TransactionSigningTimeFrame.HasExpired)
 				{
-					round.LogWarning(null,$"Signing phase failed with timed out after {round.TransactionSigningTimeFrame.Duration.TotalSeconds} seconds.");
+					round.LogWarning(null,null,$"Signing phase failed with timed out after {round.TransactionSigningTimeFrame.Duration.TotalSeconds} seconds.");
 					if (round.FastSigningPhase)
 					{
 						await FailFastTransactionSigningPhaseAsync(round, cancellationToken).ConfigureAwait(false);
@@ -386,12 +386,12 @@ public partial class Arena : PeriodicRunner
 			}
 			catch (RPCException ex)
 			{
-				round.LogError(null,$"Transaction broadcasting failed: '{ex}'.");
+				round.LogError(null,null,$"Transaction broadcasting failed: '{ex}'.");
 				EndRound(round, EndRoundState.TransactionBroadcastFailed);
 			}
 			catch (Exception ex)
 			{
-				round.LogWarning(null,$"Signing phase failed, reason: '{ex}'.");
+				round.LogWarning(null,null,$"Signing phase failed, reason: '{ex}'.");
 				EndRound(round, EndRoundState.AbortedWithError);
 			}
 		}
@@ -432,7 +432,7 @@ public partial class Arena : PeriodicRunner
 
 		var cnt = round.Alices.RemoveAll(alice => unsignedOutpoints.Contains(alice.Coin.Outpoint));
 
-		round.LogInfo(null,$"Removed {cnt} alices, because they didn't sign. Remaining: {round.InputCount}");
+		round.LogInfo(null, null, $"Removed {cnt} alices, because they didn't sign. Remaining: {round.InputCount}");
 
 		await EndRoundAndTryCreateBlameRoundAsync(round, cancellationToken).ConfigureAwait(false);
 	}
@@ -449,7 +449,7 @@ public partial class Arena : PeriodicRunner
 
 		var removedAlices = round.Alices.RemoveAll(alice => alicesToRemove.Contains(alice));
 
-		round.LogInfo(null,$"Removed {removedAlices} alices, because they weren't ready. Remaining: {round.InputCount}");
+		round.LogInfo(null, null, $"Removed {removedAlices} alices, because they weren't ready. Remaining: {round.InputCount}");
 
 		await EndRoundAndTryCreateBlameRoundAsync(round, cancellationToken).ConfigureAwait(false);
 	}
@@ -479,7 +479,7 @@ public partial class Arena : PeriodicRunner
 
 		BlameRound blameRound = new(parameters, round, blameWhitelist, SecureRandom.Instance);
 		AddRound(blameRound);
-		blameRound.LogInfo(null,$"Blame round created from round '{round.Id}'.");
+		blameRound.LogInfo(null, null, $"Blame round created from round '{round.Id}'.");
 	}
 
 	private async Task CreateRoundsAsync(CancellationToken cancellationToken)
@@ -528,9 +528,9 @@ public partial class Arena : PeriodicRunner
 
 						if (foundLargeRound is null)
 						{
-							largeRound.LogInfo(null,$"Mined round with parameters: {nameof(largeRound.Parameters.MaxSuggestedAmount)}:'{largeRound.Parameters.MaxSuggestedAmount}' BTC.");
+							largeRound.LogInfo(null, null, $"Mined round with parameters: {nameof(largeRound.Parameters.MaxSuggestedAmount)}:'{largeRound.Parameters.MaxSuggestedAmount}' BTC.");
 						}
-						smallRound.LogInfo(null,$"Mined round with parameters: {nameof(smallRound.Parameters.MaxSuggestedAmount)}:'{smallRound.Parameters.MaxSuggestedAmount}' BTC.");
+						smallRound.LogInfo(null, null, $"Mined round with parameters: {nameof(smallRound.Parameters.MaxSuggestedAmount)}:'{smallRound.Parameters.MaxSuggestedAmount}' BTC.");
 
 						// If it can't create the large round, then don't abort.
 						EndRound(round, EndRoundState.AbortedLoadBalancing);
@@ -550,7 +550,7 @@ public partial class Arena : PeriodicRunner
 
 			var r = new Round(parameters, SecureRandom.Instance);
 			AddRound(r);
-			r.LogInfo(null,$"Created round with parameters: {r.Parameters.MiningFeeRate} mining fee, {r.Parameters.MinInputCountByRound} min inputs");
+			r.LogInfo(null, null, $"Created round with parameters: {r.Parameters.MiningFeeRate} mining fee, {r.Parameters.MinInputCountByRound} min inputs");
 		}
 	}
 
@@ -582,7 +582,7 @@ public partial class Arena : PeriodicRunner
 
 		if (times > maxCycleTimes)
 		{
-			r.LogInfo(null,"First ordered round creation too expensive. Skipping...");
+			r.LogInfo(null, null, "First ordered round creation too expensive. Skipping...");
 			return null;
 		}
 		else
@@ -617,7 +617,7 @@ public partial class Arena : PeriodicRunner
 			var removedAliceCount = alicesToRemove.Length;
 			if (removedAliceCount > 0)
 			{
-				round.LogInfo(null,$"{removedAliceCount} alices timed out and removed.");
+				round.LogInfo(null, null, $"{removedAliceCount} alices timed out and removed.");
 			}
 		}
 	}
@@ -631,7 +631,7 @@ public partial class Arena : PeriodicRunner
 		if (collectedCoordinationFee == 0)
 		{
 			round.FeeTxOuts = [];
-			round.LogInfo(null,$"Coordination fee wasn't taken, because it was free for everyone. Hurray!");
+			round.LogInfo(null, null, $"Coordination fee wasn't taken, because it was free for everyone. Hurray!");
 		}
 		if(Config.CoordinatorSplits.Any())
 		{
@@ -645,7 +645,7 @@ public partial class Arena : PeriodicRunner
 			var coordinationFee = coinjoin.Balance - expectedCost;
 			if (coordinationFee > 0)
 			{
-				round.LogInfo(null,$"Coordination fee was originally {Money.Satoshis(collectedCoordinationFee).ToDecimal(MoneyUnit.BTC)}, " +
+				round.LogInfo(null, null, $"Coordination fee was originally {Money.Satoshis(collectedCoordinationFee).ToDecimal(MoneyUnit.BTC)}, " +
 				                   $"but we're now at {coordinationFee.ToDecimal(MoneyUnit.BTC)} after computing advertised feerate and splitting it among the coordinator scripts.");
 				var txOuts = ComputeSplitAmounts(coordinationFee, splits, round);
 				coinjoin = txOuts.Aggregate(coinjoin, (current, txOut) => current.AddOutput(txOut)).AsPayingForSharedOverhead();
@@ -653,7 +653,7 @@ public partial class Arena : PeriodicRunner
 			}
 			if(coinjoin.EffectiveFeeRate > coinjoin.Parameters.MiningFeeRate)
 			{
-				round.LogWarning(null,$"Effective fee rate is higher than the advertised fee rate. Effective: {coinjoin.EffectiveFeeRate.SatoshiPerByte}, Advertised: {coinjoin.Parameters.MiningFeeRate.SatoshiPerByte}");
+				round.LogWarning(null,null,$"Effective fee rate is higher than the advertised fee rate. Effective: {coinjoin.EffectiveFeeRate.SatoshiPerByte}, Advertised: {coinjoin.Parameters.MiningFeeRate.SatoshiPerByte}");
 			}
 		}
 
@@ -730,7 +730,7 @@ public partial class Arena : PeriodicRunner
 			var roundOrNull = Rounds.FirstOrDefault(x => x.Id == disruptedRoundId);
 			if (roundOrNull is { } nonNullRound)
 			{
-				nonNullRound.LogInfo(null,"Round aborted because it was disrupted by double spenders.");
+				nonNullRound.LogInfo(null, null, "Round aborted because it was disrupted by double spenders.");
 				nonNullRound.EndRound(EndRoundState.AbortedDoubleSpendingDetected);
 			}
 		}

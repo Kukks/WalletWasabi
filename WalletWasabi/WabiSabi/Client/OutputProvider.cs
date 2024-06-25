@@ -17,11 +17,11 @@ namespace WalletWasabi.WabiSabi.Client;
 
 public class OutputProvider
 {
-	private readonly IWallet _wallet;
+	private readonly IWallet? _wallet;
 
 	private WasabiRandom Random { get; }
 
-	public OutputProvider(IWallet wallet,  WasabiRandom? random = null)
+	public OutputProvider(IWallet? wallet,  WasabiRandom? random = null)
 	{
 		_wallet = wallet;
 

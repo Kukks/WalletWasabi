@@ -21,11 +21,9 @@ public class SmartCoin : NotifyPropertyChangedBase, IEquatable<SmartCoin>, IDest
 	private Height _height;
 	private SmartTransaction? _spenderTransaction;
 	private bool _coinJoinInProgress;
-	private DateTimeOffset? _bannedUntilUtc;
 	private bool _spentAccordingToBackend;
 
 	private bool _confirmed;
-	private bool _isBanned;
 	private bool _isExcludedFromCoinJoin;
 
 	private Lazy<uint256> _transactionId;

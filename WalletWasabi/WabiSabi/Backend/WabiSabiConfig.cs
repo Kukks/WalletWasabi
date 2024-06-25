@@ -23,18 +23,6 @@ using WalletWasabi.WabiSabi.Backend.DoSPrevention;
 using WalletWasabi.Helpers;
 
 namespace WalletWasabi.WabiSabi.Backend;
-public class DefaultCoordinatorSplits : DefaultValueAttribute
-{
-
-	public override object? Value => WabiSabiConfig.DefaultCoordinatorSplits;
-
-	public DefaultCoordinatorSplits(string? value) : base(value)
-	{
-
-	}
-};
-
-
 
 [JsonObject(MemberSerialization.OptIn)]
 public class WabiSabiConfig : ConfigBase
@@ -166,27 +154,8 @@ public class WabiSabiConfig : ConfigBase
 		[JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
 		public string Value { get; set; }
 	}
-
-	public static List<CoordinatorSplit> DefaultCoordinatorSplits =new()
-	{
-		new CoordinatorSplit()
-		{
-			Ratio = 1,
-			Type = "hrf"
-
-		},
-		new CoordinatorSplit()
-		{
-			Ratio = 1,
-			Type = "opensats",
-			Value = "btcpayserver"
-
-		}
-	};
-
-	[DefaultCoordinatorSplits(null)]
 	[JsonProperty(PropertyName = "CoordinatorSplits", DefaultValueHandling = DefaultValueHandling.Populate)]
-	public List<CoordinatorSplit> CoordinatorSplits { get; set; } = DefaultCoordinatorSplits;
+	public List<CoordinatorSplit> CoordinatorSplits { get; set; } = new();
 
 	[DefaultValueMoneyBtc("0.1")]
 	[JsonProperty(PropertyName = "MaxSuggestedAmountBase", DefaultValueHandling = DefaultValueHandling.Populate)]

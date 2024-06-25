@@ -163,7 +163,7 @@ public class WalletManager : IWalletProvider
 		return null;
 	}
 
-	public Task<IEnumerable<IWallet>> GetWalletsAsync() => Task.FromResult<IEnumerable<IWallet>>(GetWallets());
+	public Task<IEnumerable<IWallet?>> GetWalletsAsync() => Task.FromResult<IEnumerable<IWallet>>(GetWallets());
 
 	public IEnumerable<Wallet> GetWallets()
 	{

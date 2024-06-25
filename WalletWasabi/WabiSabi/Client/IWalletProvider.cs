@@ -6,5 +6,5 @@ namespace WalletWasabi.WabiSabi.Client;
 
 public interface IWalletProvider
 {
-	Task<IEnumerable<IWallet>> GetWalletsAsync();
+	Task<IEnumerable<IWallet?>> GetWalletsAsync();
 }

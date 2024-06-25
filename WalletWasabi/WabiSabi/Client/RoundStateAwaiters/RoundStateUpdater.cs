@@ -41,16 +41,16 @@ public class RoundStateUpdater : PeriodicRunner
 		{
 			return;
 		}
-		if (SlowRequestsMode)
-		{
-			lock (AwaitersLock)
-			{
-				if (Awaiters.Count == 0 && DateTimeOffset.UtcNow - LastSuccessfulRequestTime < TimeSpan.FromMinutes(5))
-				{
-					return;
-				}
-			}
-		}
+		// if (SlowRequestsMode)
+		// {
+		// 	lock (AwaitersLock)
+		// 	{
+		// 		if (Awaiters.Count == 0 && DateTimeOffset.UtcNow - LastSuccessfulRequestTime < TimeSpan.FromMinutes(5))
+		// 		{
+		// 			return;
+		// 		}
+		// 	}
+		// }
 
 		var request = new RoundStateRequest(
 			RoundStates.Select(x => new RoundStateCheckpoint(x.Key, x.Value.CoinjoinState.Events.Count)).ToImmutableList());

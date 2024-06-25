@@ -17,7 +17,7 @@ public static class TransactionBuilderWalletExtensions
 	/// <exception cref="ArgumentNullException"></exception>
 	/// <exception cref="ArgumentOutOfRangeException"></exception>
 	public static BuildTransactionResult BuildTransaction(
-		this Wallet wallet,
+		this Wallet? wallet,
 		string password,
 		PaymentIntent payments,
 		FeeStrategy feeStrategy,
@@ -61,7 +61,7 @@ public static class TransactionBuilderWalletExtensions
 	}
 
 	public static BuildTransactionResult BuildChangelessTransaction(
-		this Wallet wallet,
+		this Wallet? wallet,
 		IDestination destination,
 		LabelsArray label,
 		FeeRate feeRate,
@@ -71,7 +71,7 @@ public static class TransactionBuilderWalletExtensions
 		=> wallet.BuildChangelessTransaction(destination, label, feeRate, allowedInputs.Select(coin => coin.Outpoint), allowDoubleSpend, tryToSign);
 
 	public static BuildTransactionResult BuildChangelessTransaction(
-		this Wallet wallet,
+		this Wallet? wallet,
 		IDestination destination,
 		LabelsArray label,
 		FeeRate feeRate,
@@ -131,7 +131,7 @@ public static class TransactionBuilderWalletExtensions
 	}
 
 	public static BuildTransactionResult BuildTransactionWithoutOverpaymentProtection(
-		this Wallet wallet,
+		this Wallet? wallet,
 		string password,
 		PaymentIntent payments,
 		FeeStrategy feeStrategy,

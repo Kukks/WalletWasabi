@@ -105,6 +105,13 @@ public class Wallet : BackgroundService, IWallet
 
 	public WasabiSynchronizer Synchronizer { get; }
 	public ServiceConfiguration ServiceConfiguration { get; }
+
+	public void Log(LogLevel logLevel, string logMessage, string? coordinator, string callerFilePath = "",
+		string callerMemberName = "", int callerLineNumber = -1)
+	{
+		throw new NotImplementedException();
+	}
+
 	public string WalletName => KeyManager.WalletName;
 
 	public CoinsRegistry Coins { get; }
@@ -161,16 +168,16 @@ public class Wallet : BackgroundService, IWallet
 
 	public bool IsWalletPrivate() => GetPrivacyPercentage() >= 100;
 
-	public async Task<IWallet.MixingReason[]> ShouldMix(string coordinatorName, bool? isLowFee = null,
+	public async Task<IWallet.MixingReason[]> ShouldMix(string? coordinatorName, bool? isLowFee = null,
 		bool? anyPayments = false)
 	{
 		return new[] { IWallet.MixingReason.PreliminaryMixConclusion };
 	}
 
-	public Task<IEnumerable<SmartCoin>> GetCoinjoinCoinCandidatesAsync(string coordinatorname) => Task.FromResult(GetCoinjoinCoinCandidates());
+	public Task<IEnumerable<SmartCoin>> GetCoinjoinCoinCandidatesAsync(string? coordinatorname) => Task.FromResult(GetCoinjoinCoinCandidates());
 
 	public Task<IEnumerable<SmartTransaction>> GetTransactionsAsync() => Task.FromResult(GetTransactions());
-	public bool IsRoundOk(RoundParameters coinjoinStateParameters, string coordinatorName)
+	public bool IsRoundOk(RoundParameters coinjoinStateParameters, string? coordinatorName)
 	{
 		return true;
 	}
@@ -601,7 +608,7 @@ public class Wallet : BackgroundService, IWallet
 		var excludedOutpoints = Coins.Where(c => c.IsExcludedFromCoinJoin).Select(c => c.Outpoint);
 		KeyManager.SetExcludedCoinsFromCoinJoin(excludedOutpoints);
 	}
-	bool IWallet.IsMixable(string coordinator)
+	bool IWallet.IsMixable(string? coordinator)
 	{
 		return State == WalletState.Started // Only running wallets
 			&& !KeyManager.IsWatchOnly // that are not watch-only wallets

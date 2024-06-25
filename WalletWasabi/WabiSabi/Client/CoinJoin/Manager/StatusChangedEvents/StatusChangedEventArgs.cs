@@ -34,10 +34,10 @@ public enum CoinjoinError
 
 public class StatusChangedEventArgs : EventArgs
 {
-	public StatusChangedEventArgs(IWallet wallet)
+	public StatusChangedEventArgs(IWallet? wallet)
 	{
 		Wallet = wallet;
 	}
 
-	public IWallet Wallet { get; }
+	public IWallet? Wallet { get; }
 }

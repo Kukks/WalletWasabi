@@ -14,13 +14,13 @@ namespace WalletWasabi.WabiSabi.Client;
 
 public class CoinJoinTrackerFactory
 {
-	private readonly string _coordinatorName;
+	private readonly string? _coordinatorName;
 
 	public CoinJoinTrackerFactory(IWasabiHttpClientFactory httpClientFactory,
 		RoundStateUpdater roundStatusUpdater,
 		string coordinatorIdentifier,
 		CancellationToken cancellationToken,
-		string coordinatorName)
+		string? coordinatorName)
 	{
 		HttpClientFactory = httpClientFactory;
 		_coordinatorName = coordinatorName;
@@ -36,7 +36,7 @@ public class CoinJoinTrackerFactory
 	private string CoordinatorIdentifier { get; }
 	private LiquidityClueProvider LiquidityClueProvider { get; }
 
-	public async Task<CoinJoinTracker> CreateAndStartAsync(IWallet wallet, Func<Task<(IEnumerable<SmartCoin> Candidates, IEnumerable<SmartCoin> Ineligible)>> coinCandidatesFunc, bool stopWhenAllMixed, bool overridePlebStop)
+	public async Task<CoinJoinTracker> CreateAndStartAsync(IWallet? wallet, Func<Task<(IEnumerable<SmartCoin> Candidates, IEnumerable<SmartCoin> Ineligible)>> coinCandidatesFunc, bool stopWhenAllMixed, bool overridePlebStop)
 	{
 		await LiquidityClueProvider.InitLiquidityClueAsync(wallet).ConfigureAwait(false);
 

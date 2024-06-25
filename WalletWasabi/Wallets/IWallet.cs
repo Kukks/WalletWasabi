@@ -31,12 +31,13 @@ public enum ConsolidationModeType
 
 public interface IWallet
 {
-	void Log(LogLevel logLevel, string logMessage, [CallerFilePath] string callerFilePath = "",
-		[CallerMemberName] string callerMemberName = "", [CallerLineNumber] int callerLineNumber = -1);
+	void Log(LogLevel logLevel, string logMessage, string? coordinator, string callerFilePath = "",
+		string callerMemberName = "",
+		int callerLineNumber = -1);
 	string WalletName { get; }
 	WalletId WalletId { get; }
 	bool IsUnderPlebStop { get; }
-	bool IsMixable(string coordinator);
+	bool IsMixable(string? coordinator);
 
 	/// <summary>
 	/// Watch only wallets have no key chains.
@@ -67,9 +68,9 @@ bool ConsiderEntryProximity { get; }
 		Consolidation,
 	}
 
-	Task<MixingReason[]> ShouldMix(string coordinatorName, bool? isLowFee = null, bool? anyPayments = null);
+	Task<MixingReason[]> ShouldMix(string? coordinatorName, bool? isLowFee = null, bool? anyPayments = null);
 
-	Task<IEnumerable<SmartCoin>> GetCoinjoinCoinCandidatesAsync(string coordinatorname);
+	Task<IEnumerable<SmartCoin>> GetCoinjoinCoinCandidatesAsync(string? coordinatorname);
 
 	Task<IEnumerable<SmartTransaction>> GetTransactionsAsync();
 
@@ -78,7 +79,7 @@ bool ConsiderEntryProximity { get; }
 		return null;
 	}
 
-	bool IsRoundOk(RoundParameters coinjoinStateParameters, string coordinatorName);
+	bool IsRoundOk(RoundParameters coinjoinStateParameters, string? coordinatorName);
 	Task CompletedCoinjoin(CoinJoinTracker finishedCoinJoin);
 }
 
@@ -86,5 +87,5 @@ public interface IRoundCoinSelector
 {
 	Task<(ImmutableList<SmartCoin> selected, Func<IEnumerable<AliceClient>, Task<bool>> acceptableRegistered, Func<ImmutableArray<AliceClient>, (IEnumerable<TxOut> outputTxOuts, Dictionary<TxOut, PendingPayment> batchedPayments), TransactionWithPrecomputedData, RoundState, Task<bool>> acceptableOutputs)>
 		SelectCoinsAsync((IEnumerable<SmartCoin> Candidates, IEnumerable<SmartCoin> Ineligible) candidates,
-			RoundParameters roundParameters, Money liquidityClue, SecureRandom secureRandom, string coordinatorName);
+			RoundParameters roundParameters, Money liquidityClue, SecureRandom secureRandom, string? coordinatorName);
 }
