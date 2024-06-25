@@ -23,20 +23,15 @@ public class CoinPrison : IDisposable
 	}
 
 	protected HashSet<PrisonedCoinRecord> BannedCoins { get; set; } = new();
-	public string FilePath { get; set; }
+	private string FilePath { get; }
 	private object Lock { get; set; } = new();
 
 	public bool TryGetOrRemoveBannedCoin(SmartCoin coin, [NotNullWhen(true)] out DateTimeOffset? bannedUntil)
 	{
-		return TryGetOrRemoveBannedCoin(coin.Outpoint, out bannedUntil);
-	}
-
-	public bool TryGetOrRemoveBannedCoin(OutPoint coin, [NotNullWhen(true)] out DateTimeOffset? bannedUntil)
-	{
 		lock (Lock)
 		{
 			bannedUntil = null;
-			if (BannedCoins.SingleOrDefault(record => record.Outpoint == coin) is { } record)
+			if (BannedCoins.SingleOrDefault(record => record.Outpoint == coin.Outpoint) is { } record)
 			{
 				if (DateTimeOffset.UtcNow < record.BannedUntil)
 				{
@@ -64,9 +59,9 @@ public class CoinPrison : IDisposable
 		}
 	}
 
-	private void RemoveBannedCoinNoLock(OutPoint coin)
+	private void RemoveBannedCoinNoLock(SmartCoin coin)
 	{
-		var recordToRemove = BannedCoins.SingleOrDefault(record => coin == record.Outpoint);
+		var recordToRemove = BannedCoins.SingleOrDefault(record => coin.Outpoint == record.Outpoint);
 		if (recordToRemove == null)
 		{
 			Logger.LogError($"Tried to remove {nameof(coin)} from {nameof(BannedCoins)}, but {nameof(coin)} was null.");
@@ -102,8 +97,8 @@ public class CoinPrison : IDisposable
 		if (bannedUntil > currentDate.AddDays(MaxDaysToTrustLocalPrison))
 		{
 			Random random = new();
-			int minHours = (MaxDaysToTrustLocalPrison * 24 - 1) / 2;
-			int maxHours = MaxDaysToTrustLocalPrison * 24 - 1;
+			int minHours = ((MaxDaysToTrustLocalPrison * 24) - 1) / 2;
+			int maxHours = (MaxDaysToTrustLocalPrison * 24) - 1;
 			int randomHours = random.Next(minHours, maxHours);
 			int randomMinutes = random.Next(0, 60);
 			int randomSeconds = random.Next(0, 60);

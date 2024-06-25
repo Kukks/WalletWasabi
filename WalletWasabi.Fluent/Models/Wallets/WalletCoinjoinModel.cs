@@ -24,6 +24,7 @@ public partial class WalletCoinjoinModel : ReactiveObject
 	public WalletCoinjoinModel(Wallet wallet, IWalletSettingsModel settings)
 	{
 		_wallet = wallet;
+		_settings = settings;
 		_coinJoinManager = Services.HostedServices.Get<CoinJoinManager>();
 		_settings = settings;
 		StatusUpdated =

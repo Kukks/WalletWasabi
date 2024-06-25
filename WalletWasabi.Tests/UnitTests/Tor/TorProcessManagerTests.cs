@@ -6,7 +6,6 @@ using System.IO.Pipelines;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
-using WalletWasabi.Extensions;
 using WalletWasabi.Microservices;
 using WalletWasabi.Tor;
 using WalletWasabi.Tor.Control;

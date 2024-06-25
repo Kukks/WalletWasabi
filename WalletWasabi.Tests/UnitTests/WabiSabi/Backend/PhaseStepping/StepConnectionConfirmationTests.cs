@@ -1,4 +1,3 @@
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using WalletWasabi.Tests.Helpers;
@@ -108,6 +107,7 @@ public class StepConnectionConfirmationTests
 		WabiSabiConfig cfg = WabiSabiFactory.CreateWabiSabiConfig();
 		cfg.MaxInputCountByRound = 4;
 		cfg.ConnectionConfirmationTimeout = TimeSpan.Zero;
+		cfg.MinInputCountByRoundMultiplier = 0.9;
 
 		var round = WabiSabiFactory.CreateRound(cfg);
 		var a1 = WabiSabiFactory.CreateAlice(round);

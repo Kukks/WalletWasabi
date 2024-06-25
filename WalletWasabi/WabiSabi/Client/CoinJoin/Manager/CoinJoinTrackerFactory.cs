@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using NBitcoin;
 using WabiSabi.Crypto.Randomness;
 using WalletWasabi.Blockchain.TransactionOutputs;
 using WalletWasabi.WabiSabi.Client.CoinJoin.Client;
@@ -18,25 +19,25 @@ public class CoinJoinTrackerFactory
 
 	public CoinJoinTrackerFactory(IWasabiHttpClientFactory httpClientFactory,
 		RoundStateUpdater roundStatusUpdater,
-		string coordinatorIdentifier,
+		CoinJoinConfiguration coinJoinConfiguration,
 		CancellationToken cancellationToken,
 		string? coordinatorName)
 	{
 		HttpClientFactory = httpClientFactory;
 		_coordinatorName = coordinatorName;
 		RoundStatusUpdater = roundStatusUpdater;
-		CoordinatorIdentifier = coordinatorIdentifier;
+		CoinJoinConfiguration = coinJoinConfiguration;
 		CancellationToken = cancellationToken;
 		LiquidityClueProvider = new LiquidityClueProvider();
 	}
 
 	private IWasabiHttpClientFactory HttpClientFactory { get; }
 	private RoundStateUpdater RoundStatusUpdater { get; }
+	private CoinJoinConfiguration CoinJoinConfiguration { get; }
 	private CancellationToken CancellationToken { get; }
-	private string CoordinatorIdentifier { get; }
 	private LiquidityClueProvider LiquidityClueProvider { get; }
 
-	public async Task<CoinJoinTracker> CreateAndStartAsync(IWallet? wallet, Func<Task<(IEnumerable<SmartCoin> Candidates, IEnumerable<SmartCoin> Ineligible)>> coinCandidatesFunc, bool stopWhenAllMixed, bool overridePlebStop)
+	public async Task<CoinJoinTracker> CreateAndStartAsync(IWallet wallet, Func<Task<(IEnumerable<SmartCoin> Candidates, IEnumerable<SmartCoin> Ineligible)>> coinCandidatesFunc, bool stopWhenAllMixed, bool overridePlebStop)
 	{
 		await LiquidityClueProvider.InitLiquidityClueAsync(wallet).ConfigureAwait(false);
 
@@ -53,8 +54,8 @@ public class CoinJoinTrackerFactory
 			wallet.KeyChain,
 			outputProvider,
 			RoundStatusUpdater,
-			CoordinatorIdentifier,
 			coinSelector,
+			CoinJoinConfiguration,
 			LiquidityClueProvider,
 
 			wallet.FeeRateMedianTimeFrame,

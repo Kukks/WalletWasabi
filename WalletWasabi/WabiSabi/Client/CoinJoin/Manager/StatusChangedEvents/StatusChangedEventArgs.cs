@@ -29,15 +29,17 @@ public enum CoinjoinError
 	OnlyImmatureCoinsAvailable,
 	OnlyExcludedCoinsAvailable,
 	UneconomicalRound,
-	RandomlySkippedRound
+	RandomlySkippedRound,
+	CoordinationFeeRateTooHigh,
+	MiningFeeRateTooHigh,
 }
 
 public class StatusChangedEventArgs : EventArgs
 {
-	public StatusChangedEventArgs(IWallet? wallet)
+	public StatusChangedEventArgs(IWallet wallet)
 	{
 		Wallet = wallet;
 	}
 
-	public IWallet? Wallet { get; }
+	public IWallet Wallet { get; }
 }

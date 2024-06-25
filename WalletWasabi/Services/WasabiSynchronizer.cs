@@ -12,11 +12,9 @@ using WalletWasabi.Bases;
 using WalletWasabi.Blockchain.Analysis.FeesEstimation;
 using WalletWasabi.Blockchain.BlockFilters;
 using WalletWasabi.Blockchain.Blocks;
-using WalletWasabi.Logging;
 using WalletWasabi.Models;
 using WalletWasabi.Stores;
 using WalletWasabi.Tor.Socks5.Exceptions;
-using WalletWasabi.Tor.Socks5.Models.Fields.OctetFields;
 using WalletWasabi.WabiSabi.Client;
 using WalletWasabi.WebClients.Wasabi;
 
@@ -29,6 +27,7 @@ public class WasabiSynchronizer : PeriodicRunner, INotifyPropertyChanged, IThird
 	private TorStatus _torStatus;
 
 	private BackendStatus _backendStatus;
+	private bool _backendNotCompatible;
 
 	public WasabiSynchronizer(TimeSpan period, int maxFiltersToSync, BitcoinStore bitcoinStore, WasabiHttpClientFactory httpClientFactory) : base(period)
 	{
@@ -83,6 +82,12 @@ public class WasabiSynchronizer : PeriodicRunner, INotifyPropertyChanged, IThird
 		}
 	}
 
+	public bool BackendNotCompatible
+	{
+		get => _backendNotCompatible;
+		private set => RaiseAndSetIfChanged(ref _backendNotCompatible, value);
+	}
+
 	private DateTimeOffset BackendStatusChangedAt { get; set; } = DateTimeOffset.UtcNow;
 	public TimeSpan BackendStatusChangedSince => DateTimeOffset.UtcNow - BackendStatusChangedAt;
 	private int MaxFiltersToSync { get; }
@@ -115,6 +120,7 @@ public class WasabiSynchronizer : PeriodicRunner, INotifyPropertyChanged, IThird
 
 				// NOT GenSocksServErr
 				BackendStatus = BackendStatus.Connected;
+				BackendNotCompatible = false;
 				TorStatus = TorStatus.Running;
 				OnSynchronizeRequestFinished();
 			}
@@ -131,19 +137,28 @@ public class WasabiSynchronizer : PeriodicRunner, INotifyPropertyChanged, IThird
 				BackendStatus = BackendStatus.NotConnected;
 
 				// Backend API version might be updated meanwhile. Trying to update the versions.
-				var result = await WasabiClient.CheckUpdatesAsync(cancel).ConfigureAwait(false);
+				bool backendCompatible;
+				try
+				{
+					backendCompatible = await WasabiClient.CheckUpdatesAsync(cancel).ConfigureAwait(false);
+				}
+				catch (HttpRequestException) when (ex.Message.Contains("Not Found"))
+				{
+					// Backend is online but the endpoint for versions doesn't exist -> backend is not compatible.
+					BackendNotCompatible = true;
+					return;
+				}
 
 				// If the backend is compatible and the Api version updated then we just used the wrong API.
-				if (result.BackendCompatible && lastUsedApiVersion != WasabiClient.ApiVersion)
+				if (backendCompatible && lastUsedApiVersion != WasabiClient.ApiVersion)
 				{
 					// Next request will be fine, do not throw exception.
 					TriggerRound();
 					return;
 				}
-				else
-				{
-					throw;
-				}
+
+				BackendNotCompatible = !backendCompatible;
+				throw;
 			}
 			catch (Exception)
 			{
@@ -204,5 +219,5 @@ public class WasabiSynchronizer : PeriodicRunner, INotifyPropertyChanged, IThird
 		return true;
 	}
 
-	public bool Connected =>  LastResponse is not null;
+	public bool Connected => LastResponse is { };
 }

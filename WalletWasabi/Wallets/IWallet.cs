@@ -46,7 +46,6 @@ public interface IWallet
 
 	IDestinationProvider DestinationProvider { get; }
 	OutputProvider GetOutputProvider (string coordinatorName);
-	PaymentBatch BatchedPayments => new();
 
 	int AnonScoreTarget { get; }
 	ConsolidationModeType ConsolidationMode { get; }

@@ -1,4 +1,3 @@
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using NBitcoin;
@@ -99,6 +98,7 @@ public class CoordinatorTests
 
 			// Register our coin..
 			round.CoinjoinState = round.AddInput(alice.Coin, alice.OwnershipProof, WabiSabiFactory.CreateCommitmentData(round.Id));
+			round.SetPhase(Phase.ConnectionConfirmation);
 			coordinator.Arena.Rounds.Add(round);
 
 			// .. spend it also in another transaction paying less fee rate than the coinjoin

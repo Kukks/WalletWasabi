@@ -8,11 +8,10 @@ using WabiSabi.Crypto.Randomness;
 using WalletWasabi.BitcoinCore.Rpc;
 using WalletWasabi.Blockchain.Transactions;
 using WalletWasabi.Extensions;
-using WalletWasabi.Helpers;
 using WalletWasabi.Logging;
 using WalletWasabi.Models;
 using WalletWasabi.Stores;
-using WalletWasabi.Tor.Socks5.Pool.Circuits;
+using WalletWasabi.Tor.Http;
 using WalletWasabi.Wallets;
 using WalletWasabi.WebClients.Wasabi;
 
@@ -34,7 +33,7 @@ public class TransactionBroadcaster
 	private NodesGroup? Nodes { get; set; }
 	private IRPCClient? RpcClient { get; set; }
 	private WalletManager WalletManager { get; }
-	private WasabiRandom Random { get; } = InsecureRandom.Instance;
+	private WasabiRandom Random { get; } = SecureRandom.Instance;
 
 	public void Initialize(NodesGroup nodes, IRPCClient? rpcClient)
 	{
@@ -91,46 +90,9 @@ public class TransactionBroadcaster
 
 	private async Task BroadcastTransactionToBackendAsync(SmartTransaction transaction)
 	{
+		throw new NotImplementedException("Broadcasting with backend is not implemented yet.");
 		Logger.LogInfo("Broadcasting with backend...");
-		WasabiClient client;
-		if (HttpClientFactory is  not WasabiHttpClientFactory httpClientFactory)
-		{
-			return;
-		}
 
-
-		client = new(httpClientFactory.NewHttpClient(Mode.NewCircuitPerRequest));
-		try
-		{
-			await client.BroadcastAsync(transaction).ConfigureAwait(false);
-		}
-		catch (HttpRequestException ex2) when (RpcErrorTools.IsSpentError(ex2.Message))
-		{
-			if (transaction.Transaction.Inputs.Count == 1) // If we tried to only spend one coin, then we can mark it as spent. If there were more coins, then we do not know.
-			{
-				OutPoint input = transaction.Transaction.Inputs.First().PrevOut;
-				foreach (var coin in WalletManager.CoinsByOutPoint(input))
-				{
-					coin.SpentAccordingToBackend = true;
-				}
-			}
-
-			// Exception message is in form: 'message:::tx1:::tx2:::etc.' where txs are encoded in HEX.
-			IEnumerable<SmartTransaction> txs = ex2.Message.Split(":::", StringSplitOptions.RemoveEmptyEntries)
-				.Skip(1) // Skip the exception message.
-				.Select(x => new SmartTransaction(Transaction.Parse(x, Network), Height.Mempool));
-
-			foreach (var tx in txs)
-			{
-				WalletManager.Process(tx);
-			}
-
-			throw;
-		}
-
-		BelieveTransaction(transaction);
-
-		Logger.LogInfo($"Transaction is successfully broadcasted to backend: {transaction.GetHash()}.");
 	}
 
 	private void BelieveTransaction(SmartTransaction transaction)

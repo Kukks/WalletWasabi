@@ -1,3 +1,4 @@
+using System.Net;
 using NBitcoin;
 using NBitcoin.Protocol;
 
@@ -40,11 +41,6 @@ public static class Constants
 	public const int P2shInputVirtualSize = 297; // we assume a 2-of-n multisig
 	public const int P2shOutputVirtualSize = 32;
 
-	/// <summary>
-	/// OBSOLATED, USE SPECIFIC TYPE
-	/// </summary>
-	public const int OutputSizeInBytes = 33;
-
 	// https://en.bitcoin.it/wiki/Bitcoin
 	// There are a maximum of 2,099,999,997,690,000 Bitcoin elements (called satoshis), which are currently most commonly measured in units of 100,000,000 known as BTC. Stated another way, no more than 21 million BTC can ever be created.
 	public const long MaximumNumberOfSatoshis = 2099999997690000;
@@ -69,6 +65,8 @@ public static class Constants
 	public const int DefaultRegTestBitcoinCoreRpcPort = 18443;
 
 	public const decimal DefaultDustThreshold = 0.00005m;
+	public const decimal DefaultMaxCoordinationFeeRate = 0.0m;
+	public static readonly decimal DefaultMaxCoinJoinMiningFeeRate = 150.0m;
 
 	public const string AlphaNumericCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 	public const string CapitalAlphaNumericCharacters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -87,14 +85,22 @@ public static class Constants
 
 	public const string FallbackAffiliationMessageSignerKey = "30770201010420686710a86f0cdf425e3bc9781f51e45b9440aec1215002402d5cdee713066623a00a06082a8648ce3d030107a14403420004f267804052bd863a1644233b8bfb5b8652ab99bcbfa0fb9c36113a571eb5c0cb7c733dbcf1777c2745c782f96e218bb71d67d15da1a77d37fa3cb96f423e53ba";
 
+	public static readonly EndPoint DefaultMainNetBitcoinP2PEndPoint = new IPEndPoint(IPAddress.Loopback, DefaultMainNetBitcoinP2pPort);
+	public static readonly EndPoint DefaultTestNetBitcoinP2PEndPoint = new IPEndPoint(IPAddress.Loopback, DefaultTestNetBitcoinP2pPort);
+	public static readonly EndPoint DefaultRegTestBitcoinP2PEndPoint = new IPEndPoint(IPAddress.Loopback, DefaultRegTestBitcoinP2pPort);
+
+	public static readonly EndPoint DefaultMainNetBitcoinCoreRpcEndPoint = new IPEndPoint(IPAddress.Loopback, DefaultMainNetBitcoinCoreRpcPort);
+	public static readonly EndPoint DefaultTestNetBitcoinCoreRpcEndPoint = new IPEndPoint(IPAddress.Loopback, DefaultTestNetBitcoinCoreRpcPort);
+	public static readonly EndPoint DefaultRegTestBitcoinCoreRpcEndPoint = new IPEndPoint(IPAddress.Loopback, DefaultRegTestBitcoinCoreRpcPort);
+
 	public static readonly Money MaximumNumberOfBitcoinsMoney = Money.Coins(MaximumNumberOfBitcoins);
 
-	public static readonly Version ClientVersion = new(2, 0, 7, 2);
+	public static readonly Version ClientVersion = new(2, 0, 8, 1);
 
 	public static readonly Version HwiVersion = new("3.0.0");
 	public static readonly Version BitcoinCoreVersion = new("23.0");
 	public static readonly Version Ww1LegalDocumentsVersion = new(3, 0);
-	public static readonly Version Ww2LegalDocumentsVersion = new(1, 0);
+	public static readonly Version Ww2LegalDocumentsVersion = new(2, 0);
 
 	public static readonly FeeRate MinRelayFeeRate = new(1m);
 	public static readonly FeeRate AbsurdlyHighFeeRate = new(10_000m);

@@ -121,7 +121,7 @@ public class HeaderSection
 	{
 		using var message = new HttpRequestMessage
 		{
-			Content = new ByteArrayContent(Array.Empty<byte>())
+			Content = new ByteArrayContent([])
 		};
 		message.Content.Headers.ContentLength = null;
 		foreach (var field in Fields)
@@ -143,7 +143,7 @@ public class HeaderSection
 	{
 		using var message = new HttpResponseMessage
 		{
-			Content = new ByteArrayContent(Array.Empty<byte>())
+			Content = new ByteArrayContent([])
 		};
 		message.Content.Headers.ContentLength = null;
 		foreach (var field in Fields)
@@ -181,6 +181,7 @@ public class HeaderSection
 				hs.Fields.Add(new HeaderField(ContentLengthHeaderName, contentLength.ToString()));
 			}
 		}
+
 		// -- End [SECTION] Crazy VS2017/.NET Core 1.1 bug ---
 
 		return hs;

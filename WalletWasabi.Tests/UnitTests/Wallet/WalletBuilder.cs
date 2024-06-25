@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Caching.Memory;
-using Moq;
 using NBitcoin;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -42,6 +41,7 @@ public class WalletBuilder : IAsyncDisposable
 		HttpClientFactory = new WasabiHttpClientFactory(torEndPoint: null, backendUriGetter: () => null!);
 		Synchronizer = new(period: TimeSpan.FromSeconds(3), 1000, BitcoinStore, HttpClientFactory);
 		BlockDownloadService = new(BitcoinStore.BlockRepository, trustedFullNodeBlockProviders: [], p2pBlockProvider: null);
+		UnconfirmedTransactionChainProvider = new(HttpClientFactory);
 	}
 
 	private IndexStore IndexStore { get; }
@@ -51,6 +51,7 @@ public class WalletBuilder : IAsyncDisposable
 	private WasabiHttpClientFactory HttpClientFactory { get; }
 	private WasabiSynchronizer Synchronizer { get; }
 	private BlockDownloadService BlockDownloadService { get; }
+	private UnconfirmedTransactionChainProvider UnconfirmedTransactionChainProvider { get; }
 	public IEnumerable<FilterModel> Filters { get; }
 	public string DataDir { get; }
 
@@ -67,7 +68,7 @@ public class WalletBuilder : IAsyncDisposable
 
 		HybridFeeProvider feeProvider = new(Synchronizer, null);
 
-		WalletFactory walletFactory = new(DataDir, Network.RegTest, BitcoinStore, Synchronizer, serviceConfiguration, feeProvider, BlockDownloadService);
+		WalletFactory walletFactory = new(DataDir, Network.RegTest, BitcoinStore, Synchronizer, serviceConfiguration, feeProvider, BlockDownloadService, UnconfirmedTransactionChainProvider);
 		return walletFactory.CreateAndInitialize(keyManager);
 	}
 
@@ -78,6 +79,7 @@ public class WalletBuilder : IAsyncDisposable
 		await TransactionStore.DisposeAsync().ConfigureAwait(false);
 		await HttpClientFactory.DisposeAsync().ConfigureAwait(false);
 		BlockDownloadService.Dispose();
+		UnconfirmedTransactionChainProvider.Dispose();
 		Cache.Dispose();
 	}
 }

@@ -13,5 +13,3 @@ public interface IDestinationProvider
 
 	Task<ScriptType[]> GetScriptTypeAsync();
 }
-
-

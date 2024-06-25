@@ -74,9 +74,8 @@ public class BackendTests : IClassFixture<RegTestFixture>
 	public async Task GetClientVersionAsync()
 	{
 		WasabiClient client = new(BackendHttpClient);
-		var uptodate = await client.CheckUpdatesAsync(CancellationToken.None);
-		Assert.True(uptodate.BackendCompatible);
-		Assert.True(uptodate.ClientUpToDate);
+		var backendCompatible = await client.CheckUpdatesAsync(CancellationToken.None);
+		Assert.True(backendCompatible);
 	}
 
 	[Fact]
@@ -161,7 +160,9 @@ public class BackendTests : IClassFixture<RegTestFixture>
 			[specificNodeBlockProvider],
 			new P2PBlockProvider(network, nodes, httpClientFactory.IsTorEnabled));
 
-		WalletManager walletManager = new(network, workDir, new WalletDirectories(network, workDir), new WalletFactory(workDir, network, bitcoinStore, synchronizer, serviceConfiguration, feeProvider, blockDownloadService));
+		using UnconfirmedTransactionChainProvider unconfirmedChainProvider = new(httpClientFactory);
+
+		WalletManager walletManager = new(network, workDir, new WalletDirectories(network, workDir), new WalletFactory(workDir, network, bitcoinStore, synchronizer, serviceConfiguration, feeProvider, blockDownloadService, unconfirmedChainProvider));
 		walletManager.Initialize();
 
 		nodes.Connect(); // Start connection service.

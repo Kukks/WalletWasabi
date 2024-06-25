@@ -12,7 +12,6 @@ using WalletWasabi.Blockchain.BlockFilters;
 using WalletWasabi.Blockchain.Blocks;
 using WalletWasabi.Helpers;
 using WalletWasabi.Logging;
-using WalletWasabi.Models;
 
 namespace WalletWasabi.Stores;
 
@@ -24,6 +23,7 @@ public class IndexStore : IIndexStore, IAsyncDisposable
 	public IndexStore(string workFolderPath, Network network, SmartHeaderChain smartHeaderChain)
 	{
 		SmartHeaderChain = smartHeaderChain;
+		Network = network;
 
 		workFolderPath = Guard.NotNullOrEmptyOrWhitespace(nameof(workFolderPath), workFolderPath, trim: true);
 		IoHelpers.EnsureDirectoryExists(workFolderPath);
@@ -39,16 +39,19 @@ public class IndexStore : IIndexStore, IAsyncDisposable
 			File.Delete(NewIndexFilePath);
 		}
 
+		IndexStorage = CreateBlockFilterSqliteStorage();
+	}
+
+	private BlockFilterSqliteStorage CreateBlockFilterSqliteStorage()
+	{
 		try
 		{
-			IndexStorage = BlockFilterSqliteStorage.FromFile(dataSource: NewIndexFilePath, startingFilter: StartingFilters.GetStartingFilter(network));
+			return BlockFilterSqliteStorage.FromFile(dataSource: NewIndexFilePath, startingFilter: StartingFilters.GetStartingFilter(Network));
 		}
-		catch (SqliteException ex) when (ex.SqliteErrorCode == 11) // 11 ~ SQLITE_CORRUPT error code
+		catch (SqliteException ex) when (ex.SqliteExtendedErrorCode == 11) // 11 ~ SQLITE_CORRUPT error code
 		{
 			Logger.LogError($"Failed to open SQLite storage file because it's corrupted. Deleting the storage file '{NewIndexFilePath}'.");
 
-			// The database file can still be in use, clear all pools to unlock the filter database file.
-			// SqliteConnection.ClearAllPools();
 			File.Delete(NewIndexFilePath);
 			throw;
 		}
@@ -70,6 +73,9 @@ public class IndexStore : IIndexStore, IAsyncDisposable
 	/// <summary>Run migration if SQLite file does not exist.</summary>
 	private bool RunMigration { get; }
 
+	/// <summary>NBitcoin network.</summary>
+	private Network Network { get; }
+
 	private SmartHeaderChain SmartHeaderChain { get; }
 
 	/// <summary>Task completion source that is completed once a <see cref="InitializeAsync(CancellationToken)"/> finishes.</summary>
@@ -78,15 +84,13 @@ public class IndexStore : IIndexStore, IAsyncDisposable
 
 	/// <summary>Filter disk storage.</summary>
 	/// <remarks>Guarded by <see cref="IndexLock"/>.</remarks>
-	private BlockFilterSqliteStorage IndexStorage { get; }
+	private BlockFilterSqliteStorage IndexStorage { get; set; }
 
 	/// <summary>Guards <see cref="IndexStorage"/>.</summary>
 	private AsyncLock IndexLock { get; } = new();
 
 	public async Task InitializeAsync(CancellationToken cancellationToken)
 	{
-		using IDisposable _ = BenchmarkLogger.Measure();
-
 		try
 		{
 			using (await IndexLock.LockAsync(cancellationToken).ConfigureAwait(false))
@@ -187,18 +191,19 @@ public class IndexStore : IIndexStore, IAsyncDisposable
 		}
 		catch (OperationCanceledException)
 		{
-			// SqliteConnection.ClearAllPools();
 			throw;
 		}
 		catch (Exception ex)
 		{
 			Logger.LogError(ex);
 
-			// SqliteConnection.ClearAllPools();
+			IndexStorage.Dispose();
 
 			// Do not run migration code again if it fails.
 			File.Delete(NewIndexFilePath);
 			File.Delete(OldIndexFilePath);
+
+			IndexStorage = CreateBlockFilterSqliteStorage();
 		}
 	}
 
@@ -207,8 +212,6 @@ public class IndexStore : IIndexStore, IAsyncDisposable
 	{
 		try
 		{
-			using IDisposable _ = BenchmarkLogger.Measure(LogLevel.Debug, "Block filters loading");
-
 			int i = 0;
 
 			// Read last N filters. There is no need to read all of them.

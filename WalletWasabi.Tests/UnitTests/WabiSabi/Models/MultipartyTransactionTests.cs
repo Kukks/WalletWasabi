@@ -1,8 +1,6 @@
 using NBitcoin;
 using System.Collections.Immutable;
 using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using WalletWasabi.Crypto;
 using WalletWasabi.Extensions;
 using WalletWasabi.Helpers;
@@ -412,7 +410,7 @@ public class MultipartyTransactionTests
 	[InlineData(100, 120, "20.7")]
 	[InlineData(100, 140, "100")]
 	[InlineData(100, 105, "0")]
-	public async Task FeeTestsAsync(int inputCount, int outputCount, string feeRateString)
+	public void FeeTests(int inputCount, int outputCount, string feeRateString)
 	{
 		Random random = new(12345);
 

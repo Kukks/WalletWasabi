@@ -7,12 +7,9 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestPlatform.ObjectModel.DataCollection;
-using SQLitePCL;
 using WabiSabi.CredentialRequesting;
 using WabiSabi.Crypto;
 using WabiSabi.Crypto.ZeroKnowledge;
-using WalletWasabi.BitcoinCore.Rpc;
 using WalletWasabi.Blockchain.Keys;
 using WalletWasabi.Blockchain.TransactionOutputs;
 using WalletWasabi.Crypto;
@@ -37,6 +34,8 @@ namespace WalletWasabi.Tests.Helpers;
 
 public static class WabiSabiFactory
 {
+	private static string CoordinatorIdentifier = new WabiSabiConfig().CoordinatorIdentifier;
+
 	public static Coin CreateCoin(Key? key = null, Money? amount = null, ScriptPubKeyType scriptPubKeyType = ScriptPubKeyType.Segwit)
 	{
 		key ??= new();
@@ -113,7 +112,7 @@ public static class WabiSabiFactory
 				TxOut = new TxOut(Money.Coins(1), BitcoinFactory.CreateScript()),
 			};
 		};
-		mockRpc.OnGetRawTransactionAsync = (_,_) =>
+		mockRpc.OnGetRawTransactionAsync = (_, _) =>
 			Task.FromResult(BitcoinFactory.CreateTransaction());
 
 		mockRpc.OnEstimateSmartFeeAsync = (_, _) =>
@@ -294,9 +293,9 @@ public static class WabiSabiFactory
 				round.Parameters.MiningFeeRate,
 				round.Parameters.CoordinationFeeRate,
 				round.Parameters.MaxSuggestedAmount) with
-			{
-				MinInputCountByRound = cfg.MinInputCountByBlameRound
-			};
+		{
+			MinInputCountByRound = cfg.MinInputCountByBlameRound
+		};
 
 		return new BlameRound(
 			parameters: roundParameters,
@@ -342,8 +341,8 @@ public static class WabiSabiFactory
 			keyChain,
 			outputProvider,
 			roundStateUpdater,
-			"CoinJoinCoordinatorIdentifier",
 			coinSelector,
+			new CoinJoinConfiguration("CoinJoinCoordinatorIdentifier", 0.3m, 150.0m),
 			new LiquidityClueProvider(),
 			TimeSpan.Zero,
 			TimeSpan.Zero,
@@ -376,8 +375,6 @@ public static class WabiSabiFactory
 			});
 		return mockRoundParameterFactory.Object;
 	}
-
-	private static string CoordinatorIdentifier = new WabiSabiConfig().CoordinatorIdentifier;
 
 	public static (Prison, ChannelReader<Offender>) CreateObservablePrison()
 	{

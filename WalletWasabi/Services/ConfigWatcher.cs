@@ -38,7 +38,6 @@ public class ConfigWatcher : PeriodicRunner
 			Config.LoadFile(createIfMissing: true);
 			ExecuteWhenChanged();
 		}
-
 		return Task.CompletedTask;
 	}
 }

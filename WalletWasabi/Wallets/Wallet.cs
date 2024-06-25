@@ -41,7 +41,8 @@ public class Wallet : BackgroundService, IWallet
 		ServiceConfiguration serviceConfiguration,
 		HybridFeeProvider feeProvider,
 		TransactionProcessor transactionProcessor,
-		WalletFilterProcessor walletFilterProcessor)
+		WalletFilterProcessor walletFilterProcessor,
+		UnconfirmedTransactionChainProvider unconfirmedTransactionChainProvider)
 	{
 		Guard.NotNullOrEmptyOrWhitespace(nameof(dataDir), dataDir);
 		Network = network;
@@ -50,6 +51,7 @@ public class Wallet : BackgroundService, IWallet
 		Synchronizer = syncer;
 		ServiceConfiguration = serviceConfiguration;
 		FeeProvider = feeProvider;
+		// UnconfirmedTransactionChainProvider = unconfirmedTransactionChainProvider;
 
 		RuntimeParams.SetDataDir(dataDir);
 
@@ -63,8 +65,8 @@ public class Wallet : BackgroundService, IWallet
 		TransactionProcessor = transactionProcessor;
 		Coins = TransactionProcessor.Coins;
 		WalletFilterProcessor = walletFilterProcessor;
-		BatchedPayments = new PaymentBatch();
-		OutputProvider = new OutputProvider(this);
+		// BatchedPayments = new PaymentBatch();
+		// OutputProvider = new PaymentAwareOutputProvider(DestinationProvider, BatchedPayments);
 		WalletId = new WalletId(Guid.NewGuid());
 	}
 
@@ -121,7 +123,6 @@ public class Wallet : BackgroundService, IWallet
 	public bool ConsiderEntryProximity => true;
 
 	public bool RedCoinIsolation => KeyManager.RedCoinIsolation;
-	public CoinjoinSkipFactors CoinjoinSkipFactors => KeyManager.CoinjoinSkipFactors;
 	public bool BatchPayments { get; } = false;
 	public long? MinimumDenominationAmount { get; }
 
@@ -147,7 +148,6 @@ public class Wallet : BackgroundService, IWallet
 		return OutputProvider;
 	}
 
-	public PaymentBatch BatchedPayments { get; }
 
 	public int AnonScoreTarget => KeyManager.AnonScoreTarget;
 	public ConsolidationModeType ConsolidationMode => ConsolidationModeType.Never;
@@ -227,7 +227,10 @@ public class Wallet : BackgroundService, IWallet
 			}
 			else
 			{
-				mapByTxid.Add(coin.TransactionId, new TransactionSummary(coin.Transaction, coin.Amount));
+				// var unconfTransactionChainOfCoin = UnconfirmedTransactionChainProvider.GetUnconfirmedTransactionChain(coin.TransactionId) ?? [];
+				// var effectiveFeeRate = FeeHelpers.CalculateEffectiveFeeRateOfUnconfirmedChain(unconfTransactionChainOfCoin);
+
+				// mapByTxid.Add(coin.TransactionId, new TransactionSummary(coin.Transaction, coin.Amount, effectiveFeeRate));
 			}
 
 			if (coin.SpenderTransaction is { } spenderTransaction)
@@ -238,10 +241,13 @@ public class Wallet : BackgroundService, IWallet
 				{
 					foundSpenderCoin.Amount -= coin.Amount;
 				}
-				else
-				{
-					mapByTxid.Add(spenderTxId, new TransactionSummary(spenderTransaction, Money.Zero - coin.Amount));
-				}
+				// else
+				// {
+				// 	// var unconfTransactionChainOfCoin = UnconfirmedTransactionChainProvider.GetUnconfirmedTransactionChain(coin.TransactionId) ?? [];
+				// 	// var effectiveFeeRate = FeeHelpers.CalculateEffectiveFeeRateOfUnconfirmedChain(unconfTransactionChainOfCoin);
+				//
+				// 	mapByTxid.Add(spenderTxId, new TransactionSummary(spenderTransaction, Money.Zero - coin.Amount, effectiveFeeRate));
+				// }
 			}
 		}
 
@@ -345,16 +351,13 @@ public class Wallet : BackgroundService, IWallet
 		{
 			State = WalletState.Starting;
 
-			using (BenchmarkLogger.Measure(operationName: $"Starting of wallet '{WalletName}'"))
-			{
-				await RuntimeParams.LoadAsync().ConfigureAwait(false);
+			await RuntimeParams.LoadAsync().ConfigureAwait(false);
 
-				await WalletFilterProcessor.StartAsync(cancel).ConfigureAwait(false);
+			await WalletFilterProcessor.StartAsync(cancel).ConfigureAwait(false);
 
-				await LoadWalletStateAsync(cancel).ConfigureAwait(false);
-				await LoadDummyMempoolAsync().ConfigureAwait(false);
-				LoadExcludedCoins();
-			}
+			await LoadWalletStateAsync(cancel).ConfigureAwait(false);
+			await LoadDummyMempoolAsync().ConfigureAwait(false);
+			LoadExcludedCoins();
 
 			await base.StartAsync(cancel).ConfigureAwait(false);
 
@@ -396,13 +399,13 @@ public class Wallet : BackgroundService, IWallet
 		{
 			await PerformSynchronizationAsync(SyncType.NonTurbo, stoppingToken).ConfigureAwait(false);
 		}
+
 		Logger.LogInfo($"Wallet '{WalletName}' is fully synchronized.");
 	}
 
 	public string AddCoinJoinPayment(IDestination destination, Money amount)
 	{
-		var paymentId = BatchedPayments.AddPayment(destination, amount);
-		return paymentId.ToString();
+		return "";
 	}
 
 	/// <inheritdoc/>
@@ -439,6 +442,7 @@ public class Wallet : BackgroundService, IWallet
 		try
 		{
 			WalletRelevantTransactionProcessed?.Invoke(this, e);
+			// UnconfirmedTransactionChainProvider.CheckAndScheduleRequestIfNeeded(e.Transaction);
 		}
 		catch (Exception ex)
 		{
@@ -504,10 +508,7 @@ public class Wallet : BackgroundService, IWallet
 
 		Height bestTurboSyncHeight = KeyManager.GetBestHeight(SyncType.Turbo);
 
-		using (BenchmarkLogger.Measure(LogLevel.Info, "Initial Transaction Processing"))
-		{
-			TransactionProcessor.Process(BitcoinStore.TransactionStore.ConfirmedStore.GetTransactions().TakeWhile(x => x.Height <= bestTurboSyncHeight));
-		}
+		TransactionProcessor.Process(BitcoinStore.TransactionStore.ConfirmedStore.GetTransactions().TakeWhile(x => x.Height <= bestTurboSyncHeight));
 
 		BitcoinStore.IndexStore.NewFilters += IndexDownloader_NewFiltersAsync;
 
@@ -600,6 +601,16 @@ public class Wallet : BackgroundService, IWallet
 		}
 
 		coin.IsExcludedFromCoinJoin = exclude;
+		UpdateExcludedCoinFromCoinJoin();
+	}
+
+	public void UpdateExcludedCoinsFromCoinJoin(OutPoint[] outPointsToExclude)
+	{
+		foreach (var coin in Coins)
+		{
+			coin.IsExcludedFromCoinJoin = outPointsToExclude.Contains(coin.Outpoint);
+		}
+
 		UpdateExcludedCoinFromCoinJoin();
 	}
 

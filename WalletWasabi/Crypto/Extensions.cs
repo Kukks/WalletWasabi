@@ -1,8 +1,5 @@
 using System.Collections.Generic;
 using WalletWasabi.Helpers;
-using NBitcoin.Secp256k1;
-using NBitcoin;
-using System.Linq;
 
 namespace WalletWasabi.Crypto;
 
@@ -21,15 +18,5 @@ public static class Extensions
 		{
 			yield return resultSelector(e1.Current, e2.Current, e3.Current);
 		}
-	}
-
-	public static double Median(this IEnumerable<double> me)
-	{
-		if (!me.Any())
-		{
-			return 0;
-		}
-		var sorted = me.OrderBy(x => x).ToArray();
-		return sorted[sorted.Length / 2];
 	}
 }

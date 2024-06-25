@@ -153,6 +153,8 @@ public class TestWallet : IKeyChain, IDestinationProvider
 
 	public IEnumerable<ScriptType> SupportedScriptTypes { get; } = [ScriptType.P2WPKH];
 
+	public IEnumerable<ScriptType> SupportedScriptTypes { get; } = [ScriptType.P2WPKH];
+
 	public IEnumerable<IDestination> GetNextInternalDestinations(int count) =>
 		Enumerable.Range(0, count).Select(_ => CreateNewAddress(true));
 

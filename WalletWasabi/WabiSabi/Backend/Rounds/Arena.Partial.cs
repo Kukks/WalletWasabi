@@ -12,6 +12,7 @@ using WalletWasabi.WabiSabi.Models;
 using WalletWasabi.WabiSabi.Models.MultipartyTransaction;
 using WalletWasabi.Logging;
 using WalletWasabi.Crypto.Randomness;
+
 namespace WalletWasabi.WabiSabi.Backend.Rounds;
 
 public partial class Arena : IWabiSabiApiRequestHandler
@@ -122,7 +123,6 @@ public partial class Arena : IWabiSabiApiRequestHandler
 			int currentBlockHeight = await Rpc.GetBlockCountAsync(cancellationToken).ConfigureAwait(false);
 
 			CoinVerifier?.TryScheduleVerification(coin, round.InputRegistrationTimeFrame.EndTime, confirmations, oneHop: oneHop, currentBlockHeight, cancellationToken);
-
 			return new(alice.Id,
 				commitAmountCredentialResponse,
 				commitVsizeCredentialResponse,
@@ -134,6 +134,7 @@ public partial class Arena : IWabiSabiApiRequestHandler
 	{
 		using (await AsyncLock.LockAsync(cancellationToken).ConfigureAwait(false))
 		{
+			var beforeInside = DateTimeOffset.UtcNow;
 			var round = GetRound(request.RoundId, Phase.OutputRegistration);
 			var alice = GetAlice(request.AliceId, round);
 			if (alice.IsCoordinationFeeExempted && request.AffiliationId != AffiliationConstants.DefaultAffiliationId)
@@ -241,7 +242,6 @@ public partial class Arena : IWabiSabiApiRequestHandler
 					// Update the coinjoin state, adding the confirmed input.
 					round.CoinjoinState = round.Assert<ConstructionState>().AddInput(alice.Coin, alice.OwnershipProof, round.CoinJoinInputCommitmentData);
 					alice.ConfirmedConnection = true;
-
 					return response;
 
 				default:
@@ -387,6 +387,10 @@ public partial class Arena : IWabiSabiApiRequestHandler
 
 	public Task<RoundStateResponse> GetStatusAsync(RoundStateRequest request, CancellationToken cancellationToken)
 	{
+		if (Config.IsCoordinationEnabled is false)
+		{
+			return Task.FromResult(new RoundStateResponse(Array.Empty<RoundState>(), Array.Empty<CoinJoinFeeRateMedian>(), Affiliation.Models.AffiliateInformation.Empty));
+		}
 		var requestCheckPointDictionary = request.RoundCheckpoints.ToDictionary(r => r.RoundId, r => r);
 		var responseRoundStates = RoundStates.Select(x =>
 		{
@@ -402,7 +406,7 @@ public partial class Arena : IWabiSabiApiRequestHandler
 
 	public (uint256 RoundId, FeeRate MiningFeeRate)[] GetRoundsContainingOutpoints(IEnumerable<OutPoint> outPoints) =>
 		Rounds
-		.Where(r => r.Phase != Phase.Ended)
+		.Where(r => r.Phase != Phase.Ended && r.Phase >= Phase.ConnectionConfirmation)
 		.SelectMany(r => r.CoinjoinState.Inputs.Select(a => (RoundId: r.Id, MiningFeeRate: r.Parameters.MiningFeeRate, Coin: a)))
 		.Where(x => outPoints.Any(outpoint => outpoint == x.Coin.Outpoint))
 		.Select(x => (x.RoundId, x.MiningFeeRate))

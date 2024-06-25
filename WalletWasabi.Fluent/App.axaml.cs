@@ -1,6 +1,5 @@
 using System.Linq;
 using System.Reactive.Concurrency;
-using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
@@ -151,7 +150,6 @@ public class App : Application
 			amountProvider,
 			new EditableSearchSourceSource(),
 			torStatusChecker,
-			new LegalDocumentsProvider(),
 			new HealthMonitor(applicationSettings, torStatusChecker));
 	}
 }
