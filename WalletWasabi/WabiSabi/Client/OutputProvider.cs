@@ -43,7 +43,9 @@ public class OutputProvider
 			roundParameters.AllowedOutputAmounts.Max,
 			availableVsize,
 			scrriptTypes,
-			Random, _wallet.MinimumDenominationAmount);
+			Random,
+			_wallet.MinimumDenominationAmount,
+			_wallet.AllowedDenominations?.Any() is true? _wallet.AllowedDenominations : null);
 
 		var registeredCoinEffectiveValues = registeredCoins.Select(client => client.EffectiveValue);
 

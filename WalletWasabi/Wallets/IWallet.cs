@@ -56,6 +56,7 @@ bool ConsiderEntryProximity { get; }
 	bool RedCoinIsolation { get; }
 	bool BatchPayments { get; }
 	long? MinimumDenominationAmount { get; }
+	long[]? AllowedDenominations { get; }
 
 	public enum MixingReason
 	{

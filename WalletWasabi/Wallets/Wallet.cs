@@ -126,6 +126,8 @@ public class Wallet : BackgroundService, IWallet
 	public bool BatchPayments { get; } = false;
 	public long? MinimumDenominationAmount { get; }
 
+	public long[]? AllowedDenominations => null;
+
 	public Network Network { get; }
 	public TransactionProcessor TransactionProcessor { get; }
 

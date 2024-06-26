@@ -15,7 +15,13 @@ public class AmountDecomposer
 	/// <param name="minAllowedOutputAmount">Min output amount that's allowed to be registered.</param>
 	/// <param name="maxAllowedOutputAmount">Max output amount that's allowed to be registered.</param>
 	/// <param name="availableVsize">Available virtual size for outputs.</param>
-	public AmountDecomposer(FeeRate feeRate, Money minAllowedOutputAmount, Money maxAllowedOutputAmount,  int availableVsize, IEnumerable<ScriptType> allowedOutputTypes, WasabiRandom random,  long? minimumDenominationAmount = null)
+	/// <param name="allowedOutputTypes"></param>
+	/// <param name="random"></param>
+	/// <param name="minimumDenominationAmount"></param>
+	/// <param name="walletAllowedDenominations"></param>
+	public AmountDecomposer(FeeRate feeRate, Money minAllowedOutputAmount, Money maxAllowedOutputAmount,
+		int availableVsize, IEnumerable<ScriptType> allowedOutputTypes, WasabiRandom random,
+		long? minimumDenominationAmount = null, long[]? walletAllowedDenominations = null)
 	{
 		FeeRate = feeRate;
 
@@ -26,7 +32,7 @@ public class AmountDecomposer
 		Random = random;
 
 		// Create many standard denominations.
-		Denominations = DenominationBuilder.CreateDenominations(MinAllowedOutputAmount, MaxAllowedOutputAmount, FeeRate, AllowedOutputTypes, minimumDenominationAmount, random);
+		Denominations = DenominationBuilder.CreateDenominations(MinAllowedOutputAmount, MaxAllowedOutputAmount, FeeRate, AllowedOutputTypes, minimumDenominationAmount, random, walletAllowedDenominations);
 
 		ChangeScriptType = AllowedOutputTypes.RandomElement(random);
 	}

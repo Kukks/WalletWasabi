@@ -11,7 +11,7 @@ public static class DenominationBuilder
 	public static IOrderedEnumerable<Output> CreateDenominations(Money minAllowedOutputAmount,
 		Money maxAllowedOutputAmount, FeeRate feeRate, IEnumerable<ScriptType> allowedOutputTypes,
 		long? minimumDenominationAmount,
-		WasabiRandom random)
+		WasabiRandom random, long[]? walletAllowedDenominations)
 	{
 		var denominations = new HashSet<Output?>();
 
@@ -27,6 +27,11 @@ public static class DenominationBuilder
 					stop = true;
 				}
 				if ( (minimumDenominationAmount is not null && result.Amount.Satoshi < minimumDenominationAmount.Value) || result.Amount < minAllowedOutputAmount || result.Amount > maxAllowedOutputAmount)
+				{
+					return null;
+				}
+
+				if(walletAllowedDenominations is not null && !walletAllowedDenominations.Contains(result.Amount.Satoshi))
 				{
 					return null;
 				}
