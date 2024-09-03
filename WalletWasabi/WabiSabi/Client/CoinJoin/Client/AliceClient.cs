@@ -12,7 +12,6 @@ using WalletWasabi.WabiSabi.Client.RoundStateAwaiters;
 using WalletWasabi.Extensions;
 using System.Net.Http;
 using WabiSabi.Crypto.ZeroKnowledge;
-using WalletWasabi.Affiliation;
 using WalletWasabi.WabiSabi.Models.MultipartyTransaction;
 
 namespace WalletWasabi.WabiSabi.Client.CoinJoin.Client;
@@ -25,8 +24,7 @@ public class AliceClient
 		ArenaClient arenaClient,
 		SmartCoin coin,
 		IEnumerable<Credential> issuedAmountCredentials,
-		IEnumerable<Credential> issuedVsizeCredentials,
-		bool isCoordinationFeeExempted)
+		IEnumerable<Credential> issuedVsizeCredentials)
 	{
 		var roundParameters = roundState.CoinjoinState.Parameters;
 		AliceId = aliceId;
@@ -39,7 +37,6 @@ public class AliceClient
 		IssuedVsizeCredentials = issuedVsizeCredentials;
 		MaxVsizeAllocationPerAlice = roundParameters.MaxVsizeAllocationPerAlice;
 		ConfirmationTimeout = roundParameters.ConnectionConfirmationTimeout / 2;
-		IsCoordinationFeeExempted = isCoordinationFeeExempted;
 	}
 
 	public Guid AliceId { get; }
@@ -52,7 +49,6 @@ public class AliceClient
 	public IEnumerable<Credential> IssuedVsizeCredentials { get; private set; }
 	private long MaxVsizeAllocationPerAlice { get; }
 	private TimeSpan ConfirmationTimeout { get; }
-	public bool IsCoordinationFeeExempted { get; }
 
 	public DateTimeOffset LastSuccessfulInputConnectionConfirmation { get; private set; } = DateTimeOffset.UtcNow;
 
@@ -111,8 +107,8 @@ public class AliceClient
 			coin,
 			new CoinJoinInputCommitmentData(arenaClient.CoordinatorIdentifier, roundState.Id));
 
-		var (response, isCoordinationFeeExempted) = await arenaClient.RegisterInputAsync(roundState.Id, coin.Coin.Outpoint, ownershipProof, cancellationToken).ConfigureAwait(false);
-		aliceClient = new(response.Value, roundState, arenaClient, coin, response.IssuedAmountCredentials, response.IssuedVsizeCredentials, isCoordinationFeeExempted);
+		var response = await arenaClient.RegisterInputAsync(roundState.Id, coin.Coin.Outpoint, ownershipProof, cancellationToken).ConfigureAwait(false);
+		aliceClient = new(response.Value, roundState, arenaClient, coin, response.IssuedAmountCredentials, response.IssuedVsizeCredentials);
 		coin.CoinJoinInProgress = true;
 
 		Logger.LogInfo($"Round ({roundState.Id}), Alice ({aliceClient.AliceId}): Registered {coin.Outpoint}.");
@@ -216,9 +212,9 @@ public class AliceClient
 
 	public async Task ReadyToSignAsync(CancellationToken cancellationToken)
 	{
-		await ArenaClient.ReadyToSignAsync(RoundId, AliceId, IsCoordinationFeeExempted? AffiliationConstants.DefaultAffiliationId: AffiliationConstants.NonDefaultAffiliationId ,cancellationToken).ConfigureAwait(false);
+		await ArenaClient.ReadyToSignAsync(RoundId, AliceId,cancellationToken).ConfigureAwait(false);
 		Logger.LogInfo($"Round ({RoundId}), Alice ({AliceId}): Ready to sign.");
 	}
 
-	public Money EffectiveValue => SmartCoin.EffectiveValue(FeeRate, IsCoordinationFeeExempted ? CoordinationFeeRate.Zero : CoordinationFeeRate);
+	public Money EffectiveValue => SmartCoin.EffectiveValue(FeeRate, CoordinationFeeRate);
 }

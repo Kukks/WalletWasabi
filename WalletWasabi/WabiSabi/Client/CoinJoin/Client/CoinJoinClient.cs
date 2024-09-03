@@ -91,7 +91,7 @@ public class CoinJoinClient
 	private OutputProvider OutputProvider { get; }
 	public RoundStateUpdater RoundStatusUpdater { get; }
 	private LiquidityClueProvider LiquidityClueProvider { get; }
-	public CoinJoinConfiguration CoinJoinConfiguration { get; }
+	private CoinJoinConfiguration CoinJoinConfiguration { get; }
 	private CoinJoinCoinSelector CoinJoinCoinSelector { get; }
 	private TimeSpan DoNotRegisterInLastMinuteTimeLimit { get; }
 	private TimeSpan FeeRateMedianTimeFrame { get; }
@@ -143,9 +143,26 @@ public class CoinJoinClient
 			throw new InvalidOperationException($"Blame Round ({roundState.Id}): Abandoning: the minimum output amount is too high.");
 		}
 
+		if (roundState.CoinjoinState.Parameters.MinInputCountByRound < CoinJoinConfiguration.AbsoluteMinInputCount)
+		{
+			throw new InvalidOperationException($"Blame Round ({roundState.Id}): Abandoning: the minimum input count was too low.");
+		}
+
 		if (!roundState.IsBlame && !IsRoundEconomic(roundState.CoinjoinState.Parameters.MiningFeeRate))
 		{
 			throw new InvalidOperationException($"Blame Round ({roundState.Id}): Abandoning: the round is not economic.");
+		}
+		//
+		// if (roundState.CoinjoinState.Parameters.CoordinationFeeRate.Rate > CoinJoinConfiguration.MaxCoordinationFeeRate)
+		// {
+		// 	throw new InvalidOperationException($"Blame Round ({roundState.Id}): Abandoning: " +
+		// 	                                    $"the coordinator is malicious and tried to trick the client into paying a coordination fee rate of {roundState.CoinjoinState.Parameters.CoordinationFeeRate.Rate} for the blame round");
+		// }
+
+		if (roundState.CoinjoinState.Parameters.MiningFeeRate.SatoshiPerByte > CoinJoinConfiguration.MaxCoinJoinMiningFeeRate)
+		{
+			throw new InvalidOperationException($"Blame Round ({roundState.Id}): Abandoning: " +
+			                                    $"the mining fee rate for the round was {roundState.CoinjoinState.Parameters.MiningFeeRate.SatoshiPerByte} sats/vb but maximum allowed is {CoinJoinConfiguration.MaxCoinJoinMiningFeeRate}.");
 		}
 
 		return roundState;
@@ -185,19 +202,30 @@ try{
 					currentRoundState.LogInfo(_wallet,CoordinatorName, roundSkippedMessage);
 					throw new CoinJoinClientException(CoinjoinError.UneconomicalRound, roundSkippedMessage);
 				}
-				if (CoinJoinConfiguration.MaxCoordinationFeeRate is {} &&roundParameters.CoordinationFeeRate.Rate * 100 > CoinJoinConfiguration.MaxCoordinationFeeRate)
-				{
-					string roundSkippedMessage = $"Coordination fee rate was {roundParameters.CoordinationFeeRate.Rate * 100} but max allowed is {CoinJoinConfiguration.MaxCoordinationFeeRate}.";
-					currentRoundState.LogInfo(_wallet,CoordinatorName,roundSkippedMessage);
-					throw new CoinJoinClientException(CoinjoinError.CoordinationFeeRateTooHigh, roundSkippedMessage);
-				}
+				// if (roundParameters.CoordinationFeeRate.Rate > CoinJoinConfiguration.MaxCoordinationFeeRate)
+				// {
+				// 	string roundSkippedMessage = $"Coordination fee rate was {roundParameters.CoordinationFeeRate.Rate} but max allowed is {CoinJoinConfiguration.MaxCoordinationFeeRate}.";
+				// 	currentRoundState.LogInfo(_wallet, CoordinatorName,roundSkippedMessage);
+				// 	throw new CoinJoinClientException(CoinjoinError.CoordinationFeeRateTooHigh, roundSkippedMessage);
+				// }
 				if (CoinJoinConfiguration.MaxCoinJoinMiningFeeRate is {} && roundParameters.MiningFeeRate.SatoshiPerByte > CoinJoinConfiguration.MaxCoinJoinMiningFeeRate)
 				{
 					string roundSkippedMessage = $"Mining fee rate was {roundParameters.MiningFeeRate} but max allowed is {CoinJoinConfiguration.MaxCoinJoinMiningFeeRate}.";
 					currentRoundState.LogInfo(_wallet,CoordinatorName,roundSkippedMessage);
 					throw new CoinJoinClientException(CoinjoinError.MiningFeeRateTooHigh, roundSkippedMessage);
 				}
-
+				if (roundParameters.MinInputCountByRound < CoinJoinConfiguration.AbsoluteMinInputCount)
+				{
+					string roundSkippedMessage = $"Min input count for the round was {roundParameters.MinInputCountByRound} but min allowed is {CoinJoinConfiguration.AbsoluteMinInputCount}.";
+					currentRoundState.LogInfo(_wallet, CoordinatorName,roundSkippedMessage);
+					throw new CoinJoinClientException(CoinjoinError.MinInputCountTooLow, roundSkippedMessage);
+				}
+				// if (SkipFactors.ShouldSkipRoundRandomly(SecureRandom, roundParameters.MiningFeeRate, RoundStatusUpdater.CoinJoinFeeRateMedians, currentRoundState.Id))
+				// {
+				// 	string roundSkippedMessage = "Round skipped randomly for better privacy.";
+				// 	currentRoundState.LogInfo(roundSkippedMessage);
+				// 	throw new CoinJoinClientException(CoinjoinError.RandomlySkippedRound, roundSkippedMessage);
+				// }
 			}
 
 			coinCandidates = await coinCandidatesFunc().ConfigureAwait(false);
@@ -563,14 +591,14 @@ try{
 					arenaRequestHandler);
 
 				var aliceClient = await AliceClient.CreateRegisterAndConfirmInputAsync(roundState, aliceArenaClient, coin, KeyChain, RoundStatusUpdater, linkedUnregisterCts.Token, linkedRegistrationsCts.Token, linkedConfirmationsCts.Token).ConfigureAwait(false);
-				if (!aliceClient.IsCoordinationFeeExempted && coin.Transaction.Labels.Contains("coinjoin") &&
-				    coin.Transaction.Labels.Contains(CoordinatorName))
-				{
-					// where's my free remix motherfucker?
-					await aliceClient.TryToUnregisterAlicesAsync(linkedUnregisterCts.Token).ConfigureAwait(false);
-					throw new Exception(
-						"Coin was created in a coinjoin with this coordinator, so it should be a free remix, but it was not.");
-				}
+				// if (!aliceClient.IsCoordinationFeeExempted && coin.Transaction.Labels.Contains("coinjoin") &&
+				//     coin.Transaction.Labels.Contains(CoordinatorName))
+				// {
+				// 	// where's my free remix motherfucker?
+				// 	await aliceClient.TryToUnregisterAlicesAsync(linkedUnregisterCts.Token).ConfigureAwait(false);
+				// 	throw new Exception(
+				// 		"Coin was created in a coinjoin with this coordinator, so it should be a free remix, but it was not.");
+				// }
 
 				// Right after the first real-cred confirmation happened we entered into critical phase.
 				if (Interlocked.Exchange(ref eventInvokedAlready, 1) == 0)
@@ -848,7 +876,7 @@ try{
 		var inputNetworkFee = Money.Satoshis(registeredAliceClients.Sum(alice => feeRate.GetFee(alice.SmartCoin.Coin.ScriptPubKey.EstimateInputVsize())));
 		var outputNetworkFee = Money.Satoshis(myOutputs.outputTxOuts.Sum(output => feeRate.GetFee(output.ScriptPubKey.EstimateOutputVsize())));
 		var totalNetworkFee = inputNetworkFee + outputNetworkFee;
-		var totalCoordinationFee = Money.Satoshis(registeredAliceClients.Where(a => !a.IsCoordinationFeeExempted).Sum(a => roundParameters.CoordinationFeeRate.GetFee(a.SmartCoin.Amount)));
+		var totalCoordinationFee = Money.Satoshis(registeredAliceClients.Sum(a => roundParameters.CoordinationFeeRate.GetFee(a.SmartCoin.Amount)));
 
 		var batchedPaymentAmount = Money.Satoshis(myOutputs.batchedPayments.Keys.Sum(a => a.Value));
 		var batchedPayments = myOutputs.batchedPayments.Count;
@@ -1039,42 +1067,47 @@ try{
 		var unsignedCoinJoin = signingState.CreateUnsignedTransactionWithPrecomputedData();
 		var abandonAndAllSubsequentBlames = false;
 
-		var mustSignAllInputs = true;
-		if (unsignedCoinJoin.Transaction.Inputs.Count <= registeredAliceClients.Length)
+		// If everything is okay, then sign all the inputs. Otherwise, in case there are missing outputs, the server is
+		// lying (it lied us before when it responded with 200 OK to the OutputRegistration requests or it is lying us
+		// now when we identify as satoshi.
+		// In this scenario we should ban the coordinator and stop dealing with it.
+		// see more: https://github.com/WalletWasabi/WalletWasabi/issues/8171
+		var isItSoloCoinjoin =  signingState.Inputs.Count() == registeredAliceClients.Length;
+		var isItForbiddenSoloCoinjoining = isItSoloCoinjoin && !CoinJoinConfiguration.AllowSoloCoinjoining;
+		if (isItForbiddenSoloCoinjoining)
 		{
-			//we're the only one in the coinjoin, fuck that.
-			roundState.LogInfo(_wallet, CoordinatorName,  "We are the only ones in this coinjoin.");
+			roundState.LogInfo(_wallet, CoordinatorName, $"I am the only one in that coinjoin.");
 			abandonAndAllSubsequentBlames = true;
 		}
-		else
+		bool allMyOutputsArePresent = SanityCheck(outputTxOuts.outputTxOuts, unsignedCoinJoin.Transaction.Outputs);
+
+		if (!allMyOutputsArePresent)
 		{
-			// If everything is okay, then sign all the inputs. Otherwise, in case there are missing outputs, the server is
-			// lying (it lied us before when it responded with 200 OK to the OutputRegistration requests or it is lying us
-			// now when we identify as satoshi.
-			// In this scenario we should ban the coordinator and stop dealing with it.
-			// see more: https://github.com/zkSNACKs/WalletWasabi/issues/8171
-			if (!SanityCheck(outputTxOuts.outputTxOuts, unsignedCoinJoin.Transaction.Outputs))
-			{
-				mustSignAllInputs = false;
+			roundState.LogInfo(_wallet, CoordinatorName, $"There are missing outputs.");
+		}
 
-				roundState.LogInfo(_wallet, CoordinatorName,
-					$"There are missing outputs. A subset of inputs will be signed.");
+		// Assert that the effective fee rate is at least what was agreed on.
+		// Otherwise, coordinator could take some of the mining fees for itself.
+		// There is a tolerance because before constructing the transaction only an estimation can be computed.
+		var isCoordinatorTakingExtraFees = signingState.EffectiveFeeRate.FeePerK.Satoshi <= signingState.Parameters.MiningFeeRate.FeePerK.Satoshi * 0.90;
+		if (isCoordinatorTakingExtraFees)
+		{
+			roundState.LogInfo(_wallet, CoordinatorName, $"Effective fee rate of the transaction is lower than expected.");
+		}
 
-			}
-			else if (OutputAcceptor is not null)
+		var mustSignAllInputs = !isItForbiddenSoloCoinjoining && allMyOutputsArePresent && !isCoordinatorTakingExtraFees;
+
+
+
+		if (OutputAcceptor is not null)
 			{
 				mustSignAllInputs = await OutputAcceptor
 					.Invoke(registeredAliceClients, outputTxOuts, unsignedCoinJoin, roundState).ConfigureAwait(false);
 			}
 
-			// Assert that the effective fee rate is at least what was agreed on.
-			// Otherwise, coordinator could take some of the mining fees for itself.
-			// There is a tolerance because before constructing the transaction only an estimation can be computed.
-			if (mustSignAllInputs)
-			{
-				mustSignAllInputs = signingState.EffectiveFeeRate.FeePerK.Satoshi > signingState.Parameters.MiningFeeRate.FeePerK.Satoshi * 0.90;
-			}
-
+		if (!mustSignAllInputs)
+		{
+			roundState.LogInfo(_wallet, CoordinatorName,$"A subset of inputs will be signed.	");
 		}
 
 		// Send signature.

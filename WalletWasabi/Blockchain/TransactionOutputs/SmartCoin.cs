@@ -119,7 +119,7 @@ return coin;
 	}
 
 	/// <returns>False if external, or the tx inputs are all external.</returns>
-	/// <remarks>Context: https://github.com/zkSNACKs/WalletWasabi/issues/10567</remarks>
+	/// <remarks>Context: https://github.com/WalletWasabi/WalletWasabi/issues/10567</remarks>
 	public bool IsSufficientlyDistancedFromExternalKeys { get; set; } = true;
 
 	[MemberNotNullWhen(returnValue: true, nameof(SpenderTransaction))]
