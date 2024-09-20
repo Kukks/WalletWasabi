@@ -144,10 +144,7 @@ public partial class MainViewModel : ViewModelBase
 	{
 		var announcements = new List<AnnouncementBase>();
 
-		if (UiContext.ApplicationSettings.ShowCoordinatorAnnouncement)
-		{
-			announcements.Add(new ZkSnacksCoordinatorAnnouncementViewModel(UiContext));
-		}
+		// Add Announcements here.
 
 		return announcements;
 	}
@@ -194,7 +191,7 @@ public partial class MainViewModel : ViewModelBase
 	{
 		UiContext.WalletRepository.Wallets
 			.Connect()
-			.FilterOnObservable(x => x.Coinjoin.IsRunning)
+			.FilterOnObservable(x => x.IsCoinjoinRunning)
 			.ToCollection()
 			.Select(x => x.Count != 0)
 			.BindTo(this, x => x.IsCoinJoinActive);

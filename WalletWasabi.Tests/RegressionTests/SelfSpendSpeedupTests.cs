@@ -63,7 +63,6 @@ public class SelfSpendSpeedupTests : IClassFixture<RegTestFixture>
 		await using WasabiHttpClientFactory httpClientFactory = new(torEndPoint: null, backendUriGetter: () => new Uri(RegTestFixture.BackendEndPoint));
 		using WasabiSynchronizer synchronizer = new(period: TimeSpan.FromSeconds(3), 10000, bitcoinStore, httpClientFactory);
 		HybridFeeProvider feeProvider = new(synchronizer, null);
-		using UnconfirmedTransactionChainProvider unconfirmedChainProvider = new(httpClientFactory);
 
 		// 4. Create key manager service.
 		var keyManager = KeyManager.CreateNew(out _, password, network);
@@ -79,7 +78,7 @@ public class SelfSpendSpeedupTests : IClassFixture<RegTestFixture>
 			[specificNodeBlockProvider],
 			new P2PBlockProvider(network, nodes, httpClientFactory.IsTorEnabled));
 
-		WalletFactory walletFactory = new(workDir, network, bitcoinStore, synchronizer, serviceConfiguration, feeProvider, blockDownloadService, unconfirmedChainProvider);
+		WalletFactory walletFactory = new(workDir, network, bitcoinStore, synchronizer, serviceConfiguration, feeProvider, blockDownloadService);
 		WalletManager walletManager = new(network, workDir, new WalletDirectories(network, workDir), walletFactory);
 		walletManager.Initialize();
 
@@ -106,9 +105,6 @@ public class SelfSpendSpeedupTests : IClassFixture<RegTestFixture>
 
 			wallet.Password = password;
 
-			TransactionBroadcaster broadcaster = new(network, bitcoinStore, httpClientFactory, walletManager);
-			broadcaster.Initialize(nodes, rpc);
-
 			var waitCount = 0;
 			while (wallet.Coins.Sum(x => x.Amount) == Money.Zero)
 			{
@@ -125,11 +121,13 @@ public class SelfSpendSpeedupTests : IClassFixture<RegTestFixture>
 
 			Money amountToSend = wallet.Coins.Where(x => x.IsAvailable()).Sum(x => x.Amount) / 2;
 			var txToSpeedUp = wallet.BuildTransaction(password, new PaymentIntent(keyManager.GetNextReceiveKey("foo").GetAssumedScriptPubKey(), amountToSend, label: "bar"), FeeStrategy.SevenDaysConfirmationTargetStrategy, allowUnconfirmed: true);
+
+			TransactionBroadcaster broadcaster = new([new RpcBroadcaster(rpc)], bitcoinStore.MempoolService, walletManager);
 			await broadcaster.SendTransactionAsync(txToSpeedUp.Transaction);
 
 			Assert.Equal(Assert.Single(txToSpeedUp.SpentCoins).SpenderTransaction, txToSpeedUp.Transaction);
 
-			var rbf = wallet.SpeedUpTransaction(txToSpeedUp.Transaction);
+			var rbf = await wallet.SpeedUpTransactionAsync(txToSpeedUp.Transaction, null, CancellationToken.None);
 
 			// Spender is not updated until broadcast:
 			Assert.Equal(Assert.Single(txToSpeedUp.SpentCoins).SpenderTransaction, txToSpeedUp.Transaction);
@@ -187,7 +185,7 @@ public class SelfSpendSpeedupTests : IClassFixture<RegTestFixture>
 
 			#region CanDoTwice
 
-			var rbf2 = wallet.SpeedUpTransaction(rbf.Transaction);
+			var rbf2 = await wallet.SpeedUpTransactionAsync(rbf.Transaction, null, CancellationToken.None);
 
 			// Spender is not updated until broadcast:
 			Assert.Equal(Assert.Single(txToSpeedUp.SpentCoins).SpenderTransaction, rbf.Transaction);
@@ -255,7 +253,7 @@ public class SelfSpendSpeedupTests : IClassFixture<RegTestFixture>
 				Assert.Equal(coin.SpenderTransaction, txToSpeedUp.Transaction);
 			}
 
-			rbf = wallet.SpeedUpTransaction(txToSpeedUp.Transaction);
+			rbf = await wallet.SpeedUpTransactionAsync(txToSpeedUp.Transaction, null, CancellationToken.None);
 
 			// Spender is not updated until broadcast:
 			foreach (var coin in txToSpeedUp.SpentCoins)
@@ -340,7 +338,7 @@ public class SelfSpendSpeedupTests : IClassFixture<RegTestFixture>
 			txToSpeedUp = wallet.BuildTransaction(password, new PaymentIntent(keyManager.GetNextReceiveKey("foo").GetAssumedScriptPubKey().GetDestination()!, MoneyRequest.CreateAllRemaining()), FeeStrategy.CreateFromFeeRate(200), allowedInputs: receiveTx.WalletOutputs.Select(x => x.Outpoint));
 			await broadcaster.SendTransactionAsync(txToSpeedUp.Transaction);
 
-			Assert.Throws<TransactionFeeOverpaymentException>(() => wallet.SpeedUpTransaction(txToSpeedUp.Transaction));
+			await Assert.ThrowsAsync<TransactionFeeOverpaymentException>(async () => await wallet.SpeedUpTransactionAsync(txToSpeedUp.Transaction, null, CancellationToken.None));
 
 			#endregion TooSmall
 		}

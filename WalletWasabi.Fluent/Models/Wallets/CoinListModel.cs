@@ -22,7 +22,7 @@ public abstract partial class CoinListModel : IDisposable
 		WalletModel = walletModel;
 		var transactionProcessed = walletModel.Transactions.TransactionProcessed;
 		var anonScoreTargetChanged = this.WhenAnyValue(x => x.WalletModel.Settings.AnonScoreTarget).Skip(1).ToSignal();
-		var isCoinjoinRunningChanged = walletModel.Coinjoin.IsRunning.ToSignal();
+		var isCoinjoinRunningChanged = walletModel.IsCoinjoinRunning.ToSignal();
 		var isSelected = this.WhenAnyValue(x => x.WalletModel.IsSelected).Skip(1).ToSignal();
 
 		var signals =
@@ -32,8 +32,8 @@ public abstract partial class CoinListModel : IDisposable
 				.Merge(isSelected)
 				.Publish();
 
+		List = signals.Fetch(CreateCoinModels, x => x.Key).DisposeWith(_disposables);
 		Pockets = signals.Fetch(GetPockets, x => x.Labels).DisposeWith(_disposables);
-		List = signals.Fetch(() => Wallet.Coins.Select(CreateCoinModel), x => x.Key).DisposeWith(_disposables);
 
 		signals
 			.Do(_ => Logger.LogDebug($"Refresh signal emitted in {walletModel.Name}"))
@@ -56,14 +56,14 @@ public abstract partial class CoinListModel : IDisposable
 		return List.Items.First(coinModel => coinModel.Key == smartCoin.Outpoint.GetHashCode());
 	}
 
-	private ICoinModel CreateCoinModel(SmartCoin smartCoin)
+	protected ICoinModel CreateCoinModel(SmartCoin smartCoin)
 	{
 		return new CoinModel(smartCoin, WalletModel.Settings.AnonScoreTarget);
 	}
 
 	protected abstract Pocket[] GetPockets();
 
-	protected abstract ICoinModel[] GetCoins();
+	protected abstract ICoinModel[] CreateCoinModels();
 
 	public void Dispose() => _disposables.Dispose();
 }

@@ -26,7 +26,7 @@ public class WabiSabiCoordinator : BackgroundService
 	{
 		Parameters = parameters;
 		RpcClient = rpc;
-		Warden = new(parameters.PrisonFilePath, Config);
+		Warden = new( Config);
 		ConfigWatcher = new(parameters.ConfigChangeMonitoringPeriod, Config, () => Logger.LogInfo("WabiSabi configuration has changed."));
 
 		CoinJoinFeeRateStatStore = CoinJoinFeeRateStatStore.LoadFromFile(parameters.CoinJoinFeeRateStatStoreFilePath, Config, rpc);
@@ -37,7 +37,6 @@ public class WabiSabiCoordinator : BackgroundService
 
 		RoundParameterFactory roundParameterFactory = new(Config, rpc.Network);
 		Arena = new(
-			parameters.RoundProgressSteppingPeriod,
 			Config,
 			rpc,
 			Warden.Prison,

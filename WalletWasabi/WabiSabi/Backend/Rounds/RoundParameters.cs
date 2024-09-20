@@ -11,7 +11,6 @@ public record RoundParameters
 	public RoundParameters(
 		Network network,
 		FeeRate miningFeeRate,
-		CoordinationFeeRate coordinationFeeRate,
 		Money maxSuggestedAmount,
 		int minInputCountByRound,
 		int maxInputCountByRound,
@@ -29,7 +28,6 @@ public record RoundParameters
 	{
 		Network = network;
 		MiningFeeRate = miningFeeRate;
-		CoordinationFeeRate = coordinationFeeRate;
 		MaxSuggestedAmount = maxSuggestedAmount;
 		MinInputCountByRound = minInputCountByRound;
 		MaxInputCountByRound = maxInputCountByRound;
@@ -52,7 +50,7 @@ public record RoundParameters
 
 	public Network Network { get; init; }
 	public FeeRate MiningFeeRate { get; init; }
-	public CoordinationFeeRate CoordinationFeeRate { get; init; }
+	public CoordinationFeeRate CoordinationFeeRate => CoordinationFeeRate.Zero; // for serialization compatibility
 	public Money MaxSuggestedAmount { get; init; }
 	public int MinInputCountByRound { get; init; }
 	public int MaxInputCountByRound { get; init; }
@@ -91,13 +89,11 @@ public record RoundParameters
 		WabiSabiConfig wabiSabiConfig,
 		Network network,
 		FeeRate miningFeeRate,
-		CoordinationFeeRate coordinationFeeRate,
 		Money maxSuggestedAmount)
 	{
 		return new RoundParameters(
 			network,
 			miningFeeRate,
-			coordinationFeeRate,
 			maxSuggestedAmount,
 			wabiSabiConfig.MinInputCountByRound,
 			wabiSabiConfig.MaxInputCountByRound,

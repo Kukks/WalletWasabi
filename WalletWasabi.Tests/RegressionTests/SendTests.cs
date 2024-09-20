@@ -63,7 +63,6 @@ public class SendTests : IClassFixture<RegTestFixture>
 		await using WasabiHttpClientFactory httpClientFactory = new(torEndPoint: null, backendUriGetter: () => new Uri(RegTestFixture.BackendEndPoint));
 		using WasabiSynchronizer synchronizer = new(period: TimeSpan.FromSeconds(3), 10000, bitcoinStore, httpClientFactory);
 		HybridFeeProvider feeProvider = new(synchronizer, null);
-		using UnconfirmedTransactionChainProvider unconfirmedChainProvider = new(httpClientFactory);
 
 		// 4. Create key manager service.
 		var keyManager = KeyManager.CreateNew(out _, password, network);
@@ -79,7 +78,7 @@ public class SendTests : IClassFixture<RegTestFixture>
 			[specificNodeBlockProvider],
 			new P2PBlockProvider(network, nodes, httpClientFactory.IsTorEnabled));
 
-		WalletFactory walletFactory = new(workDir, network, bitcoinStore, synchronizer, serviceConfiguration, feeProvider, blockDownloadService, unconfirmedChainProvider);
+		WalletFactory walletFactory = new(workDir, network, bitcoinStore, synchronizer, serviceConfiguration, feeProvider, blockDownloadService);
 		WalletManager walletManager = new(network, workDir, new WalletDirectories(network, workDir), walletFactory);
 		walletManager.Initialize();
 
@@ -108,9 +107,6 @@ public class SendTests : IClassFixture<RegTestFixture>
 			var blockCount = await rpc.GetBlockCountAsync();
 			await setup.WaitForFiltersToBeProcessedAsync(TimeSpan.FromSeconds(120), blockCount);
 
-			TransactionBroadcaster broadcaster = new(network, bitcoinStore, httpClientFactory, walletManager);
-			broadcaster.Initialize(nodes, rpc);
-
 			var waitCount = 0;
 			while (wallet.Coins.Sum(x => x.Amount) == Money.Zero)
 			{
@@ -137,6 +133,8 @@ public class SendTests : IClassFixture<RegTestFixture>
 			Assert.Contains(new[] { key.P2wpkhScript, key2.P2wpkhScript }, x => x == spentCoin.ScriptPubKey);
 			Assert.Equal(Money.Coins(1m), res2.SpentCoins.Single().Amount);
 			Assert.False(res2.SpendsUnconfirmed);
+
+			TransactionBroadcaster broadcaster = new([new RpcBroadcaster(rpc)], bitcoinStore.MempoolService, walletManager);
 
 			await broadcaster.SendTransactionAsync(res2.Transaction);
 
@@ -520,7 +518,6 @@ public class SendTests : IClassFixture<RegTestFixture>
 			await feeProvider.StopAsync(CancellationToken.None);
 			nodes?.Dispose();
 			node?.Disconnect();
-			unconfirmedChainProvider?.Dispose();
 		}
 	}
 

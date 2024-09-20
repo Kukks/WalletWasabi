@@ -22,8 +22,6 @@ public partial class WalletAuthModel : ReactiveObject
 
 	public bool HasPassword => !string.IsNullOrEmpty(_wallet.Password);
 
-	public bool HasPassword => !string.IsNullOrEmpty(_wallet.Kitchen.SaltSoup());
-
 	public async Task LoginAsync(string password)
 	{
 		var isPasswordCorrect = await Task.Run(() => _wallet.TryLogin(password, out var _));

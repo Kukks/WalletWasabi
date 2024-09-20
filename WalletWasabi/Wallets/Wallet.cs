@@ -42,7 +42,7 @@ public class Wallet : BackgroundService, IWallet
 		HybridFeeProvider feeProvider,
 		TransactionProcessor transactionProcessor,
 		WalletFilterProcessor walletFilterProcessor,
-		UnconfirmedTransactionChainProvider unconfirmedTransactionChainProvider)
+		CpfpInfoProvider? cpfpInfoProvider)
 	{
 		Guard.NotNullOrEmptyOrWhitespace(nameof(dataDir), dataDir);
 		Network = network;
@@ -51,7 +51,7 @@ public class Wallet : BackgroundService, IWallet
 		Synchronizer = syncer;
 		ServiceConfiguration = serviceConfiguration;
 		FeeProvider = feeProvider;
-		// UnconfirmedTransactionChainProvider = unconfirmedTransactionChainProvider;
+		CpfpInfoProvider = cpfpInfoProvider;
 
 		RuntimeParams.SetDataDir(dataDir);
 
@@ -127,7 +127,7 @@ public class Wallet : BackgroundService, IWallet
 	public TransactionProcessor TransactionProcessor { get; }
 
 	public HybridFeeProvider FeeProvider { get; }
-
+	public CpfpInfoProvider? CpfpInfoProvider { get; }
 	public WalletFilterProcessor WalletFilterProcessor { get; }
 	public FilterModel? LastProcessedFilter => WalletFilterProcessor.LastProcessedFilter;
 
@@ -210,7 +210,7 @@ public class Wallet : BackgroundService, IWallet
 	/// </summary>
 	/// <param name="sortForUi"><c>true</c> to sort by "first seen", "height", and "block index", <c>false</c> to sort by "height", "block index", and "first seen".</param>
 	/// <remarks>Transaction amount specifies how it affected your final wallet balance (spend some bitcoin, received some bitcoin, or no change).</remarks>
-	public List<TransactionSummary> BuildHistorySummary(bool sortForUi = false)
+	public async Task<List<TransactionSummary>> BuildHistorySummaryAsync(bool sortForUi = false, CancellationToken cancellationToken = default)
 	{
 		Dictionary<uint256, TransactionSummary> mapByTxid = new();
 
@@ -222,8 +222,11 @@ public class Wallet : BackgroundService, IWallet
 			}
 			else
 			{
-				// var unconfTransactionChainOfCoin = UnconfirmedTransactionChainProvider.GetUnconfirmedTransactionChain(coin.TransactionId) ?? [];
-				// var effectiveFeeRate = FeeHelpers.CalculateEffectiveFeeRateOfUnconfirmedChain(unconfTransactionChainOfCoin);
+				FeeRate? effectiveFeeRate = null;
+				if(CpfpInfoProvider is not null && await CpfpInfoProvider.GetCachedCpfpInfoAsync(coin.TransactionId, cancellationToken).ConfigureAwait(false) is { } cpfpInfo)
+				{
+					effectiveFeeRate = new FeeRate(cpfpInfo.EffectiveFeePerVSize);
+				}
 
 				// mapByTxid.Add(coin.TransactionId, new TransactionSummary(coin.Transaction, coin.Amount, effectiveFeeRate));
 			}
@@ -236,13 +239,16 @@ public class Wallet : BackgroundService, IWallet
 				{
 					foundSpenderCoin.Amount -= coin.Amount;
 				}
-				// else
-				// {
-				// 	// var unconfTransactionChainOfCoin = UnconfirmedTransactionChainProvider.GetUnconfirmedTransactionChain(coin.TransactionId) ?? [];
-				// 	// var effectiveFeeRate = FeeHelpers.CalculateEffectiveFeeRateOfUnconfirmedChain(unconfTransactionChainOfCoin);
-				//
-				// 	mapByTxid.Add(spenderTxId, new TransactionSummary(spenderTransaction, Money.Zero - coin.Amount, effectiveFeeRate));
-				// }
+				else
+				{
+					FeeRate? effectiveFeeRate = null;
+					if(CpfpInfoProvider is not null && await CpfpInfoProvider.GetCachedCpfpInfoAsync(coin.TransactionId, cancellationToken).ConfigureAwait(false) is { } cpfpInfo)
+					{
+						effectiveFeeRate = new FeeRate(cpfpInfo.EffectiveFeePerVSize);
+					}
+
+					mapByTxid.Add(spenderTxId, new TransactionSummary(spenderTransaction, Money.Zero - coin.Amount, effectiveFeeRate));
+				}
 			}
 		}
 
@@ -272,9 +278,9 @@ public class Wallet : BackgroundService, IWallet
 		}
 	}
 
-	public HdPubKey GetNextReceiveAddress(IEnumerable<string> destinationLabels)
+	public HdPubKey GetNextReceiveAddress(IEnumerable<string> destinationLabels, ScriptPubKeyType scriptPubKeyType)
 	{
-		return KeyManager.GetNextReceiveKey(new LabelsArray(destinationLabels));
+		return KeyManager.GetNextReceiveKey(new LabelsArray(destinationLabels), scriptPubKeyType);
 	}
 
 	public int GetPrivacyPercentage()
@@ -437,7 +443,12 @@ public class Wallet : BackgroundService, IWallet
 		try
 		{
 			WalletRelevantTransactionProcessed?.Invoke(this, e);
-			// UnconfirmedTransactionChainProvider.CheckAndScheduleRequestIfNeeded(e.Transaction);
+
+
+			if (CpfpInfoProvider.ShouldRequest(e.Transaction))
+			{
+				CpfpInfoProvider?.ScheduleRequest(e.Transaction);
+			}
 		}
 		catch (Exception ex)
 		{
@@ -482,6 +493,11 @@ public class Wallet : BackgroundService, IWallet
 			if (BitcoinStore.SmartHeaderChain.HashesLeft != 0 || BitcoinStore.SmartHeaderChain.TipHash != filterModels.Last().Header.BlockHash)
 			{
 				return;
+			}
+
+			if (CpfpInfoProvider is not null)
+			{
+				await CpfpInfoProvider.UpdateCacheAsync(CancellationToken.None).ConfigureAwait(false);
 			}
 
 			await BitcoinStore.MempoolService.TryPerformMempoolCleanupAsync(Synchronizer.HttpClientFactory).ConfigureAwait(false);

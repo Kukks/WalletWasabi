@@ -28,14 +28,15 @@ public partial class Arena : PeriodicRunner
 	private readonly WabiSabiConfig.CoordinatorScriptResolver _coordinatorScriptResolver;
 
 	public Arena(
-		TimeSpan period,
 		WabiSabiConfig config,
 		IRPCClient rpc,
 		Prison prison,
 		RoundParameterFactory roundParameterFactory,
 		IHttpClientFactory httpClientFactory,
 		WabiSabiConfig.CoordinatorScriptResolver coordinatorScriptResolver,
-		CoinJoinScriptStore? coinJoinScriptStore = null) : base(period)
+		CoinJoinScriptStore? coinJoinScriptStore = null,
+		TimeSpan? period = null
+		) : base(period ?? TimeSpan.FromSeconds(2))
 	{
 		_httpClientFactory = httpClientFactory;
 		_coordinatorScriptResolver = coordinatorScriptResolver;
@@ -613,13 +614,6 @@ public partial class Arena : PeriodicRunner
 		ConstructionState coinjoin, CancellationToken cancellationToken)
 	{
 
-		var collectedCoordinationFee = round.Alices.Sum(x => round.Parameters.CoordinationFeeRate.GetFee(x.Coin.Amount));
-
-		if (collectedCoordinationFee == 0)
-		{
-			round.FeeTxOuts = [];
-			round.LogInfo(null, null, $"Coordination fee wasn't taken, because it was free for everyone. Hurray!");
-		}
 		if(Config.CoordinatorSplits?.Any() is true)
 		{
 			var splits = await Config.GetNextCleanCoordinatorScripts(_coordinatorScriptResolver,_httpClientFactory, round, cancellationToken).ConfigureAwait(false);
@@ -632,18 +626,24 @@ public partial class Arena : PeriodicRunner
 			var coordinationFee = coinjoin.Balance - expectedCost;
 			if (coordinationFee > 0)
 			{
-				round.LogInfo(null, null, $"Coordination fee was originally {Money.Satoshis(collectedCoordinationFee).ToDecimal(MoneyUnit.BTC)}, " +
-				                   $"but we're now at {coordinationFee.ToDecimal(MoneyUnit.BTC)} after computing advertised feerate and splitting it among the coordinator scripts.");
+				round.LogInfo(null, null, $"Coordination fee  at {coordinationFee.ToDecimal(MoneyUnit.BTC)} after computing advertised feerate and splitting it among the coordinator scripts.");
 				var txOuts = ComputeSplitAmounts(coordinationFee, splits, round);
 				coinjoin = txOuts.Aggregate(coinjoin, (current, txOut) => current.AddOutput(txOut)).AsPayingForSharedOverhead();
 				round.FeeTxOuts = txOuts;
 			}
 			if(coinjoin.EffectiveFeeRate > coinjoin.Parameters.MiningFeeRate)
 			{
-				round.LogWarning(null,null,$"Effective fee rate is higher than the advertised fee rate. Effective: {coinjoin.EffectiveFeeRate.SatoshiPerByte}, Advertised: {coinjoin.Parameters.MiningFeeRate.SatoshiPerByte}");
+				round.LogWarning(null, null,
+					$"Effective fee rate is higher than the advertised fee rate. Effective: {coinjoin.EffectiveFeeRate.SatoshiPerByte}, Advertised: {coinjoin.Parameters.MiningFeeRate.SatoshiPerByte}");
 			}
 		}
 
+		if (round.FeeTxOuts is null || round.FeeTxOuts.Any() is false )
+		{
+
+			round.FeeTxOuts = [];
+			round.LogInfo(null, null, $"Coordination fee wasn't taken, because it was free for everyone. Hurray!");
+		}
 		return coinjoin;
 	}
 	// Compute splits of the coordinator fee based on ratios

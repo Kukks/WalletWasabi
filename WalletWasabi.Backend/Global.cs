@@ -4,7 +4,6 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using WalletWasabi.BitcoinCore;
-using WalletWasabi.BitcoinCore.Mempool;
 using WalletWasabi.BitcoinCore.Rpc;
 using WalletWasabi.Blockchain.BlockFilters;
 using WalletWasabi.Blockchain.Blocks;
@@ -38,15 +37,13 @@ public class Global : IDisposable
 		}
 
 		// We have to find it, because it's cloned by the node and not perfectly cloned (event handlers cannot be cloned.)
-		P2pNode = new(config.Network, config.GetBitcoinP2pEndPoint(), new(), $"/WasabiCoordinator:{Constants.BackendMajorVersion}/");
-		HostedServices.Register<BlockNotifier>(() => new BlockNotifier(TimeSpan.FromSeconds(7), rpcClient, P2pNode), "Block Notifier");
+		P2pNode = new(config.Network, config.GetBitcoinP2pEndPoint(), new());
+		HostedServices.Register<BlockNotifier>(() => new BlockNotifier(rpcClient, P2pNode), "Block Notifier");
 
 		// Initialize index building
 		var indexBuilderServiceDir = Path.Combine(DataDir, "IndexBuilderService");
-		var indexFilePath = Path.Combine(indexBuilderServiceDir, $"Index{RpcClient.Network}.dat");
+		var indexFilePath = Path.Combine(indexBuilderServiceDir, $"Index{RpcClient.Network}.sqlite");
 		IndexBuilderService = new(RpcClient, HostedServices.Get<BlockNotifier>(), indexFilePath);
-
-		MempoolMirror = new MempoolMirror(TimeSpan.FromSeconds(21), RpcClient, P2pNode);
 	}
 
 	public string DataDir { get; }
@@ -64,7 +61,6 @@ public class Global : IDisposable
 	private CoordinatorParameters CoordinatorParameters { get; }
 
 	public WabiSabiCoordinator? WabiSabiCoordinator { get; private set; }
-	public MempoolMirror MempoolMirror { get; }
 
 	public async Task InitializeAsync(CancellationToken cancel)
 	{
@@ -73,8 +69,6 @@ public class Global : IDisposable
 
 		// Make sure P2P works.
 		await P2pNode.ConnectAsync(cancel).ConfigureAwait(false);
-
-		HostedServices.Register<MempoolMirror>(() => MempoolMirror, "Full Node Mempool Mirror");
 
 		var blockNotifier = HostedServices.Get<BlockNotifier>();
 

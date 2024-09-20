@@ -165,6 +165,12 @@ public class CoinJoinClient
 			                                    $"the mining fee rate for the round was {roundState.CoinjoinState.Parameters.MiningFeeRate.SatoshiPerByte} sats/vb but maximum allowed is {CoinJoinConfiguration.MaxCoinJoinMiningFeeRate}.");
 		}
 
+		if (roundState.CoinjoinState.Parameters.MiningFeeRate.SatoshiPerByte > CoinJoinConfiguration.MaxCoinJoinMiningFeeRate)
+		{
+			throw new InvalidOperationException($"Blame Round ({roundState.Id}): Abandoning: " +
+			                                    $"the mining fee rate for the round was {roundState.CoinjoinState.Parameters.MiningFeeRate.SatoshiPerByte} sats/vb but maximum allowed is {CoinJoinConfiguration.MaxCoinJoinMiningFeeRate}.");
+		}
+
 		return roundState;
 	}
 
@@ -202,13 +208,7 @@ try{
 					currentRoundState.LogInfo(_wallet,CoordinatorName, roundSkippedMessage);
 					throw new CoinJoinClientException(CoinjoinError.UneconomicalRound, roundSkippedMessage);
 				}
-				// if (roundParameters.CoordinationFeeRate.Rate > CoinJoinConfiguration.MaxCoordinationFeeRate)
-				// {
-				// 	string roundSkippedMessage = $"Coordination fee rate was {roundParameters.CoordinationFeeRate.Rate} but max allowed is {CoinJoinConfiguration.MaxCoordinationFeeRate}.";
-				// 	currentRoundState.LogInfo(_wallet, CoordinatorName,roundSkippedMessage);
-				// 	throw new CoinJoinClientException(CoinjoinError.CoordinationFeeRateTooHigh, roundSkippedMessage);
-				// }
-				if (CoinJoinConfiguration.MaxCoinJoinMiningFeeRate is {} && roundParameters.MiningFeeRate.SatoshiPerByte > CoinJoinConfiguration.MaxCoinJoinMiningFeeRate)
+				if (roundParameters.MiningFeeRate.SatoshiPerByte > CoinJoinConfiguration.MaxCoinJoinMiningFeeRate)
 				{
 					string roundSkippedMessage = $"Mining fee rate was {roundParameters.MiningFeeRate} but max allowed is {CoinJoinConfiguration.MaxCoinJoinMiningFeeRate}.";
 					currentRoundState.LogInfo(_wallet,CoordinatorName,roundSkippedMessage);
@@ -216,6 +216,7 @@ try{
 				}
 				if (roundParameters.MinInputCountByRound < CoinJoinConfiguration.AbsoluteMinInputCount)
 				{
+
 					string roundSkippedMessage = $"Min input count for the round was {roundParameters.MinInputCountByRound} but min allowed is {CoinJoinConfiguration.AbsoluteMinInputCount}.";
 					currentRoundState.LogInfo(_wallet, CoordinatorName,roundSkippedMessage);
 					throw new CoinJoinClientException(CoinjoinError.MinInputCountTooLow, roundSkippedMessage);
@@ -876,7 +877,6 @@ try{
 		var inputNetworkFee = Money.Satoshis(registeredAliceClients.Sum(alice => feeRate.GetFee(alice.SmartCoin.Coin.ScriptPubKey.EstimateInputVsize())));
 		var outputNetworkFee = Money.Satoshis(myOutputs.outputTxOuts.Sum(output => feeRate.GetFee(output.ScriptPubKey.EstimateOutputVsize())));
 		var totalNetworkFee = inputNetworkFee + outputNetworkFee;
-		var totalCoordinationFee = Money.Satoshis(registeredAliceClients.Sum(a => roundParameters.CoordinationFeeRate.GetFee(a.SmartCoin.Amount)));
 
 		var batchedPaymentAmount = Money.Satoshis(myOutputs.batchedPayments.Keys.Sum(a => a.Value));
 		var batchedPayments = myOutputs.batchedPayments.Count;
@@ -884,7 +884,7 @@ try{
 		string[] summary = new string[]
 		{
 			"",
-			$"\tInput total: {totalInputAmount.ToString(true, false)} Eff: {totalEffectiveInputAmount.ToString(true, false)} NetwFee: {inputNetworkFee.ToString(true, false)} CoordFee: {totalCoordinationFee.ToString(true)}",
+			$"\tInput total: {totalInputAmount.ToString(true, false)} Eff: {totalEffectiveInputAmount.ToString(true, false)} NetwFee: {inputNetworkFee.ToString(true, false)}",
 			$"\tOutput total: {totalOutputAmount.ToString(true, false)} Eff: {totalEffectiveOutputAmount.ToString(true, false)} NetwFee: {outputNetworkFee.ToString(true, false)} BatcPaym: {batchedPaymentAmount.ToString(true, false)}({batchedPayments})",
 			$"\tTotal diff : {totalDifference.ToString(true, false)}",
 			$"\tEffect diff : {effectiveDifference.ToString(true, false)}",
@@ -975,18 +975,17 @@ try{
 		using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, phaseTimeoutCts.Token);
 
 		var registeredCoins = registeredAliceClients.Select(x => x.SmartCoin.Coin);
-		var inputEffectiveValuesAndSizes = registeredAliceClients.Select(x => (x.EffectiveValue, x.SmartCoin.ScriptPubKey.EstimateInputVsize()));
-		var availableVsize = registeredAliceClients.SelectMany(x => x.IssuedVsizeCredentials).Sum(x => x.Value);
+		var availableVsizes = registeredAliceClients.SelectMany(x => x.IssuedVsizeCredentials.Where(y=>y.Value > 0)).Select(x => x.Value);
 
 		// Calculate outputs values
 		var constructionState = roundState.Assert<ConstructionState>();
 
 		var theirCoins = constructionState.Inputs.Where(x => !registeredCoins.Any(y => x.Outpoint == y.Outpoint));
 		var registeredCoinEffectiveValues = registeredAliceClients.Select(x => x.EffectiveValue);
-		var theirCoinEffectiveValues = theirCoins.Select(x => x.EffectiveValue(roundParameters.MiningFeeRate, roundParameters.CoordinationFeeRate));
-		var outputTxOuts = await OutputProvider.GetOutputs(roundId, roundParameters, registeredAliceClients, theirCoinEffectiveValues, (int) availableVsize).ConfigureAwait(false);
+		var theirCoinEffectiveValues = theirCoins.Select(x => x.EffectiveValue(roundParameters.MiningFeeRate));
+		var outputTxOuts = await OutputProvider.GetOutputs(roundId, roundParameters, registeredAliceClients, theirCoinEffectiveValues, (int) availableVsizes.Sum()).ConfigureAwait(false);
 
-		DependencyGraph dependencyGraph = DependencyGraph.ResolveCredentialDependencies(inputEffectiveValuesAndSizes, outputTxOuts.Item1, roundParameters.MiningFeeRate, roundParameters.MaxVsizeAllocationPerAlice);
+		DependencyGraph dependencyGraph = DependencyGraph.ResolveCredentialDependencies(registeredCoinEffectiveValues, outputTxOuts.Item1, roundParameters.MiningFeeRate,availableVsizes);
 		DependencyGraphTaskScheduler scheduler = new(dependencyGraph);
 
 		var combinedToken = linkedCts.Token;

@@ -2,6 +2,7 @@ using Microsoft.Extensions.Caching.Memory;
 using NBitcoin;
 using Nito.AsyncEx;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -9,11 +10,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using WalletWasabi.BitcoinCore;
 using WalletWasabi.BitcoinCore.Endpointing;
-using WalletWasabi.BitcoinCore.Mempool;
 using WalletWasabi.BitcoinCore.Monitoring;
 using WalletWasabi.BitcoinP2p;
 using WalletWasabi.Blockchain.Analysis.FeesEstimation;
-using WalletWasabi.Blockchain.BlockFilters;
 using WalletWasabi.Blockchain.Blocks;
 using WalletWasabi.Blockchain.Mempool;
 using WalletWasabi.Blockchain.TransactionBroadcasting;
@@ -75,7 +74,6 @@ public class Global
 
 		BitcoinStore = new BitcoinStore(IndexStore, AllTransactionStore, mempoolService, smartHeaderChain, blocks);
 		HttpClientFactory = BuildHttpClientFactory(() => Config.GetBackendUri());
-		CoordinatorHttpClientFactory = BuildHttpClientFactory(() => Config.GetCoordinatorUri());
 
 		HostedServices.Register<UpdateManager>(() => new UpdateManager(TimeSpan.FromDays(1), DataDir, Config.DownloadNewVersion, HttpClientFactory.NewHttpClient(Mode.DefaultCircuit, maximumRedirects: 10), HttpClientFactory.SharedWasabiClient), "Update Manager");
 		UpdateManager = HostedServices.Get<UpdateManager>();
@@ -129,12 +127,35 @@ public class Global
 			trustedFullNodeBlockProviders: trustedFullNodeBlockProviders,
 			new P2PBlockProvider(P2PNodesManager));
 
-        HostedServices.Register<UnconfirmedTransactionChainProvider>(() => new UnconfirmedTransactionChainProvider(HttpClientFactory), friendlyName: "Unconfirmed Transaction Chain Provider");
-        WalletFactory walletFactory = new(DataDir, config.Network, BitcoinStore, wasabiSynchronizer, config.ServiceConfiguration, HostedServices.Get<HybridFeeProvider>(), BlockDownloadService, HostedServices.Get<UnconfirmedTransactionChainProvider>());
-		WalletManager = new WalletManager(config.Network, DataDir, new WalletDirectories(Config.Network, DataDir), walletFactory);
-		TransactionBroadcaster = new TransactionBroadcaster(Network, BitcoinStore, HttpClientFactory, WalletManager);
+		if (Network != Network.RegTest)
+		{
+			HostedServices.Register<CpfpInfoProvider>(() => new CpfpInfoProvider(HttpClientFactory, Network), friendlyName: "CPFP Info Provider");
+		}
 
-		CoinPrison = CoinPrison.CreateOrLoadFromFile(DataDir);
+		WalletFactory walletFactory = new(
+			DataDir,
+			config.Network,
+			BitcoinStore,
+			wasabiSynchronizer,
+			config.ServiceConfiguration,
+			HostedServices.Get<HybridFeeProvider>(),
+			BlockDownloadService,
+			Network == Network.RegTest ? null : HostedServices.Get<CpfpInfoProvider>());
+
+		WalletManager = new WalletManager(config.Network, DataDir, new WalletDirectories(Config.Network, DataDir), walletFactory);
+		var p2p = HostedServices.Get<P2pNetwork>();
+		var broadcasters = new List<IBroadcaster>();
+		if (BitcoinCoreNode?.RpcClient is not null)
+		{
+			broadcasters.Add(new RpcBroadcaster(BitcoinCoreNode.RpcClient));
+		}
+		broadcasters.AddRange([
+			new NetworkBroadcaster(BitcoinStore.MempoolService, p2p.Nodes),
+			new BackendBroadcaster(HttpClientFactory)
+		]);
+
+		TransactionBroadcaster = new TransactionBroadcaster(broadcasters.ToArray(), BitcoinStore.MempoolService, WalletManager);
+
 		WalletManager.WalletStateChanged += WalletManager_WalletStateChanged;
 	}
 
@@ -154,7 +175,7 @@ public class Global
 	/// <summary>HTTP client factory for sending HTTP requests.</summary>
 	public WasabiHttpClientFactory HttpClientFactory { get; }
 
-	public WasabiHttpClientFactory CoordinatorHttpClientFactory { get; }
+	public WasabiHttpClientFactory? CoordinatorHttpClientFactory { get; private set; }
 
 	public string ConfigFilePath { get; }
 	public Config Config { get; }
@@ -173,7 +194,7 @@ public class Global
 	public Network Network => Config.Network;
 
 	public IMemoryCache Cache { get; private set; }
-	public CoinPrison CoinPrison { get; }
+	public CoinPrison? CoinPrison { get; private set; }
 	public JsonRpcServer? RpcServer { get; private set; }
 
 	public Uri? OnionServiceUri { get; private set; }
@@ -181,6 +202,7 @@ public class Global
 	private PersonCircuit RoundStateUpdaterCircuit { get; }
 	private AllTransactionStore AllTransactionStore { get; }
 	private IndexStore IndexStore { get; }
+
 
 	private WasabiHttpClientFactory BuildHttpClientFactory(Func<Uri> backendUriGetter) =>
 		new(
@@ -232,11 +254,14 @@ public class Global
 
 				await BlockDownloadService.StartAsync(cancel).ConfigureAwait(false);
 
-				RegisterCoinJoinComponents();
-
-				if (initializeSleepInhibitor)
+				if (Config.TryGetCoordinatorUri(out var coordinatorUri))
 				{
-					await CreateSleepInhibitorAsync().ConfigureAwait(false);
+					RegisterCoinJoinComponents(coordinatorUri);
+
+					if (initializeSleepInhibitor)
+					{
+						await CreateSleepInhibitorAsync().ConfigureAwait(false);
+					}
 				}
 
 				bool useTestApi = Network != Network.Main;
@@ -254,7 +279,6 @@ public class Global
 
 				Logger.LogInfo("Start synchronizing filters...");
 
-				TransactionBroadcaster.Initialize(HostedServices.Get<P2pNetwork>().Nodes, BitcoinCoreNode?.RpcClient);
 				CoinJoinProcessor = new CoinJoinProcessor(Network, HostedServices.Get<WasabiSynchronizer>(), WalletManager, BitcoinCoreNode?.RpcClient);
 
 				await StartRpcServerAsync(terminateService, cancel).ConfigureAwait(false);
@@ -377,15 +401,9 @@ public class Global
 
 	private void RegisterLocalNodeDependentComponents(CoreNode coreNode)
 	{
-		HostedServices.Register<BlockNotifier>(() => new BlockNotifier(TimeSpan.FromSeconds(7), coreNode.RpcClient, coreNode.P2pNode), "Block Notifier");
+		HostedServices.Register<BlockNotifier>(() => new BlockNotifier(coreNode.RpcClient, coreNode.P2pNode), "Block Notifier");
 		HostedServices.Register<RpcMonitor>(() => new RpcMonitor(TimeSpan.FromSeconds(7), coreNode.RpcClient), "RPC Monitor");
 		HostedServices.Register<RpcFeeProvider>(() => new RpcFeeProvider(TimeSpan.FromMinutes(1), coreNode.RpcClient, HostedServices.Get<RpcMonitor>()), "RPC Fee Provider");
-		if (!Config.BlockOnlyMode)
-		{
-			HostedServices.Register<MempoolMirror>(
-				() => new MempoolMirror(TimeSpan.FromSeconds(21), coreNode.RpcClient, coreNode.P2pNode),
-				"Full Node Mempool Mirror");
-		}
 	}
 
 	private void RegisterFeeRateProviders()
@@ -395,12 +413,17 @@ public class Global
 		HostedServices.Register<HybridFeeProvider>(() => new HybridFeeProvider(HostedServices.Get<ThirdPartyFeeProvider>(), HostedServices.GetOrDefault<RpcFeeProvider>()), "Hybrid Fee Provider");
 	}
 
-	private void RegisterCoinJoinComponents()
+	private void RegisterCoinJoinComponents(Uri coordinatorUri)
 	{
+		var prisonForCoordinator = Path.Combine(DataDir, coordinatorUri.Host);
+		CoinPrison = CoinPrison.CreateOrLoadFromFile(prisonForCoordinator);
+
+		CoordinatorHttpClientFactory = BuildHttpClientFactory(() => coordinatorUri);
+
 		Tor.Http.IHttpClient roundStateUpdaterHttpClient = CoordinatorHttpClientFactory.NewHttpClient(Mode.SingleCircuitPerLifetime, RoundStateUpdaterCircuit);
 		HostedServices.Register<RoundStateUpdater>(() => new RoundStateUpdater(TimeSpan.FromSeconds(10), new WabiSabiHttpApiClient(roundStateUpdaterHttpClient)), "Round info updater");
 
-		var coinJoinConfiguration = new CoinJoinConfiguration(Config.CoordinatorIdentifier, Config.MaxCoordinationFeeRate, Config.MaxCoinjoinMiningFeeRate, Config.AbsoluteMinInputCount, AllowSoloCoinjoining: false);
+		var coinJoinConfiguration = new CoinJoinConfiguration(Config.CoordinatorIdentifier, Config.MaxCoinjoinMiningFeeRate, Config.AbsoluteMinInputCount, AllowSoloCoinjoining: false);
 		HostedServices.Register<CoinJoinManager>(() => new CoinJoinManager(WalletManager, HostedServices.Get<RoundStateUpdater>(), CoordinatorHttpClientFactory, HostedServices.Get<WasabiSynchronizer>(), coinJoinConfiguration, CoinPrison), "CoinJoin Manager");
 	}
 
@@ -414,7 +437,7 @@ public class Global
 		}
 
 		var wallet = sender as Wallet ?? throw new InvalidOperationException($"The sender for {nameof(WalletManager.WalletStateChanged)} was not a Wallet.");
-		CoinPrison.UpdateWallet(wallet);
+		CoinPrison?.UpdateWallet(wallet);
 	}
 
 	public async Task DisposeAsync()
@@ -448,7 +471,10 @@ public class Global
 					Logger.LogError($"Error during {nameof(WalletManager.RemoveAndStopAllAsync)}: {ex}");
 				}
 
-				CoinPrison.Dispose();
+				if (CoinPrison is { } coinPrison)
+				{
+					coinPrison.Dispose();
+				}
 
 				if (RpcServer is { } rpcServer)
 				{
@@ -492,8 +518,11 @@ public class Global
 					Logger.LogInfo($"{nameof(HttpClientFactory)} is disposed.");
 				}
 
-				await CoordinatorHttpClientFactory.DisposeAsync().ConfigureAwait(false);
-				Logger.LogInfo($"{nameof(CoordinatorHttpClientFactory)} is disposed.");
+				if (CoordinatorHttpClientFactory is { } coordinatorHttpClientFactory)
+				{
+					await coordinatorHttpClientFactory.DisposeAsync().ConfigureAwait(false);
+					Logger.LogInfo($"{nameof(CoordinatorHttpClientFactory)} is disposed.");
+				}
 
 				if (BitcoinCoreNode is { } bitcoinCoreNode)
 				{

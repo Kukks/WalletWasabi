@@ -63,7 +63,6 @@ public class BuildTransactionReorgsTest : IClassFixture<RegTestFixture>
 		await using WasabiHttpClientFactory httpClientFactory = new(torEndPoint: null, backendUriGetter: () => new Uri(RegTestFixture.BackendEndPoint));
 		using WasabiSynchronizer synchronizer = new(period: TimeSpan.FromSeconds(3), 10000, bitcoinStore, httpClientFactory);
 		HybridFeeProvider feeProvider = new(synchronizer, null);
-		using UnconfirmedTransactionChainProvider unconfirmedChainProvider = new(httpClientFactory);
 
 		// 4. Create key manager service.
 		var keyManager = KeyManager.CreateNew(out _, password, network);
@@ -79,7 +78,7 @@ public class BuildTransactionReorgsTest : IClassFixture<RegTestFixture>
 			[specificNodeBlockProvider],
 			new P2PBlockProvider(network, nodes, httpClientFactory.IsTorEnabled));
 
-		WalletFactory walletFactory = new(workDir, network, bitcoinStore, synchronizer, serviceConfiguration, feeProvider, blockDownloadService, unconfirmedChainProvider);
+		WalletFactory walletFactory = new(workDir, network, bitcoinStore, synchronizer, serviceConfiguration, feeProvider, blockDownloadService);
 		WalletManager walletManager = new(network, workDir, new WalletDirectories(network, workDir), walletFactory);
 		walletManager.Initialize();
 
@@ -112,8 +111,7 @@ public class BuildTransactionReorgsTest : IClassFixture<RegTestFixture>
 
 			var coin = Assert.Single(wallet.Coins);
 			Assert.True(coin.Confirmed);
-			TransactionBroadcaster broadcaster = new(network, bitcoinStore, httpClientFactory, walletManager);
-			broadcaster.Initialize(nodes, rpc);
+			TransactionBroadcaster broadcaster = new([], bitcoinStore.MempoolService, walletManager);
 
 			// Send money before reorg.
 			PaymentIntent operations = new(scp, Money.Coins(0.011m));

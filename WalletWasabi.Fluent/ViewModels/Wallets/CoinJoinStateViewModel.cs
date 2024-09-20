@@ -10,6 +10,7 @@ using WalletWasabi.Fluent.Models.Wallets;
 using WalletWasabi.Fluent.State;
 using WalletWasabi.Fluent.ViewModels.Wallets.Settings;
 using WalletWasabi.WabiSabi.Backend.Rounds;
+using WalletWasabi.WabiSabi.Client;
 using WalletWasabi.WabiSabi.Client.CoinJoinProgressEvents;
 using WalletWasabi.WabiSabi.Client.StatusChangedEvents;
 
@@ -22,7 +23,6 @@ public partial class CoinJoinStateViewModel : ViewModelBase
 	private const string WaitingMessage = "Awaiting coinjoin";
 	private const string UneconomicalRoundMessage = "Awaiting cheaper coinjoins";
 	private const string RandomlySkippedRoundMessage = "Skipping a round for better privacy";
-	private const string CoordinationFeeRateTooHighMessage = "Coordination fee rate was too high";
 	private const string CoinjoinMiningFeeRateTooHighMessage = "Mining fee rate was too high";
 	private const string MinInputCountTooLowMessage = "Min input count was too low";
 	private const string PauseMessage = "Coinjoin is paused";
@@ -65,16 +65,17 @@ public partial class CoinJoinStateViewModel : ViewModelBase
 	[AutoNotify] private bool _isInCriticalPhase;
 	[AutoNotify] private bool _isCountDownDelayHappening;
 	[AutoNotify] private bool _areAllCoinsPrivate;
+	[AutoNotify] private bool _isCoinjoinSupported;
 
 	private DateTimeOffset _countDownStartTime;
 	private DateTimeOffset _countDownEndTime;
 
-	public CoinJoinStateViewModel(UiContext uiContext, IWalletModel wallet, WalletSettingsViewModel settings)
+	public CoinJoinStateViewModel(UiContext uiContext, IWalletModel wallet, IWalletCoinjoinModel walletCoinjoinModel, WalletSettingsViewModel settings)
 	{
 		UiContext = uiContext;
 		_wallet = wallet;
 
-		wallet.Coinjoin.StatusUpdated
+		walletCoinjoinModel.StatusUpdated
 					   .Do(ProcessStatusChange)
 					   .Subscribe();
 
@@ -118,7 +119,7 @@ public partial class CoinJoinStateViewModel : ViewModelBase
 			if (wallet.Settings.IsCoinjoinProfileSelected)
 			{
 				var overridePlebStop = _stateMachine.IsInState(State.PlebStopActive);
-				await wallet.Coinjoin.StartAsync(stopWhenAllMixed: !IsAutoCoinJoinEnabled, overridePlebStop);
+				await walletCoinjoinModel.StartAsync(stopWhenAllMixed: !IsAutoCoinJoinEnabled, overridePlebStop);
 			}
 		});
 
@@ -128,7 +129,7 @@ public partial class CoinJoinStateViewModel : ViewModelBase
 				x => x.PauseSpreading,
 				(isInCriticalPhase, pauseSpreading) => !isInCriticalPhase && !pauseSpreading);
 
-		StopPauseCommand = ReactiveCommand.CreateFromTask(wallet.Coinjoin.StopAsync, stopPauseCommandCanExecute);
+		StopPauseCommand = ReactiveCommand.CreateFromTask(walletCoinjoinModel.StopAsync, stopPauseCommandCanExecute);
 
 		AutoCoinJoinObservable = wallet.Settings.WhenAnyValue(x => x.AutoCoinjoin);
 
@@ -149,7 +150,8 @@ public partial class CoinJoinStateViewModel : ViewModelBase
 		_autoCoinJoinStartTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(Random.Shared.Next(5, 16)) };
 		_autoCoinJoinStartTimer.Tick += async (_, _) =>
 		{
-			await wallet.Coinjoin.StartAsync(stopWhenAllMixed: false, false);
+			await walletCoinjoinModel.StartAsync(stopWhenAllMixed: false, false);
+
 			_autoCoinJoinStartTimer.Stop();
 		};
 
@@ -176,6 +178,8 @@ public partial class CoinJoinStateViewModel : ViewModelBase
 				await mainViewModel.SettingsPage.ActivateCoordinatorTab();
 			}
 		});
+
+		IsCoinjoinSupported = _wallet.Coinjoin is not null;
 	}
 
 	private enum State
@@ -208,8 +212,6 @@ public partial class CoinJoinStateViewModel : ViewModelBase
 
 	public ICommand NavigateToExcludedCoinsCommand { get; }
 
-	public ICommand NavigateToCoordinatorSettingsCommand { get; }
-
 	public bool IsAutoCoinJoinEnabled => _wallet.Settings.AutoCoinjoin;
 
 	public IObservable<bool> AutoCoinJoinObservable { get; }
@@ -221,6 +223,7 @@ public partial class CoinJoinStateViewModel : ViewModelBase
 	public ICommand PlayCommand { get; }
 
 	public ICommand StopPauseCommand { get; }
+	public ICommand NavigateToCoordinatorSettingsCommand { get; }
 
 	private void ConfigureStateMachine()
 	{
@@ -385,7 +388,6 @@ public partial class CoinJoinStateViewModel : ViewModelBase
 					CoinjoinError.OnlyExcludedCoinsAvailable => OnlyExcludedCoinsAvailableMessage,
 					CoinjoinError.UneconomicalRound => UneconomicalRoundMessage,
 					CoinjoinError.RandomlySkippedRound => RandomlySkippedRoundMessage,
-					CoinjoinError.CoordinationFeeRateTooHigh => CoordinationFeeRateTooHighMessage,
 					CoinjoinError.MiningFeeRateTooHigh => CoinjoinMiningFeeRateTooHighMessage,
 					CoinjoinError.MinInputCountTooLow => MinInputCountTooLowMessage,
 					_ => GeneralErrorMessage

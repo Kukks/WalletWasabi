@@ -127,9 +127,6 @@ public class Config
 			[ nameof(CoordinatorIdentifier)] = (
 				"-",
 				GetStringValue("CoordinatorIdentifier", PersistentConfig.CoordinatorIdentifier, cliArgs)),
-			[ nameof(MaxCoordinationFeeRate)] = (
-				"Max coordination fee rate the client is willing to accept to participate into a round",
-				GetDecimalValue("MaxCoordinationFeeRate", PersistentConfig.MaxCoordinationFeeRate, cliArgs)),
 			[ nameof(MaxCoinjoinMiningFeeRate)] = (
 				"Max mining fee rate in s/vb the client is willing to pay to participate into a round",
 				GetDecimalValue("MaxCoinjoinMiningFeeRate", PersistentConfig.MaxCoinJoinMiningFeeRate, cliArgs)),
@@ -193,9 +190,6 @@ public class Config
 
 	public bool EnableGpu => GetEffectiveValue<BoolValue, bool>(nameof(EnableGpu));
 	public string CoordinatorIdentifier => GetEffectiveValue<StringValue, string>(nameof(CoordinatorIdentifier));
-	public decimal MaxCoordinationFeeRate => decimal.Min(
-		GetEffectiveValue<DecimalValue, decimal>(nameof(MaxCoordinationFeeRate)),
-		Constants.AbsoluteMaxCoordinationFeeRate);
 	public decimal MaxCoinjoinMiningFeeRate => GetEffectiveValue<DecimalValue, decimal>(nameof(MaxCoinjoinMiningFeeRate));
 	public int AbsoluteMinInputCount => int.Max(
 		GetEffectiveValue<IntValue, int>(nameof(AbsoluteMinInputCount)),
@@ -256,7 +250,7 @@ public class Config
 		throw new NotSupportedNetworkException(Network);
 	}
 
-	public Uri GetCoordinatorUri()
+	private Uri GetCoordinatorUri()
 	{
 		var result = Network switch
 		{
@@ -267,6 +261,21 @@ public class Config
 		};
 
 		return new Uri(result);
+	}
+
+	public bool TryGetCoordinatorUri([NotNullWhen(true)] out Uri? coordinatorUri)
+	{
+		try
+		{
+			coordinatorUri = GetCoordinatorUri();
+			return coordinatorUri.Host != "api.wasabiwallet.io" &&
+			       coordinatorUri.Host != "api.wasabiwallet.co";
+		}
+		catch (Exception e) when (e is UriFormatException or ArgumentException or NotSupportedNetworkException)
+		{
+			coordinatorUri = null;
+			return false;
+		}
 	}
 
 	public IEnumerable<(string ParameterName, string Hint)> GetConfigOptionsMetadata() =>

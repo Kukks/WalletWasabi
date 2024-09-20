@@ -63,7 +63,6 @@ public class SpendUnconfirmedTxTests : IClassFixture<RegTestFixture>
 		await using WasabiHttpClientFactory httpClientFactory = new(torEndPoint: null, backendUriGetter: () => new Uri(RegTestFixture.BackendEndPoint));
 		using WasabiSynchronizer synchronizer = new(period: TimeSpan.FromSeconds(3), 10000, bitcoinStore, httpClientFactory);
 		HybridFeeProvider feeProvider = new(synchronizer, null);
-		using UnconfirmedTransactionChainProvider unconfirmedChainProvider = new(httpClientFactory);
 
 		// 4. Create key manager service.
 		var keyManager = KeyManager.CreateNew(out _, password, network);
@@ -79,7 +78,7 @@ public class SpendUnconfirmedTxTests : IClassFixture<RegTestFixture>
 			[specificNodeBlockProvider],
 			new P2PBlockProvider(network, nodes, httpClientFactory.IsTorEnabled));
 
-		WalletFactory walletFactory = new(workDir, network, bitcoinStore, synchronizer, serviceConfiguration, feeProvider, blockDownloadService, unconfirmedChainProvider);
+		WalletFactory walletFactory = new(workDir, network, bitcoinStore, synchronizer, serviceConfiguration, feeProvider, blockDownloadService);
 		WalletManager walletManager = new(network, workDir, new WalletDirectories(network, workDir), walletFactory);
 		walletManager.Initialize();
 
@@ -115,9 +114,6 @@ public class SpendUnconfirmedTxTests : IClassFixture<RegTestFixture>
 			Assert.Equal(tx0Id, eventArgs.NewlyReceivedCoins.Single().TransactionId);
 			Assert.Single(wallet.Coins);
 
-			TransactionBroadcaster broadcaster = new(network, bitcoinStore, httpClientFactory, walletManager);
-			broadcaster.Initialize(nodes, rpc);
-
 			using Key key2 = new();
 			using Key key3 = new();
 			var destination1 = key.PubKey.GetAddress(ScriptPubKeyType.Segwit, Network.Main);
@@ -136,6 +132,8 @@ public class SpendUnconfirmedTxTests : IClassFixture<RegTestFixture>
 			eventAwaiter = new EventAwaiter<ProcessedResult>(
 				h => wallet.TransactionProcessor.WalletRelevantTransactionProcessed += h,
 				h => wallet.TransactionProcessor.WalletRelevantTransactionProcessed -= h);
+
+			TransactionBroadcaster broadcaster = new([new RpcBroadcaster(rpc)], bitcoinStore.MempoolService, walletManager);
 			await broadcaster.SendTransactionAsync(tx1Res.Transaction);
 			eventArgs = await eventAwaiter.WaitAsync(TimeSpan.FromSeconds(21));
 			Assert.Equal(tx0Id, eventArgs.NewlySpentCoins.Single().TransactionId);

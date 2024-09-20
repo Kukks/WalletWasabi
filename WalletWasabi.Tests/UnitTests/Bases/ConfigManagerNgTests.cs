@@ -52,8 +52,8 @@ public class ConfigManagerNgTests
 			  "MainNetBackendUri": "https://api.wasabiwallet.io/",
 			  "TestNetBackendUri": "https://api.wasabiwallet.co/",
 			  "RegTestBackendUri": "http://localhost:37127/",
-			  "MainNetCoordinatorUri": "https://api.wasabiwallet.io/",
-			  "TestNetCoordinatorUri": "https://api.wasabiwallet.co/",
+			  "MainNetCoordinatorUri": "",
+			  "TestNetCoordinatorUri": "",
 			  "RegTestCoordinatorUri": "http://localhost:37127/",
 			  "UseTor": "Enabled",
 			  "TerminateTorOnExit": false,
@@ -75,7 +75,6 @@ public class ConfigManagerNgTests
 			  "DustThreshold": "0.00005",
 			  "EnableGpu": true,
 			  "CoordinatorIdentifier": "CoinJoinCoordinatorIdentifier",
-			  "MaxCoordinationFeeRate": 0.0,
 			  "MaxCoinJoinMiningFeeRate": 150.0,
 			  "AbsoluteMinInputCount": 21,
 			  "ConfigVersion": 0

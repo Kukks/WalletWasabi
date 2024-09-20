@@ -21,17 +21,13 @@ using WalletWasabi.WabiSabi.Backend.Statistics;
 using WalletWasabi.WabiSabi.Client;
 using WalletWasabi.WabiSabi.Models;
 using WalletWasabi.WabiSabi.Models.MultipartyTransaction;
-using WalletWasabi.Wallets;
 using Xunit;
-using WalletWasabi.BitcoinCore.Mempool;
 using WalletWasabi.WabiSabi.Client.CoinJoin.Client;
 
 namespace WalletWasabi.Tests.UnitTests.WabiSabi.Client;
 
 public class ArenaClientTests
 {
-	public MempoolMirror DummyMempoolMirror { get; } = new(TimeSpan.Zero, null!, null!);
-
 	[Fact]
 	public async Task FullP2wpkhCoinjoinTestAsync()
 	{
@@ -196,7 +192,7 @@ public class ArenaClientTests
 
 		var amountsToRequest = new[]
 		{
-			Money.Coins(.75m) - round.Parameters.MiningFeeRate.GetFee(inputVirtualSize) - round.Parameters.CoordinationFeeRate.GetFee(Money.Coins(1m)),
+			Money.Coins(.75m) - round.Parameters.MiningFeeRate.GetFee(inputVirtualSize),
 			Money.Coins(.25m),
 		}.Select(x => x.Satoshi).ToArray();
 
