@@ -234,9 +234,10 @@ try{
 				// 	throw new CoinJoinClientException(CoinjoinError.RandomlySkippedRound, roundSkippedMessage);
 				// }
 			}
-
+			currentRoundState.LogInfo(_wallet, CoordinatorName, "coin candidates requested.");
 			coinCandidates = await coinCandidatesFunc().ConfigureAwait(false);
 
+			currentRoundState.LogInfo(_wallet, CoordinatorName, "coin candidates received.: " + coinCandidates.Candidates.Count());
 				var liquidityClue = LiquidityClueProvider.GetLiquidityClue(roundParameters.MaxSuggestedAmount);
 				// DestinationProvider
 				// var utxoSelectionParameters =
@@ -244,12 +245,18 @@ try{
 
 				if (CoinSelectionFunc is not null)
 				{
+
+					currentRoundState.LogInfo(_wallet, CoordinatorName, "coin selection function used.");
 					var x = await CoinSelectionFunc.SelectCoinsAsync(coinCandidates, roundParameters,
 						liquidityClue,
 						SecureRandom, CoordinatorName).ConfigureAwait(false);
+
+					currentRoundState.LogInfo(_wallet, CoordinatorName, "coin selection function returned.");
 					CoinsToRegister = x.selected;
 					Acceptor = x.acceptableRegistered;
 					OutputAcceptor = x.acceptableOutputs;
+
+					currentRoundState.LogInfo(_wallet, CoordinatorName, "c4");
 				}
 				else
 				{
@@ -258,6 +265,8 @@ try{
 							liquidityClue);
 				}
 
+
+				currentRoundState.LogInfo(_wallet, CoordinatorName, "c5");
 				if (!roundParameters.AllowedInputTypes.Contains(ScriptType.P2WPKH) ||
 				    !roundParameters.AllowedOutputTypes.Contains(ScriptType.P2WPKH))
 				{
