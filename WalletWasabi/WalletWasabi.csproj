@@ -27,19 +27,40 @@
 		</ItemGroup>
 	</Target>
 
-	<ItemGroup>
-		<!-- TODO: Workaround for incompatible package Microsoft.AspNetCore.Mvc.NewtonsoftJson -->
-		<PackageReference Include="Microsoft.AspNetCore.WebUtilities" />
-		<PackageReference Include="Microsoft.Extensions.Caching.Abstractions" />
-		<PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
-		<PackageReference Include="Microsoft.Extensions.Http" />
-		<PackageReference Include="NNostr.Client" />
-		<PackageReference Include="System.IO.Pipelines" />
-		<PackageReference Include="Microsoft.Data.Sqlite" />
-		<PackageReference Include="Microsoft.Win32.SystemEvents" />
-		<PackageReference Include="NBitcoin" />
-		<PackageReference Include="System.Text.Json" />
-		<PackageReference Include="WabiSabi" />
+	<ItemGroup><!-- TODO: Workaround for incompatible package Microsoft.AspNetCore.Mvc.NewtonsoftJson -->
+<!--		<PackageReference Include="Microsoft.AspNetCore.WebUtilities" />-->
+<!--		<PackageReference Include="Microsoft.Extensions.Caching.Abstractions" />-->
+<!--		<PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />-->
+<!--		<PackageReference Include="Microsoft.Extensions.Http" />-->
+<!--		<PackageReference Include="NNostr.Client" />-->
+<!--		<PackageReference Include="System.IO.Pipelines" />-->
+<!--		<PackageReference Include="Microsoft.Data.Sqlite" />-->
+<!--		<PackageReference Include="Microsoft.Win32.SystemEvents" />-->
+<!--		<PackageReference Include="NBitcoin" />-->
+<!--		<PackageReference Include="System.Text.Json" />-->
+<!--		<PackageReference Include="WabiSabi" />-->
+	
+	  <PackageReference Include="Microsoft.AspNetCore.WebUtilities" />
+	
+	  <PackageReference Include="Microsoft.Data.Sqlite.Core" />
+	
+	  <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" />
+	
+	  <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+	
+	  <PackageReference Include="Microsoft.Extensions.Http" />
+	
+	  <PackageReference Include="Microsoft.Win32.SystemEvents" />
+	
+	  <PackageReference Include="NBitcoin" />
+	
+	  <PackageReference Include="NBitcoin.Secp256k1" />
+	
+	  <PackageReference Include="Newtonsoft.Json" />
+	
+	  <PackageReference Include="NNostr.Client" />
+	
+	  <PackageReference Include="WabiSabi" />
 	</ItemGroup>
 
 	<ItemGroup>
