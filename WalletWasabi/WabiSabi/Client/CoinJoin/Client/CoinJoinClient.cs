@@ -171,6 +171,12 @@ public class CoinJoinClient
 			                                    $"the mining fee rate for the round was {roundState.CoinjoinState.Parameters.MiningFeeRate.SatoshiPerByte} sats/vb but maximum allowed is {CoinJoinConfiguration.MaxCoinJoinMiningFeeRate}.");
 		}
 
+		if (roundState.CoinjoinState.Parameters.MiningFeeRate.SatoshiPerByte > CoinJoinConfiguration.MaxCoinJoinMiningFeeRate)
+		{
+			throw new InvalidOperationException($"Blame Round ({roundState.Id}): Abandoning: " +
+			                                    $"the mining fee rate for the round was {roundState.CoinjoinState.Parameters.MiningFeeRate.SatoshiPerByte} sats/vb but maximum allowed is {CoinJoinConfiguration.MaxCoinJoinMiningFeeRate}.");
+		}
+
 		return roundState;
 	}
 

@@ -54,15 +54,14 @@ public class WabiSabiApiApplicationFactory<TStartup> : WebApplicationFactory<TSt
 			services.AddHostedService<BackgroundServiceStarter<Arena>>();
 			services.AddSingleton<Arena>();
 			services.AddSingleton(_ => Network.RegTest);
-			services.AddScoped<IRPCClient>(_ => BitcoinFactory.GetMockMinimalRpc());
-			services.AddScoped<Prison>(_ => WabiSabiFactory.CreatePrison());
-			services.AddScoped<WabiSabiConfig>();
-			services.AddScoped<RoundParameterFactory>();
-			services.AddScoped(typeof(TimeSpan), _ => TimeSpan.FromSeconds(2));
-			services.AddScoped(s => new CoinJoinScriptStore());
+			services.AddSingleton<IRPCClient>(_ => BitcoinFactory.GetMockMinimalRpc());
+			services.AddSingleton<Prison>(_ => WabiSabiFactory.CreatePrison());
+			services.AddSingleton<WabiSabiConfig>();
+			services.AddSingleton<RoundParameterFactory>();
+			services.AddSingleton(typeof(TimeSpan), _ => TimeSpan.FromSeconds(2));
+			services.AddSingleton(s => new CoinJoinScriptStore());
 			services.AddSingleton<CoinJoinFeeRateStatStore>();
 			services.AddHttpClient();
-			services.AddSingleton(s => new MempoolMirror(TimeSpan.Zero, null!, null!));
 		});
 		builder.ConfigureLogging(o => o.SetMinimumLevel(LogLevel.Warning));
 	}
