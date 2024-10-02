@@ -37,7 +37,7 @@ namespace WalletWasabi.WabiSabi.Client.CoinJoin.Client;
 
 public class CoinJoinClient
 {
-	private readonly IWallet? _wallet;
+	private readonly IWallet _wallet;
 	public  readonly string? CoordinatorName;
 
 	private static readonly Money MinimumOutputAmountSanity = Money.Coins(0.0001m); // ignore rounds with too big minimum denominations
@@ -51,7 +51,7 @@ public class CoinJoinClient
 
 	public CoinJoinClient(
 		IWasabiHttpClientFactory httpClientFactory,
-		IWallet? wallet,
+		IWallet wallet,
 		IKeyChain keyChain,
 		OutputProvider outputProvider,
 		RoundStateUpdater roundStatusUpdater,
@@ -103,6 +103,9 @@ public class CoinJoinClient
 
 		using CancellationTokenSource cts = new(MaxWaitingTimeForRound);
 		using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(token, cts.Token);
+		try
+		{
+
 
 		return await RoundStatusUpdater
 			.CreateRoundAwaiterAsync(
@@ -117,6 +120,13 @@ public class CoinJoinClient
 					&& roundState.Id != excludeRound,
 				linkedCts.Token)
 			.ConfigureAwait(false);
+		}
+		catch
+		{
+
+			_wallet.LogDebug(CoordinatorName, "Failed waiting for round");
+			throw;
+		}
 	}
 
 	private async Task<RoundState> WaitForBlameRoundAsync(uint256 blameRoundId, CancellationToken token)
@@ -191,6 +201,8 @@ public class CoinJoinClient
 
 	public async Task<CoinJoinResult?> StartCoinJoinAsync(Func<Task<(IEnumerable<SmartCoin> Candidates, IEnumerable<SmartCoin> Ineligible)>> coinCandidatesFunc, CancellationToken cancellationToken)
 	{
+
+
 		RoundState? currentRoundState;
 		uint256 excludeRound = uint256.Zero;
 		(IEnumerable<SmartCoin> Candidates, IEnumerable<SmartCoin> Ineligible) coinCandidates;
@@ -199,10 +211,12 @@ public class CoinJoinClient
 try{
 		do
 		{
+
 			// Sanity check if we would get coins at all otherwise this will throw.
 			await coinCandidatesFunc().ConfigureAwait(false);
 
 				currentRoundState = await WaitForRoundAsync(excludeRound, cancellationToken).ConfigureAwait(false);
+
 				CurrentRoundId = currentRoundState.Id;
 				RoundParameters roundParameters = currentRoundState.CoinjoinState.Parameters;
 
@@ -234,10 +248,7 @@ try{
 				// 	throw new CoinJoinClientException(CoinjoinError.RandomlySkippedRound, roundSkippedMessage);
 				// }
 			}
-			currentRoundState.LogInfo(_wallet, CoordinatorName, "coin candidates requested.");
 			coinCandidates = await coinCandidatesFunc().ConfigureAwait(false);
-
-			currentRoundState.LogInfo(_wallet, CoordinatorName, "coin candidates received.: " + coinCandidates.Candidates.Count());
 				var liquidityClue = LiquidityClueProvider.GetLiquidityClue(roundParameters.MaxSuggestedAmount);
 				// DestinationProvider
 				// var utxoSelectionParameters =
@@ -245,18 +256,12 @@ try{
 
 				if (CoinSelectionFunc is not null)
 				{
-
-					currentRoundState.LogInfo(_wallet, CoordinatorName, "coin selection function used.");
 					var x = await CoinSelectionFunc.SelectCoinsAsync(coinCandidates, roundParameters,
 						liquidityClue,
 						SecureRandom, CoordinatorName).ConfigureAwait(false);
-
-					currentRoundState.LogInfo(_wallet, CoordinatorName, "coin selection function returned.");
 					CoinsToRegister = x.selected;
 					Acceptor = x.acceptableRegistered;
 					OutputAcceptor = x.acceptableOutputs;
-
-					currentRoundState.LogInfo(_wallet, CoordinatorName, "c4");
 				}
 				else
 				{
@@ -264,9 +269,7 @@ try{
 						CoinJoinCoinSelector.SelectCoinsForRound(coinCandidates.Candidates, roundParameters,
 							liquidityClue);
 				}
-
-
-				currentRoundState.LogInfo(_wallet, CoordinatorName, "c5");
+				
 				if (!roundParameters.AllowedInputTypes.Contains(ScriptType.P2WPKH) ||
 				    !roundParameters.AllowedOutputTypes.Contains(ScriptType.P2WPKH))
 				{
