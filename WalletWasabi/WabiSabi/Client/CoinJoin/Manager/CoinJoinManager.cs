@@ -593,7 +593,7 @@ public class CoinJoinManager : BackgroundService
 			// temporarily we are shortening the circuit by aborting the rounds if
 			// there are Alices that didn't confirm.
 			// The fix is already done but the clients have to upgrade.
-			wallet.LogInfo(CoordinatorName, $"{nameof(CoinJoinClient)} failed with exception: '{e}'");
+			wallet.LogInfo(CoordinatorName, $"{nameof(CoinJoinClient)} failed with exception:  '{e}\n {e.StackTrace}'");
 		}
 		catch (WabiSabiProtocolException wpe) when (wpe.ErrorCode == WabiSabiProtocolErrorCode.WrongPhase)
 		{
@@ -602,7 +602,7 @@ public class CoinJoinManager : BackgroundService
 		}
 		catch (Exception e)
 		{
-			wallet.LogError(CoordinatorName, $"{nameof(CoinJoinClient)} failed with exception: '{e}'");
+			wallet.LogError(CoordinatorName, $"{nameof(CoinJoinClient)} failed with exception: '{e}\n {e.StackTrace}'");
 		}
 
 		// If any coins were marked for banning, store them to file
